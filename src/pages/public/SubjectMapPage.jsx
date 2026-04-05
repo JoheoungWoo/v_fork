@@ -1,19 +1,31 @@
-import { useEffect, useState } from "react";
 import apiClient from "@/api/core/apiClient";
 import FullMapGraph from "@/components/graph/FullMapGraph";
+import { useEffect, useState } from "react";
 
 // 수식 렌더링 라이브러리
-import "katex/dist/katex.min.css";
 import { Latex } from "@/components/public/Latex";
+import "katex/dist/katex.min.css";
 
 // 아이콘 라이브러리
-import { BookOpen, Calculator, PenTool, Play, X } from "lucide-react";
 import useMove from "@/hooks/useMove";
+import { BookOpen, Calculator, PenTool, Play, X } from "lucide-react";
 
 // ----------------------------------------------------------------------
 // 1. 과목 상수 데이터 (SUBJECTS)
 // ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+// 1. 과목 상수 데이터 (SUBJECTS) - 💡 기초수학 추가 완료!
+// ----------------------------------------------------------------------
 const SUBJECTS = [
+  {
+    id: "기초수학", // 백엔드 DB 과목명과 일치해야 합니다
+    label: "기초수학",
+    icon: "📐",
+    color: "from-pink-500 to-rose-500",
+    borderColor: "border-pink-500",
+    bgColor: "bg-pink-500",
+    themeColor: "#ec4899",
+  },
   {
     id: "전기자기학",
     label: "전기자기학",
@@ -70,14 +82,17 @@ const SUBJECTS = [
   },
 ];
 
-// ✅ [추가됨] 노드 이름과 실제 강의 ID 매핑 객체
+// ✅ 노드 이름과 실제 강의 ID 매핑 객체 (기초수학 연결 고리 추가)
 const NODE_TO_LECTURE_MAP = {
   "옴의 법칙 (Ohm's Law)": "circuit_ohm_law_equivalent",
   "옴의 법칙": "circuit_ohm_law_equivalent",
   "병렬연결 (Parallel Connection)": "circuit_ohm_law_equivalent",
   "직렬 회로": "circuit_resistance",
   "Y-Δ 변환": "circuit_ydelta",
-  // 필요한 강의 매핑을 여기에 계속 추가하세요.
+  // 💡 기초수학 노드 매핑 추가 (DB에 있는 노드명과 영상 ID 매핑)
+  삼각함수: "c3d27bab5e1cf6ae9f07f70ae08c1e26",
+  미분: "c44dc0cd81fbb02320299a7bff062e4d",
+  "벡터 내적": "201092af306ff8cb381808e4c3f45e0c",
 };
 
 export default function SubjectMapPage() {
