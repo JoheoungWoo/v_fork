@@ -12,15 +12,13 @@ import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import VideoPlayerList from "@/components/video/VideoPlayList";
 
-// 💡 대표님께서 만드신 위젯 맵 Import (경로를 확인해 주세요!)
-import WIDGET_MAP from "./WIDGET_MAP";
-
 import {
   circuitLectures,
   emLectures,
   mathLectures,
   visionLectures,
 } from "@/constants/videoData";
+import WIDGET_MAP from "@/utils/widgetData";
 
 // ==========================================
 // 💡 커스텀 Katex 컴포넌트
