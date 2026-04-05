@@ -1,18 +1,21 @@
 import apiClient from "@/api/core/apiClient";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { Loader2, MoveLeft, Sparkles } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  MoveLeft,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-// 컴포넌트 Import
 import QnaCard from "@/components/quiz/QnaCard";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
 import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import VideoPlayerList from "@/components/video/VideoPlayList";
-
-// 💡 위젯 데이터 맵 Import
 import WIDGET_MAP from "@/utils/widgetData";
 
 import {
@@ -23,16 +26,43 @@ import {
 } from "@/constants/videoData";
 
 // ==========================================
-// 💡 커스텀 Katex 컴포넌트
+// 💡 1. 무적의 수식 렌더링 도구 모음 (이중 이스케이프 및 $ 기호 완벽 방어)
 // ==========================================
+const KatexInline = ({ math }) => {
+  if (!math) return null;
+  const cleanMath = String(math).replace(/\\\\/g, "\\"); // 백엔드 JSON 이중 백슬래시 제거
+  const html = katex.renderToString(cleanMath, { throwOnError: false });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
 const KatexBlock = ({ math }) => {
   if (!math) return null;
-  const html = katex.renderToString(String(math), {
+  const cleanMath = String(math).replace(/\\\\/g, "\\");
+  const html = katex.renderToString(cleanMath, {
     throwOnError: false,
     displayMode: true,
   });
   return <div dangerouslySetInnerHTML={{ __html: html }} />;
 };
+
+// 문장 중간에 섞인 $수식$ 을 감지하여 텍스트와 분리해주는 마법의 컴포넌트
+const MixedText = ({ text }) => {
+  if (!text) return null;
+  const parts = String(text).split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
+  return (
+    <span>
+      {parts.map((part, i) => {
+        if (part.startsWith("$$") && part.endsWith("$$")) {
+          return <KatexBlock key={i} math={part.slice(2, -2)} />;
+        } else if (part.startsWith("$") && part.endsWith("$")) {
+          return <KatexInline key={i} math={part.slice(1, -1)} />;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+};
+// ==========================================
 
 const ALL_LECTURES = [
   ...mathLectures,
@@ -48,8 +78,12 @@ export default function AiVideoWatch() {
   const [videoInfo, setVideoInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("quiz");
+
   const [problemData, setProblemData] = useState(null);
   const [isFetchingProblem, setIsFetchingProblem] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [showSolution, setShowSolution] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(null);
 
   const localVideoData = ALL_LECTURES.find((l) => l.id === id);
   const isVision = id.startsWith("vision_");
@@ -59,18 +93,9 @@ export default function AiVideoWatch() {
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${id}`);
-
-        // 💡 1. 백엔드 데이터와 로컬 데이터를 합칩니다.
-        // 콘솔에 찍힌 'widget_type'을 우선적으로 챙깁니다.
-        const merged = {
-          ...localVideoData, // 기본 로컬 데이터
-          ...res.data, // 백엔드 실시간 데이터 (widget_type 포함)
-        };
-
-        console.log("🚀 최종 병합된 데이터:", merged);
+        const merged = { ...localVideoData, ...res.data };
         setVideoInfo(merged);
       } catch (error) {
-        console.warn("API 호출 실패, 로컬 데이터를 사용합니다.");
         setVideoInfo(localVideoData);
       } finally {
         setLoading(false);
@@ -78,10 +103,13 @@ export default function AiVideoWatch() {
     };
 
     setProblemData(null);
+    setSelectedIndex(null);
+    setShowSolution(false);
+    setIsCorrect(null);
+
     if (id) fetchVideoData();
   }, [id, localVideoData]);
 
-  // 💡 2. 위젯 컴포넌트를 찾는 로직 (widget_type 필드 엄격 체크)
   const WidgetComponent = useMemo(() => {
     const type = videoInfo?.widget_type || videoInfo?.widgetType;
     if (!type) return null;
@@ -90,17 +118,36 @@ export default function AiVideoWatch() {
 
   const handleFetchProblem = async () => {
     setIsFetchingProblem(true);
+    setSelectedIndex(null);
+    setShowSolution(false);
+    setIsCorrect(null);
+
     try {
-      const endpoint = id.includes("circuit")
-        ? "/api/circuit/random"
-        : "/api/math/random";
-      const res = await apiClient.get(`${endpoint}?type=${id}`);
-      setProblemData(res.data);
+      let newData = null;
+      if (videoInfo && videoInfo.generator) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        newData = videoInfo.generator();
+      } else {
+        const endpoint = id.includes("circuit")
+          ? "/api/circuit/random"
+          : "/api/math/random";
+        const res = await apiClient.get(`${endpoint}?type=${id}`);
+        newData = res.data;
+      }
+      setProblemData(newData);
     } catch (e) {
-      alert("문제를 가져오는데 실패했습니다.");
+      alert("백엔드에서 문제를 가져오는데 실패했습니다.");
     } finally {
       setIsFetchingProblem(false);
     }
+  };
+
+  const handleChoiceClick = (index) => {
+    if (showSolution) return;
+    const correct = index === problemData.correct_index;
+    setSelectedIndex(index);
+    setIsCorrect(correct);
+    setShowSolution(true);
   };
 
   if (loading)
@@ -116,6 +163,14 @@ export default function AiVideoWatch() {
         영상을 찾을 수 없습니다.
       </div>
     );
+
+  const problemText =
+    problemData?.problem || problemData?.question || problemData?.problem_latex;
+  const answerText = problemData?.answer || problemData?.correct_answer;
+  const stepsList = problemData?.steps || problemData?.explanation || [];
+  const imageUrl =
+    problemData?.image || problemData?.image_url || problemData?.image_base64;
+  const choices = problemData?.choices || [];
 
   return (
     <main className="pt-24 pb-12 px-6 max-w-7xl mx-auto font-body">
@@ -151,7 +206,6 @@ export default function AiVideoWatch() {
                   실전 퀴즈
                 </button>
 
-                {/* 💡 3. 위젯 탭 노출 조건 강화 */}
                 {WidgetComponent && (
                   <button
                     className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400"}`}
@@ -177,39 +231,156 @@ export default function AiVideoWatch() {
 
               {activeTab === "quiz" && (
                 <div className="mt-8 text-center">
-                  <button
-                    onClick={handleFetchProblem}
-                    disabled={isFetchingProblem}
-                    className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md ${isFetchingProblem ? "bg-gray-400" : "bg-[#0047a5] text-white"}`}
-                  >
-                    {isFetchingProblem
-                      ? "⏳ 문제 생성 중..."
-                      : "🎯 랜덤 문제 가져오기"}
-                  </button>
+                  <div className="mb-8">
+                    <button
+                      onClick={handleFetchProblem}
+                      disabled={isFetchingProblem}
+                      className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md ${isFetchingProblem ? "bg-gray-400" : "bg-[#0047a5] text-white"}`}
+                    >
+                      {isFetchingProblem
+                        ? "⏳ 문제 생성 중..."
+                        : "🎯 랜덤 문제 가져오기"}
+                    </button>
+                  </div>
+
                   {problemData && (
-                    <div className="mt-8 p-8 bg-white border rounded-2xl shadow-sm text-left">
-                      {(problemData.image || problemData.image_url) && (
-                        <div className="mb-6 flex justify-center bg-gray-50 p-4 rounded-xl border">
+                    <div className="mt-8 p-8 bg-white border border-gray-100 rounded-3xl shadow-xl text-left">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                          📝 실전 테스트
+                        </h3>
+                        {showSolution && (
+                          <div
+                            className={`flex items-center gap-2 font-black text-xl ${isCorrect ? "text-green-600" : "text-red-600"}`}
+                          >
+                            {isCorrect ? (
+                              <>
+                                <CheckCircle2 size={28} /> 정답입니다!
+                              </>
+                            ) : (
+                              <>
+                                <XCircle size={28} /> 아쉬워요!
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {imageUrl && (
+                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 flex justify-center">
                           <img
                             src={
-                              problemData.image
-                                ? `data:image/png;base64,${problemData.image}`
-                                : problemData.image_url
+                              imageUrl.startsWith("data:") ||
+                              imageUrl.startsWith("http")
+                                ? imageUrl
+                                : `data:image/png;base64,${imageUrl}`
                             }
-                            alt="그래프"
-                            className="max-w-full h-auto"
+                            alt="문제 이미지"
+                            className="max-w-full h-auto rounded-lg shadow-sm"
                           />
                         </div>
                       )}
-                      <KatexBlock
-                        math={problemData.problem || problemData.problem_latex}
-                      />
+
+                      {/* 💡 문제 지문 출력 (KatexBlock 사용) */}
+                      {problemText && (
+                        <div className="mb-10 text-xl text-gray-800 font-bold leading-relaxed px-2 flex justify-center overflow-x-auto">
+                          <KatexBlock math={problemText} />
+                        </div>
+                      )}
+
+                      {/* 4지 선다 버튼 영역 */}
+                      {choices.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+                          {choices.map((choice, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleChoiceClick(index)}
+                              disabled={showSolution}
+                              className={`p-6 text-left rounded-2xl border-2 transition-all flex items-center gap-4 group ${
+                                selectedIndex === index
+                                  ? isCorrect
+                                    ? "border-green-500 bg-green-50"
+                                    : "border-red-500 bg-red-50"
+                                  : showSolution &&
+                                      index === problemData.correct_index
+                                    ? "border-green-500 bg-green-50"
+                                    : "border-gray-200 hover:border-[#0047a5] hover:shadow-md"
+                              }`}
+                            >
+                              <span
+                                className={`w-10 h-10 flex items-center justify-center rounded-full font-black shrink-0 ${
+                                  selectedIndex === index
+                                    ? "bg-white text-gray-900"
+                                    : "bg-gray-100 text-gray-500 group-hover:bg-[#0047a5] group-hover:text-white"
+                                }`}
+                              >
+                                {index + 1}
+                              </span>
+                              <span className="text-lg font-bold">
+                                <MixedText text={choice} />
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 단계별 해설 영역 */}
+                      {showSolution && stepsList.length > 0 && (
+                        <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-200 animate-slide-up">
+                          <h4 className="text-xl font-black text-[#0047a5] mb-6 flex items-center gap-2">
+                            💡 전문가의 상세 풀이
+                          </h4>
+                          <div className="space-y-4">
+                            {stepsList.map((step, idx) => (
+                              <div
+                                key={idx}
+                                className="flex gap-4 items-start bg-blue-50/50 p-6 rounded-2xl border border-blue-100/50"
+                              >
+                                <span className="bg-[#0047a5] text-white font-black w-8 h-8 flex items-center justify-center rounded-lg shrink-0 mt-1">
+                                  {idx + 1}
+                                </span>
+                                <div className="mt-1 w-full">
+                                  {/* 💡 혼합 텍스트($ 기호) 자동 분리 렌더링 적용! */}
+                                  <p className="text-gray-700 font-bold mb-3 leading-relaxed">
+                                    <MixedText
+                                      text={
+                                        typeof step === "string"
+                                          ? step
+                                          : step.text || step.description
+                                      }
+                                    />
+                                  </p>
+                                  {(step.math || step.formula) && (
+                                    <div className="bg-white p-4 rounded-xl shadow-sm overflow-x-auto">
+                                      <KatexBlock
+                                        math={step.math || step.formula}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* 최종 정답 출력 */}
+                          {answerText && (
+                            <div className="mt-10 p-8 bg-[#0047a5] text-white rounded-3xl text-center shadow-lg">
+                              <p className="text-blue-200 text-sm font-black mb-2 uppercase tracking-widest">
+                                Final Answer
+                              </p>
+                              <div className="text-4xl font-black overflow-x-auto">
+                                <KatexBlock math={answerText} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* 💡 4. 실습 위젯 렌더링 영역 */}
+              {/* 실습 위젯 렌더링 영역 */}
               {activeTab === "widget" && WidgetComponent && (
                 <div className="mt-8 p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 min-h-[500px]">
                   <Suspense
