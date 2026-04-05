@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-tertiary: #4e2200;
+  --color-surface-container-highest: #e4e2e1;
+  --color-primary-fixed: #dae2ff;
+  --color-background: #fbf9f8;
+  --color-on-tertiary-fixed-variant: #743500;
+  --color-surface: #fbf9f8;
+  --color-tertiary-container: #703300;
+  --color-surface-container-low: #f5f3f3;
+  --color-inverse-surface: #303030;
+  --color-on-background: #1b1c1c;
+  --color-inverse-on-surface: #f2f0f0;
+  --color-surface-bright: #fbf9f8;
+  --color-error: #ba1a1a;
+  --color-surface-container-lowest: #ffffff;
+  --color-tertiary-fixed: #ffdbc8;
+  --color-on-primary: #ffffff;
+  --color-on-secondary: #ffffff;
+  --color-secondary: #006d34;
+  --color-outline-variant: #c4c6d3;
+  --color-secondary-fixed: #75fd9b;
+  --color-primary-container: #1e418a;
+  --color-on-tertiary-fixed: #311300;
+  --color-on-error-container: #93000a;
+  --color-error-container: #ffdad6;
+  --color-secondary-container: #75fd9b;
+  --color-primary: #002a6e;
+  --color-on-surface-variant: #444651;
+  --color-surface-container-high: #eae8e7;
+  --color-surface-dim: #dcd9d9;
+  --color-on-primary-container: #93b0ff;
+  --color-on-error: #ffffff;
+  --color-on-primary-fixed: #001847;
+  --color-tertiary-fixed-dim: #ffb689;
+  --color-inverse-primary: #b2c5ff;
+  --color-surface-variant: #e4e2e1;
+  --color-surface-container: #f0eded;
+  --color-outline: #747782;
+  --color-on-secondary-container: #007437;
+  --color-primary-fixed-dim: #b2c5ff;
+  --color-on-primary-fixed-variant: #21438c;
+  --color-on-surface: #1b1c1c;
+  --color-on-secondary-fixed-variant: #005225;
+  --color-on-tertiary-container: #ff9953;
+  --color-secondary-fixed-dim: #56e082;
+  --color-on-secondary-fixed: #00210b;
+  --color-surface-tint: #3c5ba6;
+
+  /* Fonts */
+  --font-headline: "Public Sans", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
+
+/* 아래는 커스텀 유틸리티 클래스 추가 (필요시) */
+@layer utilities {
+  .text-3060 {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+  @media (min-width: 768px) {
+    .text-3060 {
+      font-size: 1.25rem;
+      line-height: 2rem;
+    }
+  }
+}
