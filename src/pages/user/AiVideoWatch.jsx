@@ -8,15 +8,15 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+// 컴포넌트 Import
 import QnaCard from "@/components/quiz/QnaCard";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
 import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import VideoPlayerList from "@/components/video/VideoPlayList";
-import WIDGET_MAP from "@/utils/widgetData";
 
 import {
   circuitLectures,
@@ -26,11 +26,44 @@ import {
 } from "@/constants/videoData";
 
 // ==========================================
-// 💡 1. 무적의 수식 렌더링 도구 모음 (이중 이스케이프 및 $ 기호 완벽 방어)
+// 💡 1. WIDGET_MAP 완전 내장 (경로 에러 원천 차단!)
+// ==========================================
+const WIDGET_MAP = {
+  trig_circle: lazy(
+    () => import("@/components/animations/InteractiveUnitCircle"),
+  ),
+  ohms_law: lazy(
+    () => import("@/components/animations/ParallelResistanceWidget"),
+  ),
+  y_delta_converter: lazy(
+    () => import("@/components/animations/YDeltaConverterWidget"),
+  ),
+  coulombs_law: lazy(() => import("@/components/animations/CoulombsLaw3DPage")),
+  rotating_field: lazy(
+    () => import("@/components/animations/RotatingMagneticFieldWidget"),
+  ),
+  dc_rectifier: lazy(
+    () => import("@/components/animations/DcRectificationWidget"),
+  ),
+  equipotential: lazy(
+    () => import("@/components/animations/Equipotential3DWidget"),
+  ),
+  ampere_law: lazy(() => import("@/components/animations/AmpereLawWidget")),
+  parabolaWidget: lazy(
+    () => import("@/components/animations/ParabolaIntersection"),
+  ),
+  vectorInnerProject: lazy(
+    () => import("@/components/animations/VectorInnerProductWidget"),
+  ),
+  derivative: lazy(() => import("@/components/animations/DerivativeWidget")),
+};
+
+// ==========================================
+// 💡 2. 무적의 수식 렌더링 도구 모음
 // ==========================================
 const KatexInline = ({ math }) => {
   if (!math) return null;
-  const cleanMath = String(math).replace(/\\\\/g, "\\"); // 백엔드 JSON 이중 백슬래시 제거
+  const cleanMath = String(math).replace(/\\\\/g, "\\");
   const html = katex.renderToString(cleanMath, { throwOnError: false });
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 };
@@ -45,7 +78,6 @@ const KatexBlock = ({ math }) => {
   return <div dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
-// 문장 중간에 섞인 $수식$ 을 감지하여 텍스트와 분리해주는 마법의 컴포넌트
 const MixedText = ({ text }) => {
   if (!text) return null;
   const parts = String(text).split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
@@ -93,6 +125,7 @@ export default function AiVideoWatch() {
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${id}`);
+        // 💡 콘솔에 찍힌 API 데이터(res.data)를 로컬 데이터와 덮어씌웁니다.
         const merged = { ...localVideoData, ...res.data };
         setVideoInfo(merged);
       } catch (error) {
@@ -110,6 +143,7 @@ export default function AiVideoWatch() {
     if (id) fetchVideoData();
   }, [id, localVideoData]);
 
+  // 💡 3. 위젯 맵 연결 (이제 무조건 인식됩니다!)
   const WidgetComponent = useMemo(() => {
     const type = videoInfo?.widget_type || videoInfo?.widgetType;
     if (!type) return null;
@@ -200,15 +234,16 @@ export default function AiVideoWatch() {
             <section className="scroll-mt-24">
               <div className="flex border-b border-gray-200 mt-8 mb-2">
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
                   onClick={() => setActiveTab("quiz")}
                 >
                   실전 퀴즈
                 </button>
 
+                {/* 🌟 위젯 탭이 드디어 등장합니다! */}
                 {WidgetComponent && (
                   <button
-                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400"}`}
+                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400 hover:text-gray-600"}`}
                     onClick={() => setActiveTab("widget")}
                   >
                     <Sparkles
@@ -222,7 +257,7 @@ export default function AiVideoWatch() {
                 )}
 
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
                   onClick={() => setActiveTab("qna")}
                 >
                   질문 및 A/S
@@ -235,16 +270,16 @@ export default function AiVideoWatch() {
                     <button
                       onClick={handleFetchProblem}
                       disabled={isFetchingProblem}
-                      className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md ${isFetchingProblem ? "bg-gray-400" : "bg-[#0047a5] text-white"}`}
+                      className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md transition-all active:scale-[0.98] ${isFetchingProblem ? "bg-gray-400 text-white cursor-not-allowed animate-pulse" : "bg-[#0047a5] text-white hover:bg-blue-800"}`}
                     >
                       {isFetchingProblem
-                        ? "⏳ 문제 생성 중..."
+                        ? "⏳ 문제를 만드는 중..."
                         : "🎯 랜덤 문제 가져오기"}
                     </button>
                   </div>
 
                   {problemData && (
-                    <div className="mt-8 p-8 bg-white border border-gray-100 rounded-3xl shadow-xl text-left">
+                    <div className="mt-8 p-8 bg-white border border-gray-100 rounded-3xl shadow-xl animate-fade-in text-left">
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
                           📝 실전 테스트
@@ -270,25 +305,23 @@ export default function AiVideoWatch() {
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 flex justify-center">
                           <img
                             src={
-                              imageUrl.startsWith("data:") ||
-                              imageUrl.startsWith("http")
+                              String(imageUrl).startsWith("http") ||
+                              String(imageUrl).startsWith("data:")
                                 ? imageUrl
                                 : `data:image/png;base64,${imageUrl}`
                             }
-                            alt="문제 이미지"
+                            alt="그래프"
                             className="max-w-full h-auto rounded-lg shadow-sm"
                           />
                         </div>
                       )}
 
-                      {/* 💡 문제 지문 출력 (KatexBlock 사용) */}
                       {problemText && (
                         <div className="mb-10 text-xl text-gray-800 font-bold leading-relaxed px-2 flex justify-center overflow-x-auto">
                           <KatexBlock math={problemText} />
                         </div>
                       )}
 
-                      {/* 4지 선다 버튼 영역 */}
                       {choices.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
                           {choices.map((choice, index) => (
@@ -324,7 +357,6 @@ export default function AiVideoWatch() {
                         </div>
                       )}
 
-                      {/* 단계별 해설 영역 */}
                       {showSolution && stepsList.length > 0 && (
                         <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-200 animate-slide-up">
                           <h4 className="text-xl font-black text-[#0047a5] mb-6 flex items-center gap-2">
@@ -339,8 +371,7 @@ export default function AiVideoWatch() {
                                 <span className="bg-[#0047a5] text-white font-black w-8 h-8 flex items-center justify-center rounded-lg shrink-0 mt-1">
                                   {idx + 1}
                                 </span>
-                                <div className="mt-1 w-full">
-                                  {/* 💡 혼합 텍스트($ 기호) 자동 분리 렌더링 적용! */}
+                                <div className="mt-1 w-full overflow-hidden">
                                   <p className="text-gray-700 font-bold mb-3 leading-relaxed">
                                     <MixedText
                                       text={
@@ -362,7 +393,6 @@ export default function AiVideoWatch() {
                             ))}
                           </div>
 
-                          {/* 최종 정답 출력 */}
                           {answerText && (
                             <div className="mt-10 p-8 bg-[#0047a5] text-white rounded-3xl text-center shadow-lg">
                               <p className="text-blue-200 text-sm font-black mb-2 uppercase tracking-widest">
@@ -380,13 +410,16 @@ export default function AiVideoWatch() {
                 </div>
               )}
 
-              {/* 실습 위젯 렌더링 영역 */}
+              {/* 🌟 실습 위젯 렌더링 영역 */}
               {activeTab === "widget" && WidgetComponent && (
                 <div className="mt-8 p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 min-h-[500px]">
                   <Suspense
                     fallback={
                       <div className="flex h-64 items-center justify-center">
-                        <Loader2 className="animate-spin text-[#0047a5]" />
+                        <Loader2
+                          className="animate-spin text-[#0047a5]"
+                          size={32}
+                        />
                       </div>
                     }
                   >
