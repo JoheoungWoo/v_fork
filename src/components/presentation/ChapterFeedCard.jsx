@@ -1,7 +1,28 @@
-import React from "react";
-import { BlockMath } from "react-katex";
-import "katex/dist/katex.min.css"; 
-import { BookOpen, Calculator, FileText, Star, PlayCircle, PenTool } from "lucide-react";
+import katex from "katex";
+import {
+  BookOpen,
+  Calculator,
+  FileText,
+  PenTool,
+  PlayCircle,
+  Star,
+} from "lucide-react";
+
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
 const ChapterFeedCard = ({ item }) => {
   const concepts = item.concepts || [];
@@ -29,9 +50,9 @@ const ChapterFeedCard = ({ item }) => {
         {/* 기능 버튼 (Gold Topic일 때 등) */}
         <div className="flex gap-2">
           {item.lecture_url && (
-            <a 
-              href={item.lecture_url} 
-              target="_blank" 
+            <a
+              href={item.lecture_url}
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-sm font-bold"
             >
@@ -39,9 +60,9 @@ const ChapterFeedCard = ({ item }) => {
             </a>
           )}
           {item.quiz_url && (
-            <a 
-              href={item.quiz_url} 
-              target="_blank" 
+            <a
+              href={item.quiz_url}
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-4 py-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors text-sm font-bold"
             >
@@ -92,8 +113,8 @@ const ChapterFeedCard = ({ item }) => {
                   </div>
                   <div className="space-y-6">
                     {concept.formulas.map((formula, fIdx) => (
-                      <div 
-                        key={fIdx} 
+                      <div
+                        key={fIdx}
                         className="bg-white rounded-xl border border-amber-200 p-4 shadow-sm overflow-x-auto flex justify-center items-center min-h-[80px]"
                       >
                         <div className="text-xl text-slate-800">
