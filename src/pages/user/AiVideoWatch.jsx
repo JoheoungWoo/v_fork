@@ -148,12 +148,30 @@ export default function AiVideoWatch() {
   const localVideoData = ALL_LECTURES.find((l) => l.id === id);
   const isVision = id.startsWith("vision_");
 
+  // AiVideoWatch.jsx 내부의 useEffect 교체
   useEffect(() => {
     const fetchVideoData = async () => {
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${id}`);
-        setVideoInfo({ ...localVideoData, ...res.data });
+
+        // 💡 [핵심 수정] 백엔드에서 null이나 에러가 왔을 때 로컬 데이터를 파괴하지 않도록 방어!
+        const backendData = res.data || {};
+        const safeData = {};
+
+        Object.keys(backendData).forEach((key) => {
+          // 값이 존재하고, "null"이 아니며, "찾을 수 없" 같은 에러 메시지가 아닐 때만 챙깁니다.
+          if (
+            backendData[key] &&
+            backendData[key] !== "null" &&
+            !String(backendData[key]).includes("찾을 수 없")
+          ) {
+            safeData[key] = backendData[key];
+          }
+        });
+
+        // 안전하게 걸러낸 데이터만 로컬 데이터 위에 덮어씌웁니다.
+        setVideoInfo({ ...localVideoData, ...safeData });
       } catch (error) {
         setVideoInfo(localVideoData);
       } finally {
@@ -168,7 +186,6 @@ export default function AiVideoWatch() {
 
     if (id) fetchVideoData();
   }, [id, localVideoData]);
-
   const WidgetComponent = useMemo(() => {
     const type = videoInfo?.widget_type || videoInfo?.widgetType;
     if (!type) return null;
