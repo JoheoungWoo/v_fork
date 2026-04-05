@@ -67,7 +67,7 @@ export default function AiVideoWatch() {
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${id}`);
-
+        console.log("res: ", res);
         // 💡 핵심: API 데이터와 로컬 데이터를 합쳐서 widget_type을 반드시 확보합니다.
         const mergedData = {
           ...localVideoData, // 로컬의 widget_type을 먼저 가져옴
