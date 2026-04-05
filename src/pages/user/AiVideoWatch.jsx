@@ -9,7 +9,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import QnaCard from "@/components/quiz/QnaCard";
@@ -17,7 +17,6 @@ import RecommendedVideo from "@/components/video/RecommendedVideo";
 import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import VideoPlayerList from "@/components/video/VideoPlayList";
-import WIDGET_MAP from "@/utils/widgetData";
 
 import {
   circuitLectures,
@@ -27,7 +26,40 @@ import {
 } from "@/constants/videoData";
 
 // ==========================================
-// 💡 1. 대표님이 작성해주신 순수 Katex 컴포넌트 (이중 백슬래시 방어 추가)
+// 💡 1. WIDGET_MAP 완전 내장 (경로 에러 원천 차단!)
+// ==========================================
+const WIDGET_MAP = {
+  trig_circle: lazy(
+    () => import("@/components/animations/InteractiveUnitCircle"),
+  ),
+  ohms_law: lazy(
+    () => import("@/components/animations/ParallelResistanceWidget"),
+  ),
+  y_delta_converter: lazy(
+    () => import("@/components/animations/YDeltaConverterWidget"),
+  ),
+  coulombs_law: lazy(() => import("@/components/animations/CoulombsLaw3DPage")),
+  rotating_field: lazy(
+    () => import("@/components/animations/RotatingMagneticFieldWidget"),
+  ),
+  dc_rectifier: lazy(
+    () => import("@/components/animations/DcRectificationWidget"),
+  ),
+  equipotential: lazy(
+    () => import("@/components/animations/Equipotential3DWidget"),
+  ),
+  ampere_law: lazy(() => import("@/components/animations/AmpereLawWidget")),
+  parabolaWidget: lazy(
+    () => import("@/components/animations/ParabolaIntersection"),
+  ),
+  vectorInnerProject: lazy(
+    () => import("@/components/animations/VectorInnerProductWidget"),
+  ),
+  derivative: lazy(() => import("@/components/animations/DerivativeWidget")),
+};
+
+// ==========================================
+// 💡 2. 대표님이 요청하신 순수 Katex 컴포넌트
 // ==========================================
 const InlineMath = ({ math }) => {
   if (!math) return null;
@@ -54,37 +86,34 @@ const BlockMath = ({ math }) => {
   );
 };
 
-// 💡 2. 스마트 수식 렌더러 ($ 기호 유무에 따라 자동 판별)
-const SmartMathRenderer = ({ text, isBlock = true }) => {
+// 💡 3. 수식 혼합 텍스트 완벽 분리 렌더러 (백엔드 이스케이프 방어 추가)
+const MixedText = ({ text }) => {
   if (!text) return null;
-  const str = String(text);
 
-  // 문장 안에 $, \[, \( 기호가 섞여 있다면 문장과 수식을 분리해서 렌더링!
-  if (str.includes("$") || str.includes("\\[") || str.includes("\\(")) {
-    const regex =
-      /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\(.*?\\\)|(?<!\\)\$[\s\S]*?(?<!\\)\$)/g;
-    const parts = str.split(regex);
+  // 백엔드에서 \$ 로 넘어오는 경우를 대비해 $ 로 강제 치환
+  const cleanText = String(text).replace(/\\\$/g, "$");
 
-    return (
-      <span className="whitespace-pre-wrap leading-relaxed">
-        {parts.map((part, i) => {
-          if (!part) return null;
-          if (part.startsWith("$$") && part.endsWith("$$"))
-            return <BlockMath key={i} math={part.slice(2, -2)} />;
-          if (part.startsWith("\\[") && part.endsWith("\\]"))
-            return <BlockMath key={i} math={part.slice(2, -2)} />;
-          if (part.startsWith("\\(") && part.endsWith("\\)"))
-            return <InlineMath key={i} math={part.slice(2, -2)} />;
-          if (part.startsWith("$") && part.endsWith("$"))
-            return <InlineMath key={i} math={part.slice(1, -1)} />;
-          return <span key={i}>{part}</span>;
-        })}
-      </span>
-    );
-  }
+  // 정규식: $$, \[, \], $, \(, \) 패턴 모두 감지
+  const regex =
+    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[\s\S]*?\$|\\\([\s\S]*?\\\))/g;
+  const parts = cleanText.split(regex);
 
-  // $ 기호가 없으면 문장 전체를 수식 코드로 간주하고 크게 그립니다! (예: \text{이차함수}... 문제 해결)
-  return isBlock ? <BlockMath math={str} /> : <InlineMath math={str} />;
+  return (
+    <span className="whitespace-pre-wrap leading-relaxed">
+      {parts.map((part, i) => {
+        if (!part) return null;
+        if (part.startsWith("$$") && part.endsWith("$$"))
+          return <BlockMath key={i} math={part.slice(2, -2)} />;
+        if (part.startsWith("\\[") && part.endsWith("\\]"))
+          return <BlockMath key={i} math={part.slice(2, -2)} />;
+        if (part.startsWith("\\(") && part.endsWith("\\)"))
+          return <InlineMath key={i} math={part.slice(2, -2)} />;
+        if (part.startsWith("$") && part.endsWith("$"))
+          return <InlineMath key={i} math={part.slice(1, -1)} />;
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
 };
 // ==========================================
 
@@ -149,14 +178,21 @@ export default function AiVideoWatch() {
       let newData = null;
       if (videoInfo && videoInfo.generator) {
         await new Promise((resolve) => setTimeout(resolve, 500));
-        newData = videoInfo.generator();
+        const localData = videoInfo.generator();
+        newData = {
+          ...localData,
+          problem: `$$${localData.problem}$$`,
+          answer: `$$${localData.answer}$$`,
+          steps: localData.steps.map((s) => ({
+            text: `${s.text}${s.math ? `\n$$${s.math}$$` : ""}`,
+          })),
+        };
       } else {
         const endpoint = id.includes("circuit")
           ? "/api/circuit/random"
           : "/api/math/random";
         const res = await apiClient.get(`${endpoint}?type=${id}`);
         newData = res.data;
-        console.log("📥 백엔드 수신 데이터:", res.data); // 디버깅용 콘솔
       }
       setProblemData(newData);
     } catch (e) {
@@ -190,7 +226,7 @@ export default function AiVideoWatch() {
       </div>
     );
 
-  // 💡 데이터 추출 및 파편화 방어
+  // 💡 데이터 추출
   const problemText =
     problemData?.problem ||
     problemData?.question ||
@@ -204,35 +240,39 @@ export default function AiVideoWatch() {
   const stepsList = problemData?.steps || problemData?.explanation || [];
   const choices = problemData?.choices || problemData?.options || [];
 
-  // 💡 회로도 및 그래프 렌더링 강제 처리 함수
-  const renderImage = (imgData) => {
-    if (!imgData) return null;
-    let src = String(imgData).trim();
-    if (!src.startsWith("http") && !src.startsWith("data:")) {
-      src = `data:image/png;base64,${src}`; // Base64 코드만 왔을 경우 헤더 강제 부착
-    }
-    return (
-      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex justify-center">
-        <img
-          src={src}
-          alt="문제 이미지"
-          className="max-w-full h-auto rounded object-contain max-h-[400px]"
-        />
-      </div>
-    );
-  };
-
   const problemImage =
     problemData?.image ||
     problemData?.image_url ||
     problemData?.image_base64 ||
     problemData?.circuit_image ||
-    problemData?.plot ||
-    problemData?.img;
+    problemData?.plot;
   const solutionImage =
     problemData?.solution_image ||
     problemData?.explanation_image ||
     problemData?.answer_image;
+
+  // 💡 4. 이미지 렌더링 헬퍼 함수 (엑스박스 완벽 방어 로직)
+  const renderImage = (imgSrc, altText) => {
+    if (!imgSrc) return null;
+    const src = String(imgSrc).trim();
+
+    // 🚨 백엔드 쓰레기값("null", "None", "") 방어: Base64나 URL이 되려면 최소 20자는 넘어야 함
+    if (src === "null" || src === "None" || src.length < 20) return null;
+
+    const finalSrc =
+      src.startsWith("http") || src.startsWith("data:")
+        ? src
+        : `data:image/png;base64,${src}`;
+    return (
+      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex justify-center">
+        <img
+          src={finalSrc}
+          alt={altText}
+          className="max-w-full h-auto rounded object-contain"
+        />
+      </div>
+    );
+  };
 
   return (
     <main className="pt-24 pb-12 px-6 max-w-7xl mx-auto font-body">
@@ -262,7 +302,7 @@ export default function AiVideoWatch() {
             <section className="scroll-mt-24">
               <div className="flex border-b border-gray-200 mt-8 mb-2">
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
                   onClick={() => setActiveTab("quiz")}
                 >
                   실전 퀴즈
@@ -270,7 +310,7 @@ export default function AiVideoWatch() {
 
                 {WidgetComponent && (
                   <button
-                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400 hover:text-gray-600"}`}
+                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400"}`}
                     onClick={() => setActiveTab("widget")}
                   >
                     <Sparkles
@@ -284,7 +324,7 @@ export default function AiVideoWatch() {
                 )}
 
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
                   onClick={() => setActiveTab("qna")}
                 >
                   질문 및 A/S
@@ -328,17 +368,17 @@ export default function AiVideoWatch() {
                         )}
                       </div>
 
-                      {/* 💡 회로도/그래프 강력 렌더링 */}
-                      {renderImage(problemImage)}
+                      {/* 💡 문제 이미지 렌더링 (엑스박스 안 뜹니다!) */}
+                      {renderImage(problemImage, "문제 이미지")}
 
-                      {/* 💡 문제 텍스트 (SmartMathRenderer로 $ 기호 유무 완벽 방어) */}
+                      {/* 💡 문제 지문 */}
                       {problemText && (
                         <div className="mb-10 text-xl text-gray-800 font-bold px-2">
-                          <SmartMathRenderer text={problemText} />
+                          <MixedText text={problemText} />
                         </div>
                       )}
 
-                      {/* 4지 선다 버튼 영역 */}
+                      {/* 4지 선다 버튼 */}
                       {choices.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
                           {choices.map((choice, index) => (
@@ -369,10 +409,7 @@ export default function AiVideoWatch() {
                                 {index + 1}
                               </span>
                               <span className="text-lg font-bold">
-                                <SmartMathRenderer
-                                  text={choice}
-                                  isBlock={false}
-                                />
+                                <MixedText text={choice} />
                               </span>
                             </button>
                           ))}
@@ -390,15 +427,15 @@ export default function AiVideoWatch() {
                         )
                       )}
 
-                      {/* 💡 단계별 해설 영역 */}
+                      {/* 단계별 해설 영역 */}
                       {showSolution && (
                         <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-200 animate-slide-up">
                           <h4 className="text-xl font-black text-[#0047a5] mb-6 flex items-center gap-2">
                             💡 전문가의 상세 풀이
                           </h4>
 
-                          {/* 💡 해설용 그래프/그림 (Matplotlib) */}
-                          {renderImage(solutionImage)}
+                          {/* 해설 그림 렌더링 */}
+                          {renderImage(solutionImage, "해설 이미지")}
 
                           {stepsList.length > 0 && (
                             <div className="space-y-4">
@@ -419,7 +456,7 @@ export default function AiVideoWatch() {
                                     <div className="mt-1 w-full overflow-hidden">
                                       {stepText && (
                                         <p className="text-gray-700 font-bold mb-3">
-                                          <SmartMathRenderer text={stepText} />
+                                          <MixedText text={stepText} />
                                         </p>
                                       )}
                                       {stepMath && (
@@ -434,14 +471,13 @@ export default function AiVideoWatch() {
                             </div>
                           )}
 
-                          {/* 최종 정답 출력 */}
                           {answerText && (
                             <div className="mt-10 p-8 bg-[#0047a5] text-white rounded-3xl text-center shadow-lg">
                               <p className="text-blue-200 text-sm font-black mb-2 uppercase tracking-widest">
                                 Final Answer
                               </p>
                               <div className="text-4xl font-black overflow-x-auto">
-                                <SmartMathRenderer text={answerText} />
+                                <MixedText text={answerText} />
                               </div>
                             </div>
                           )}
