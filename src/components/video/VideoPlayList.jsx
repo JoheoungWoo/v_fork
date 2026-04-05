@@ -1,13 +1,13 @@
-import React, { useMemo } from "react";
-import { useParams } from "react-router-dom";
 import useCustomMove from "@/hooks/useCustomMove";
-import { PlayCircle, Lock, CheckCircle2 } from "lucide-react";
+import { Lock, PlayCircle } from "lucide-react";
+import { useMemo } from "react";
+import { useParams } from "react-router-dom";
 
 // ✅ 데이터 임포트
 import {
-  mathLectures,
   circuitLectures,
   emLectures,
+  mathLectures,
   visionLectures,
 } from "@/constants/videoData";
 
@@ -18,7 +18,7 @@ const ALL_LECTURES = [
   ...visionLectures,
 ];
 
-export default function VideoPlayerList() {
+export default function VideoPlayList() {
   const { id } = useParams();
   const { moveToRead } = useCustomMove("/user/videos");
 

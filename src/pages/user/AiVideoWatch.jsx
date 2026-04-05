@@ -16,7 +16,7 @@ import QnaCard from "@/components/quiz/QnaCard";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
 import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
-import VideoPlayerList from "@/components/video/VideoPlayList";
+import VideoPlayList from "@/components/video/VideoPlayList";
 
 import {
   circuitLectures,
@@ -536,7 +536,7 @@ export default function AiVideoWatch() {
         </div>
 
         <aside className="lg:col-span-4 space-y-8">
-          <VideoPlayerList />
+          <VideoPlayList />
           <RecommendedVideo count={4} />
         </aside>
       </div>
