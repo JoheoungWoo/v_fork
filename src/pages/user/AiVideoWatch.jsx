@@ -91,11 +91,8 @@ const AutoMathRenderer = ({ text, isBlock = true }) => {
   if (!text) return null;
   const cleanText = String(text).replace(/\\\$/g, "$");
 
-  // 1) 텍스트 안에 $, \[, \( 기호가 포함되어 있는지 확인
   const hasMathDelimiters = /\$\$|\\\[|\\\(|\$/.test(cleanText);
 
-  // 2) 기호가 없다면? -> 백엔드에서 통째로 보낸 문제(problem_latex)입니다!
-  // 전체를 수학 블록으로 예쁘게 렌더링합니다. ( \text{} 완벽 호환 )
   if (!hasMathDelimiters) {
     return isBlock ? (
       <BlockMath math={cleanText} />
@@ -104,7 +101,6 @@ const AutoMathRenderer = ({ text, isBlock = true }) => {
     );
   }
 
-  // 3) 기호가 섞여있다면? -> 문장과 수식을 분리해서 조립합니다.
   const regex =
     /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[\s\S]*?\$|\\\([\s\S]*?\\\))/g;
   const parts = cleanText.split(regex);
@@ -242,18 +238,21 @@ export default function AiVideoWatch() {
     problemData?.answer_latex ||
     "";
 
-  // 💡 파이썬 백엔드 맞춤 이미지 추출
-  const problemImage =
+  // 🚀 [핵심 수정] 이미지 종류별 철저한 분리 🚀
+  // 1. 문제를 푸는 데 필수적인 그림 (회로도, 기본 제공 도형 등)
+  const questionImage =
     problemData?.circuit_image ||
-    problemData?.graph_image ||
     problemData?.image ||
     problemData?.image_base64;
+
+  // 2. 정답 해설용 그림 (수학 그래프, 포물선 교점 시각화 등)
   const solutionImage =
+    problemData?.graph_image ||
     problemData?.solution_image ||
     problemData?.explanation_image ||
     problemData?.answer_image;
 
-  // 💡 4. SVG / PNG 자동 판별 렌더러 (엑스박스 완벽 해결!)
+  // 💡 SVG / PNG 자동 판별 렌더러
   const renderImage = (imgSrc, altText) => {
     if (!imgSrc) return null;
     const src = String(imgSrc).trim();
@@ -261,7 +260,6 @@ export default function AiVideoWatch() {
 
     let finalSrc = src;
     if (!src.startsWith("http") && !src.startsWith("data:")) {
-      // 🚀 파이썬 백엔드가 생성한 SVG 파일인지(PHN2, PD94) 판단하여 정확한 헤더 부착!
       if (src.startsWith("PHN2") || src.startsWith("PD94")) {
         finalSrc = `data:image/svg+xml;base64,${src}`;
       } else {
@@ -374,17 +372,17 @@ export default function AiVideoWatch() {
                         )}
                       </div>
 
-                      {/* 💡 파이썬이 생성한 회로도/그래프(SVG) 렌더링 */}
-                      {renderImage(problemImage, "문제 이미지")}
+                      {/* 🚀 회로도 같은 필수 이미지만 처음에 보여줍니다! */}
+                      {renderImage(questionImage, "문제 이미지")}
 
-                      {/* 💡 문제 지문 렌더링 (순수 LaTeX, 텍스트 혼합 모두 방어) */}
+                      {/* 문제 지문 렌더링 */}
                       {problemText && (
                         <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100">
                           <AutoMathRenderer text={problemText} />
                         </div>
                       )}
 
-                      {/* 💡 4지 선다 버튼 영역 */}
+                      {/* 4지 선다 버튼 영역 */}
                       {choices.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
                           {choices.map((choice, index) => (
@@ -443,13 +441,12 @@ export default function AiVideoWatch() {
                             💡 전문가의 상세 풀이
                           </h4>
 
-                          {/* 해설용 그래프 */}
-                          {renderImage(solutionImage, "해설 이미지")}
+                          {/* 🚀 스포일러 방지: 수학 그래프/교점 이미지는 정답을 확인한 후에만 나타납니다! */}
+                          {renderImage(solutionImage, "해설 시각화")}
 
                           {stepsList.length > 0 && (
                             <div className="space-y-4">
                               {stepsList.map((step, idx) => {
-                                // 파이썬의 "description", "latex" 키를 매핑합니다.
                                 const stepText =
                                   step.description || step.text || "";
                                 const stepMath =
