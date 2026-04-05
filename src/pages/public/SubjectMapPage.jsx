@@ -82,19 +82,119 @@ const SUBJECTS = [
   },
 ];
 
-// ✅ 노드 이름과 실제 강의 ID 매핑 객체 (기초수학 연결 고리 추가)
+// ✅ 노드 이름과 실제 강의 ID 매핑 객체 (모든 강의 완벽 연결!)
 const NODE_TO_LECTURE_MAP = {
+  // ==========================================
+  // ⚡ 1. 회로이론
+  // ==========================================
+  "직·병렬 회로망": "circuit_resistance",
+  "직렬 회로": "circuit_resistance",
+  합성저항: "circuit_resistance",
+
+  "소비 전력": "circuit_power",
+  전력: "circuit_power",
+
+  "Y-Δ 변환": "circuit_ydelta",
+  "와이-델타 변환": "circuit_ydelta",
+  Y결선: "circuit_ydelta",
+
+  "Y결선 상전압과 선간전압": "circuit_y_voltage",
+  상전압: "circuit_y_voltage",
+  선간전압: "circuit_y_voltage",
+
   "옴의 법칙 (Ohm's Law)": "circuit_ohm_law_equivalent",
   "옴의 법칙": "circuit_ohm_law_equivalent",
   "병렬연결 (Parallel Connection)": "circuit_ohm_law_equivalent",
-  "직렬 회로": "circuit_resistance",
-  "Y-Δ 변환": "circuit_ydelta",
-  // 💡 기초수학 노드 매핑 추가 (DB에 있는 노드명과 영상 ID 매핑)
-  삼각함수: "c3d27bab5e1cf6ae9f07f70ae08c1e26",
-  미분: "c44dc0cd81fbb02320299a7bff062e4d",
-  "벡터 내적": "201092af306ff8cb381808e4c3f45e0c",
-};
 
+  // ==========================================
+  // 📐 2. 기초수학
+  // ==========================================
+  "분수와 비례식": "math_fraction",
+  분수: "math_fraction",
+  비례식: "math_fraction",
+
+  "지수법칙 기초": "math_exponent",
+  지수법칙: "math_exponent",
+  지수: "math_exponent",
+
+  "로그의 이해": "math_logarithm",
+  로그: "math_logarithm",
+
+  인수분해: "math_factorization",
+  "인수분해와 완전제곱식": "math_factorization",
+
+  "함수의 이해": "math_function",
+  함수: "math_function",
+  "함수와 그래프": "math_function",
+
+  "다항식의 연산과 곱셈공식": "math_polynomial",
+  다항식: "math_polynomial",
+  곱셈공식: "math_polynomial",
+
+  "방정식과 부등식": "math_equation",
+  방정식: "math_equation",
+  부등식: "math_equation",
+
+  "직선의 방정식과 두 직선의 교점": "62069c25429c16e898888d5611eb67b4",
+  "직선의 방정식": "62069c25429c16e898888d5611eb67b4",
+
+  "포물선과 직선의 교점": "61b1ec56bcd7e87535d18c40bb9afb21",
+  포물선: "61b1ec56bcd7e87535d18c40bb9afb21",
+
+  "호도법과 라디안": "math_radian",
+  호도법: "math_radian",
+  라디안: "math_radian",
+
+  "삼각함수 1": "c3d27bab5e1cf6ae9f07f70ae08c1e26",
+  삼각함수: "c3d27bab5e1cf6ae9f07f70ae08c1e26",
+  "삼각함수의 완벽 이해": "math_trig",
+  "삼각함수 2": "8fc05f0f6c31f19deeb976cb2b1562cf",
+
+  "완전제곱식의 이해": "e935dc2d2e592a79688c5f40da5fbe23",
+  완전제곱식: "e935dc2d2e592a79688c5f40da5fbe23",
+
+  "허수와 복소수": "math_imaginary",
+  허수: "math_imaginary",
+  복소수: "math_imaginary",
+
+  "기하와 벡터": "math_vector",
+  벡터: "math_vector",
+
+  "기하와 벡터의 내적": "201092af306ff8cb381808e4c3f45e0c",
+  "벡터 내적": "201092af306ff8cb381808e4c3f45e0c",
+  내적: "201092af306ff8cb381808e4c3f45e0c",
+
+  "행렬과 행렬식": "math_matrix",
+  행렬: "math_matrix",
+  행렬식: "math_matrix",
+
+  "미분과 적분 기초": "math_calculus",
+  "미분과 적분": "math_calculus",
+  적분: "math_calculus",
+
+  "미분의 이해": "c44dc0cd81fbb02320299a7bff062e4d",
+  미분: "c44dc0cd81fbb02320299a7bff062e4d",
+
+  // ==========================================
+  // 🧲 3. 전자기학
+  // ==========================================
+  "쿨롱의 법칙": "em_coulomb",
+
+  "등전위선 3D 시각화": "lec_poten_3d",
+  등전위선: "lec_poten_3d",
+
+  "앙페르의 오른나사 법칙": "em_ampere_law",
+  "앙페르의 법칙": "em_ampere_law",
+
+  // ==========================================
+  // 👁️ 4. AI Vision
+  // ==========================================
+  "AI Company의 비전과 미래": "vision_intro",
+  "AI 비전": "vision_intro",
+
+  "AI Company Vision 영상": "vision_video",
+  "비전 영상": "vision_video",
+};
 export default function SubjectMapPage() {
   const move = useMove("/user/videos");
 
