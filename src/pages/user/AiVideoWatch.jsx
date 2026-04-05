@@ -26,7 +26,7 @@ import {
 } from "@/constants/videoData";
 
 // ==========================================
-// 💡 1. WIDGET_MAP 완전 내장 (경로 에러 원천 차단!)
+// 💡 1. WIDGET_MAP (내장형)
 // ==========================================
 const WIDGET_MAP = {
   trig_circle: lazy(
@@ -59,7 +59,7 @@ const WIDGET_MAP = {
 };
 
 // ==========================================
-// 💡 2. 대표님이 요청하신 순수 Katex 컴포넌트
+// 💡 2. 대표님 커스텀 Katex 컴포넌트
 // ==========================================
 const InlineMath = ({ math }) => {
   if (!math) return null;
@@ -81,19 +81,30 @@ const BlockMath = ({ math }) => {
   return (
     <div
       dangerouslySetInnerHTML={{ __html: html }}
-      className="overflow-x-auto my-4 flex justify-center"
+      className="overflow-x-auto flex justify-center w-full"
     />
   );
 };
 
-// 💡 3. 수식 혼합 텍스트 완벽 분리 렌더러 (백엔드 이스케이프 방어 추가)
-const MixedText = ({ text }) => {
+// 💡 3. 파이썬 백엔드 맞춤형 지능형 수식 렌더러
+const AutoMathRenderer = ({ text, isBlock = true }) => {
   if (!text) return null;
-
-  // 백엔드에서 \$ 로 넘어오는 경우를 대비해 $ 로 강제 치환
   const cleanText = String(text).replace(/\\\$/g, "$");
 
-  // 정규식: $$, \[, \], $, \(, \) 패턴 모두 감지
+  // 1) 텍스트 안에 $, \[, \( 기호가 포함되어 있는지 확인
+  const hasMathDelimiters = /\$\$|\\\[|\\\(|\$/.test(cleanText);
+
+  // 2) 기호가 없다면? -> 백엔드에서 통째로 보낸 문제(problem_latex)입니다!
+  // 전체를 수학 블록으로 예쁘게 렌더링합니다. ( \text{} 완벽 호환 )
+  if (!hasMathDelimiters) {
+    return isBlock ? (
+      <BlockMath math={cleanText} />
+    ) : (
+      <InlineMath math={cleanText} />
+    );
+  }
+
+  // 3) 기호가 섞여있다면? -> 문장과 수식을 분리해서 조립합니다.
   const regex =
     /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[\s\S]*?\$|\\\([\s\S]*?\\\))/g;
   const parts = cleanText.split(regex);
@@ -178,15 +189,7 @@ export default function AiVideoWatch() {
       let newData = null;
       if (videoInfo && videoInfo.generator) {
         await new Promise((resolve) => setTimeout(resolve, 500));
-        const localData = videoInfo.generator();
-        newData = {
-          ...localData,
-          problem: `$$${localData.problem}$$`,
-          answer: `$$${localData.answer}$$`,
-          steps: localData.steps.map((s) => ({
-            text: `${s.text}${s.math ? `\n$$${s.math}$$` : ""}`,
-          })),
-        };
+        newData = videoInfo.generator();
       } else {
         const endpoint = id.includes("circuit")
           ? "/api/circuit/random"
@@ -196,7 +199,6 @@ export default function AiVideoWatch() {
       }
       setProblemData(newData);
     } catch (e) {
-      console.error(e);
       alert("백엔드 서버에서 문제를 가져오는데 실패했습니다.");
     } finally {
       setIsFetchingProblem(false);
@@ -226,49 +228,53 @@ export default function AiVideoWatch() {
       </div>
     );
 
-  // 💡 데이터 추출
+  // 💡 파이썬 백엔드 맞춤 데이터 추출
   const problemText =
+    problemData?.problem_latex ||
     problemData?.problem ||
     problemData?.question ||
-    problemData?.problem_latex ||
     "";
+  const choices = problemData?.choices || problemData?.options || [];
+  const stepsList = problemData?.steps || problemData?.explanation || [];
   const answerText =
     problemData?.answer ||
     problemData?.correct_answer ||
     problemData?.answer_latex ||
     "";
-  const stepsList = problemData?.steps || problemData?.explanation || [];
-  const choices = problemData?.choices || problemData?.options || [];
 
+  // 💡 파이썬 백엔드 맞춤 이미지 추출
   const problemImage =
-    problemData?.image ||
-    problemData?.image_url ||
-    problemData?.image_base64 ||
     problemData?.circuit_image ||
-    problemData?.plot;
+    problemData?.graph_image ||
+    problemData?.image ||
+    problemData?.image_base64;
   const solutionImage =
     problemData?.solution_image ||
     problemData?.explanation_image ||
     problemData?.answer_image;
 
-  // 💡 4. 이미지 렌더링 헬퍼 함수 (엑스박스 완벽 방어 로직)
+  // 💡 4. SVG / PNG 자동 판별 렌더러 (엑스박스 완벽 해결!)
   const renderImage = (imgSrc, altText) => {
     if (!imgSrc) return null;
     const src = String(imgSrc).trim();
-
-    // 🚨 백엔드 쓰레기값("null", "None", "") 방어: Base64나 URL이 되려면 최소 20자는 넘어야 함
     if (src === "null" || src === "None" || src.length < 20) return null;
 
-    const finalSrc =
-      src.startsWith("http") || src.startsWith("data:")
-        ? src
-        : `data:image/png;base64,${src}`;
+    let finalSrc = src;
+    if (!src.startsWith("http") && !src.startsWith("data:")) {
+      // 🚀 파이썬 백엔드가 생성한 SVG 파일인지(PHN2, PD94) 판단하여 정확한 헤더 부착!
+      if (src.startsWith("PHN2") || src.startsWith("PD94")) {
+        finalSrc = `data:image/svg+xml;base64,${src}`;
+      } else {
+        finalSrc = `data:image/png;base64,${src}`;
+      }
+    }
+
     return (
-      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex justify-center">
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-8 flex justify-center">
         <img
           src={finalSrc}
           alt={altText}
-          className="max-w-full h-auto rounded object-contain"
+          className="max-w-full h-auto rounded object-contain max-h-[400px]"
         />
       </div>
     );
@@ -302,7 +308,7 @@ export default function AiVideoWatch() {
             <section className="scroll-mt-24">
               <div className="flex border-b border-gray-200 mt-8 mb-2">
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
                   onClick={() => setActiveTab("quiz")}
                 >
                   실전 퀴즈
@@ -310,7 +316,7 @@ export default function AiVideoWatch() {
 
                 {WidgetComponent && (
                   <button
-                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400"}`}
+                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400 hover:text-gray-600"}`}
                     onClick={() => setActiveTab("widget")}
                   >
                     <Sparkles
@@ -324,7 +330,7 @@ export default function AiVideoWatch() {
                 )}
 
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
                   onClick={() => setActiveTab("qna")}
                 >
                   질문 및 A/S
@@ -346,9 +352,9 @@ export default function AiVideoWatch() {
                   </div>
 
                   {problemData && (
-                    <div className="mt-8 p-8 bg-white border border-gray-100 rounded-3xl shadow-xl text-left">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                    <div className="mt-8 p-8 bg-blue-50/30 border border-gray-100 rounded-3xl shadow-xl text-left">
+                      <div className="flex items-center justify-between mb-8 border-b pb-4">
+                        <h3 className="text-2xl font-black text-[#0047a5] flex items-center gap-2">
                           📝 실전 테스트
                         </h3>
                         {showSolution && choices.length > 0 && (
@@ -368,17 +374,17 @@ export default function AiVideoWatch() {
                         )}
                       </div>
 
-                      {/* 💡 문제 이미지 렌더링 (엑스박스 안 뜹니다!) */}
+                      {/* 💡 파이썬이 생성한 회로도/그래프(SVG) 렌더링 */}
                       {renderImage(problemImage, "문제 이미지")}
 
-                      {/* 💡 문제 지문 */}
+                      {/* 💡 문제 지문 렌더링 (순수 LaTeX, 텍스트 혼합 모두 방어) */}
                       {problemText && (
-                        <div className="mb-10 text-xl text-gray-800 font-bold px-2">
-                          <MixedText text={problemText} />
+                        <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100">
+                          <AutoMathRenderer text={problemText} />
                         </div>
                       )}
 
-                      {/* 4지 선다 버튼 */}
+                      {/* 💡 4지 선다 버튼 영역 */}
                       {choices.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
                           {choices.map((choice, index) => (
@@ -396,11 +402,11 @@ export default function AiVideoWatch() {
                                         (problemData.correct_index ??
                                           problemData.answer_index)
                                     ? "border-green-500 bg-green-50"
-                                    : "border-gray-200 hover:border-[#0047a5] hover:shadow-md"
+                                    : "border-gray-200 bg-white hover:border-[#0047a5] hover:shadow-md"
                               }`}
                             >
                               <span
-                                className={`w-10 h-10 flex items-center justify-center rounded-full font-black shrink-0 ${
+                                className={`w-10 h-10 flex items-center justify-center rounded-full font-black shrink-0 transition-colors ${
                                   selectedIndex === index
                                     ? "bg-white text-gray-900"
                                     : "bg-gray-100 text-gray-500 group-hover:bg-[#0047a5] group-hover:text-white"
@@ -408,8 +414,11 @@ export default function AiVideoWatch() {
                               >
                                 {index + 1}
                               </span>
-                              <span className="text-lg font-bold">
-                                <MixedText text={choice} />
+                              <span className="text-lg font-bold text-gray-800">
+                                <AutoMathRenderer
+                                  text={choice}
+                                  isBlock={false}
+                                />
                               </span>
                             </button>
                           ))}
@@ -427,40 +436,41 @@ export default function AiVideoWatch() {
                         )
                       )}
 
-                      {/* 단계별 해설 영역 */}
+                      {/* 💡 단계별 해설 영역 */}
                       {showSolution && (
-                        <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-200 animate-slide-up">
-                          <h4 className="text-xl font-black text-[#0047a5] mb-6 flex items-center gap-2">
+                        <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-300 animate-slide-up">
+                          <h4 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
                             💡 전문가의 상세 풀이
                           </h4>
 
-                          {/* 해설 그림 렌더링 */}
+                          {/* 해설용 그래프 */}
                           {renderImage(solutionImage, "해설 이미지")}
 
                           {stepsList.length > 0 && (
                             <div className="space-y-4">
                               {stepsList.map((step, idx) => {
+                                // 파이썬의 "description", "latex" 키를 매핑합니다.
                                 const stepText =
-                                  typeof step === "string"
-                                    ? step
-                                    : step.text || step.description;
-                                const stepMath = step.math || step.formula;
+                                  step.description || step.text || "";
+                                const stepMath =
+                                  step.latex || step.math || step.formula || "";
+
                                 return (
                                   <div
                                     key={idx}
-                                    className="flex gap-4 items-start bg-blue-50/50 p-6 rounded-2xl border border-blue-100/50"
+                                    className="flex gap-5 items-start bg-white p-6 rounded-2xl border border-gray-200 shadow-sm"
                                   >
-                                    <span className="bg-[#0047a5] text-white font-black w-8 h-8 flex items-center justify-center rounded-lg shrink-0 mt-1">
+                                    <span className="bg-[#e5edff] text-[#0047a5] font-black w-10 h-10 flex items-center justify-center rounded-xl shrink-0 mt-1">
                                       {idx + 1}
                                     </span>
                                     <div className="mt-1 w-full overflow-hidden">
                                       {stepText && (
-                                        <p className="text-gray-700 font-bold mb-3">
-                                          <MixedText text={stepText} />
+                                        <p className="text-gray-700 font-bold mb-4 text-lg leading-relaxed">
+                                          <AutoMathRenderer text={stepText} />
                                         </p>
                                       )}
                                       {stepMath && (
-                                        <div className="bg-white p-4 rounded-xl shadow-sm overflow-x-auto">
+                                        <div className="bg-gray-50 py-4 px-6 rounded-xl border border-gray-100 overflow-x-auto">
                                           <BlockMath math={stepMath} />
                                         </div>
                                       )}
@@ -471,13 +481,14 @@ export default function AiVideoWatch() {
                             </div>
                           )}
 
+                          {/* 최종 정답 출력 */}
                           {answerText && (
-                            <div className="mt-10 p-8 bg-[#0047a5] text-white rounded-3xl text-center shadow-lg">
-                              <p className="text-blue-200 text-sm font-black mb-2 uppercase tracking-widest">
-                                Final Answer
+                            <div className="mt-12 p-10 bg-gradient-to-r from-[#0047a5] to-blue-700 text-white rounded-3xl text-center shadow-2xl">
+                              <p className="text-blue-200 text-sm font-black mb-3 uppercase tracking-widest opacity-90">
+                                최종 정답
                               </p>
-                              <div className="text-4xl font-black overflow-x-auto">
-                                <MixedText text={answerText} />
+                              <div className="text-4xl font-black overflow-x-auto drop-shadow-md">
+                                <AutoMathRenderer text={answerText} />
                               </div>
                             </div>
                           )}
@@ -489,13 +500,13 @@ export default function AiVideoWatch() {
               )}
 
               {activeTab === "widget" && WidgetComponent && (
-                <div className="mt-8 p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 min-h-[500px]">
+                <div className="mt-8 p-6 bg-white rounded-3xl border border-gray-200 shadow-inner min-h-[600px] flex flex-col">
                   <Suspense
                     fallback={
-                      <div className="flex h-64 items-center justify-center">
+                      <div className="flex flex-1 items-center justify-center">
                         <Loader2
                           className="animate-spin text-[#0047a5]"
-                          size={32}
+                          size={48}
                         />
                       </div>
                     }
