@@ -5,6 +5,7 @@ import {
   generateFactorizationQuiz,
   generateFractionQuiz,
   generateLogarithmQuiz,
+  generatePerfectSquareQuiz,
 } from "@/utils/quizUtils";
 
 // 1. 기초수학 데이터
@@ -85,6 +86,39 @@ export const mathLectures = [
     generator: generateBasicFunctionQuiz,
   },
   {
+    id: "62069c25429c16e898888d5611eb67b4", // 클라우드플레어 영상 해시 ID
+    subject: "기초수학 (중학)", // 💡 여기를 정확히 맞춰주세요!
+    title: "7강. 직선의 방정식과 두 직선의 교점", // 번호는 알맞게 조정해 주세요
+    duration: "-",
+    description:
+      "두 직선의 방정식을 이해하고, 연립방정식을 통해 두 직선이 만나는 교점을 구하는 방법을 학습합니다.",
+    thumbnail:
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/62069c25429c16e898888d5611eb67b4/thumbnails/thumbnail.jpg",
+    thumbnailTime: "10s",
+    videoUrls: [
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/62069c25429c16e898888d5611eb67b4/watch",
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/62069c25429c16e898888d5611eb67b4/manifest/video.m3u8",
+    ],
+  },
+  // 💡 2. 여기에 '포물선과 직선의 교점' 데이터 추가
+  // constants/videoData.js 내부 수정
+  {
+    id: "61b1ec56bcd7e87535d18c40bb9afb21",
+    // 61b1ec56bcd7e87535d18c40bb9afb21
+    subject: "기초수학 (중학)",
+    title: "8강. 포물선과 직선의 교점",
+    duration: "10:30", // 적절한 시간 입력
+    description:
+      "이차함수와 일차함수의 연립방정식을 통해 교점의 좌표를 찾는 방법을 배웁니다.",
+    thumbnail:
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/61b1ec56bcd7e87535d18c40bb9afb21/thumbnails/thumbnail.jpg",
+    thumbnailTime: "10s",
+    videoUrls: [
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/61b1ec56bcd7e87535d18c40bb9afb21/watch",
+    ], // 👈 이 필드가 있어야 목록에서 보입니다!
+    useBackend: true,
+  },
+  {
     id: "math_radian",
     subject: "기초수학 (고등)",
     title: "13강. 호도법과 라디안(Radian)",
@@ -129,6 +163,37 @@ export const mathLectures = [
     ],
   },
   {
+    id: "e935dc2d2e592a79688c5f40da5fbe23", // 요청하신 영상 해시 ID
+    subject: "기초수학 (중학)",
+    title: "완전제곱식의 이해",
+    duration: "-",
+    description:
+      "다항식의 제곱 형태로 인수분해되는 완전제곱식의 조건과 원리를 학습하고 실전에 적용합니다.",
+    thumbnail:
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/e935dc2d2e592a79688c5f40da5fbe23/thumbnails/thumbnail.jpg",
+    thumbnailTime: "10s",
+    videoUrls: [
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/e935dc2d2e592a79688c5f40da5fbe23/watch",
+    ],
+    generator: generatePerfectSquareQuiz, // 💡 방금 만든 문제 생성기 연결!
+  },
+  {
+    id: "201092af306ff8cb381808e4c3f45e0c", // DB와 일치하는 새 영상 ID
+    subject: "심화수학 (고등)",
+    title: "10강. 기하와 벡터의 내적",
+    duration: "-",
+    description:
+      "두 벡터의 내적 연산과 기하학적 의미(투영)를 직관적으로 이해하고, 역코사인(cos⁻¹θ)을 이용해 사이각을 구하는 방법을 학습합니다.",
+    thumbnail:
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/201092af306ff8cb381808e4c3f45e0c/thumbnails/thumbnail.jpg",
+    thumbnailTime: "10s",
+    videoUrls: [
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/201092af306ff8cb381808e4c3f45e0c/watch",
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/201092af306ff8cb381808e4c3f45e0c/manifest/video.m3u8",
+    ],
+    useBackend: true, // 무작위 퀴즈를 위해 백엔드 API를 사용하도록 설정
+  },
+  {
     id: "math_polynomial",
     subject: "기초수학 (중학)",
     title: "6강. 다항식의 연산과 곱셈공식", // ✅ 5강 -> 6강으로 수정
@@ -138,6 +203,22 @@ export const mathLectures = [
     thumbnail: "",
     thumbnailTime: "",
     videoUrls: [""],
+  },
+  {
+    id: "c44dc0cd81fbb02320299a7bff062e4d", // Neo4j 및 백엔드와 매핑되는 클라우드플레어 해시 ID
+    subject: "기초수학", // 요청하신 대로 기초수학으로 분류
+    title: "12강. 미분의 이해", // 번호는 커리큘럼에 맞게 조정해 주세요
+    duration: "-",
+    description:
+      "함수의 순간 변화율을 구하는 미분의 기본 개념과 다항함수의 미분법을 시각적으로 학습합니다.",
+    thumbnail:
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/c44dc0cd81fbb02320299a7bff062e4d/thumbnails/thumbnail.jpg",
+    thumbnailTime: "10s",
+    videoUrls: [
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/c44dc0cd81fbb02320299a7bff062e4d/watch",
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/c44dc0cd81fbb02320299a7bff062e4d/manifest/video.m3u8",
+    ],
+    useBackend: true, // 💡 FastAPI 백엔드의 무한 문제풀이(generate_derivative_problem)를 호출하기 위해 반드시 true로 설정
   },
   {
     id: "math_equation",
