@@ -27,16 +27,19 @@ import {
 } from "@/constants/videoData";
 
 // ==========================================
-// 💡 1. 만능 수식 렌더러 (어떤 형태의 백엔드 수식도 다 잡아냅니다)
+// 💡 1. 대표님이 작성해주신 순수 Katex 컴포넌트 (이중 백슬래시 방어 추가)
 // ==========================================
-const KatexInline = ({ math }) => {
+const InlineMath = ({ math }) => {
   if (!math) return null;
   const cleanMath = String(math).replace(/\\\\/g, "\\");
-  const html = katex.renderToString(cleanMath, { throwOnError: false });
+  const html = katex.renderToString(cleanMath, {
+    throwOnError: false,
+    displayMode: false,
+  });
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
-const KatexBlock = ({ math }) => {
+const BlockMath = ({ math }) => {
   if (!math) return null;
   const cleanMath = String(math).replace(/\\\\/g, "\\");
   const html = katex.renderToString(cleanMath, {
@@ -46,36 +49,42 @@ const KatexBlock = ({ math }) => {
   return (
     <div
       dangerouslySetInnerHTML={{ __html: html }}
-      className="overflow-x-auto my-4"
+      className="overflow-x-auto my-4 flex justify-center"
     />
   );
 };
 
-// 💡 텍스트와 수식($ $, \( \), \[ \])이 섞인 문장을 완벽히 분리해서 그려주는 컴포넌트
-const MixedText = ({ text }) => {
+// 💡 2. 스마트 수식 렌더러 ($ 기호 유무에 따라 자동 판별)
+const SmartMathRenderer = ({ text, isBlock = true }) => {
   if (!text) return null;
-  // 정규식: $$, \[, \], $, \(, \) 패턴을 모두 잡아냅니다.
-  const regex =
-    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[\s\S]*?\$|\\\([\s\S]*?\\\))/g;
-  const parts = String(text).split(regex);
+  const str = String(text);
 
-  return (
-    <span className="whitespace-pre-wrap leading-relaxed">
-      {parts.map((part, i) => {
-        if (!part) return null;
-        if (part.startsWith("$$") && part.endsWith("$$")) {
-          return <KatexBlock key={i} math={part.slice(2, -2)} />;
-        } else if (part.startsWith("\\[") && part.endsWith("\\]")) {
-          return <KatexBlock key={i} math={part.slice(2, -2)} />;
-        } else if (part.startsWith("$") && part.endsWith("$")) {
-          return <KatexInline key={i} math={part.slice(1, -1)} />;
-        } else if (part.startsWith("\\(") && part.endsWith("\\)")) {
-          return <KatexInline key={i} math={part.slice(2, -2)} />;
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </span>
-  );
+  // 문장 안에 $, \[, \( 기호가 섞여 있다면 문장과 수식을 분리해서 렌더링!
+  if (str.includes("$") || str.includes("\\[") || str.includes("\\(")) {
+    const regex =
+      /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\(.*?\\\)|(?<!\\)\$[\s\S]*?(?<!\\)\$)/g;
+    const parts = str.split(regex);
+
+    return (
+      <span className="whitespace-pre-wrap leading-relaxed">
+        {parts.map((part, i) => {
+          if (!part) return null;
+          if (part.startsWith("$$") && part.endsWith("$$"))
+            return <BlockMath key={i} math={part.slice(2, -2)} />;
+          if (part.startsWith("\\[") && part.endsWith("\\]"))
+            return <BlockMath key={i} math={part.slice(2, -2)} />;
+          if (part.startsWith("\\(") && part.endsWith("\\)"))
+            return <InlineMath key={i} math={part.slice(2, -2)} />;
+          if (part.startsWith("$") && part.endsWith("$"))
+            return <InlineMath key={i} math={part.slice(1, -1)} />;
+          return <span key={i}>{part}</span>;
+        })}
+      </span>
+    );
+  }
+
+  // $ 기호가 없으면 문장 전체를 수식 코드로 간주하고 크게 그립니다! (예: \text{이차함수}... 문제 해결)
+  return isBlock ? <BlockMath math={str} /> : <InlineMath math={str} />;
 };
 // ==========================================
 
@@ -140,22 +149,14 @@ export default function AiVideoWatch() {
       let newData = null;
       if (videoInfo && videoInfo.generator) {
         await new Promise((resolve) => setTimeout(resolve, 500));
-        const localData = videoInfo.generator();
-        // 로컬 데이터를 MixedText 포맷에 맞게 강제 변환
-        newData = {
-          ...localData,
-          problem: `$$${localData.problem}$$`,
-          answer: `$$${localData.answer}$$`,
-          steps: localData.steps.map((s) => ({
-            text: `${s.text}${s.math ? `\n$$${s.math}$$` : ""}`,
-          })),
-        };
+        newData = videoInfo.generator();
       } else {
         const endpoint = id.includes("circuit")
           ? "/api/circuit/random"
           : "/api/math/random";
         const res = await apiClient.get(`${endpoint}?type=${id}`);
         newData = res.data;
+        console.log("📥 백엔드 수신 데이터:", res.data); // 디버깅용 콘솔
       }
       setProblemData(newData);
     } catch (e) {
@@ -189,7 +190,7 @@ export default function AiVideoWatch() {
       </div>
     );
 
-  // 💡 2. 데이터 추출 로직 대폭 강화 (백엔드 변수명 파편화 완벽 방어)
+  // 💡 데이터 추출 및 파편화 방어
   const problemText =
     problemData?.problem ||
     problemData?.question ||
@@ -203,36 +204,35 @@ export default function AiVideoWatch() {
   const stepsList = problemData?.steps || problemData?.explanation || [];
   const choices = problemData?.choices || problemData?.options || [];
 
-  // 문제용 그림 (회로도, 기본 그래프)
+  // 💡 회로도 및 그래프 렌더링 강제 처리 함수
+  const renderImage = (imgData) => {
+    if (!imgData) return null;
+    let src = String(imgData).trim();
+    if (!src.startsWith("http") && !src.startsWith("data:")) {
+      src = `data:image/png;base64,${src}`; // Base64 코드만 왔을 경우 헤더 강제 부착
+    }
+    return (
+      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex justify-center">
+        <img
+          src={src}
+          alt="문제 이미지"
+          className="max-w-full h-auto rounded object-contain max-h-[400px]"
+        />
+      </div>
+    );
+  };
+
   const problemImage =
     problemData?.image ||
     problemData?.image_url ||
     problemData?.image_base64 ||
     problemData?.circuit_image ||
-    problemData?.plot;
-  // 해설용 그림 (Matplotlib 답안)
+    problemData?.plot ||
+    problemData?.img;
   const solutionImage =
     problemData?.solution_image ||
     problemData?.explanation_image ||
     problemData?.answer_image;
-
-  // 이미지 렌더링 헬퍼 함수
-  const renderImage = (imgSrc, altText) => {
-    if (!imgSrc) return null;
-    const src =
-      String(imgSrc).startsWith("http") || String(imgSrc).startsWith("data:")
-        ? imgSrc
-        : `data:image/png;base64,${imgSrc}`;
-    return (
-      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm mb-6 flex justify-center">
-        <img
-          src={src}
-          alt={altText}
-          className="max-w-full h-auto rounded object-contain"
-        />
-      </div>
-    );
-  };
 
   return (
     <main className="pt-24 pb-12 px-6 max-w-7xl mx-auto font-body">
@@ -262,7 +262,7 @@ export default function AiVideoWatch() {
             <section className="scroll-mt-24">
               <div className="flex border-b border-gray-200 mt-8 mb-2">
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
                   onClick={() => setActiveTab("quiz")}
                 >
                   실전 퀴즈
@@ -270,7 +270,7 @@ export default function AiVideoWatch() {
 
                 {WidgetComponent && (
                   <button
-                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400"}`}
+                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400 hover:text-gray-600"}`}
                     onClick={() => setActiveTab("widget")}
                   >
                     <Sparkles
@@ -284,7 +284,7 @@ export default function AiVideoWatch() {
                 )}
 
                 <button
-                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
                   onClick={() => setActiveTab("qna")}
                 >
                   질문 및 A/S
@@ -328,17 +328,17 @@ export default function AiVideoWatch() {
                         )}
                       </div>
 
-                      {/* 💡 문제 회로도/그래프 출력 */}
-                      {renderImage(problemImage, "문제 이미지")}
+                      {/* 💡 회로도/그래프 강력 렌더링 */}
+                      {renderImage(problemImage)}
 
-                      {/* 💡 문제 지문 (MixedText로 텍스트와 수식 완벽 혼합 렌더링) */}
+                      {/* 💡 문제 텍스트 (SmartMathRenderer로 $ 기호 유무 완벽 방어) */}
                       {problemText && (
                         <div className="mb-10 text-xl text-gray-800 font-bold px-2">
-                          <MixedText text={problemText} />
+                          <SmartMathRenderer text={problemText} />
                         </div>
                       )}
 
-                      {/* 💡 4지 선다 버튼 영역 (주관식 방어 로직 추가) */}
+                      {/* 4지 선다 버튼 영역 */}
                       {choices.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
                           {choices.map((choice, index) => (
@@ -369,13 +369,15 @@ export default function AiVideoWatch() {
                                 {index + 1}
                               </span>
                               <span className="text-lg font-bold">
-                                <MixedText text={choice} />
+                                <SmartMathRenderer
+                                  text={choice}
+                                  isBlock={false}
+                                />
                               </span>
                             </button>
                           ))}
                         </div>
                       ) : (
-                        // 백엔드에서 4지선다를 안 보냈을 경우 주관식 모드로 변경
                         !showSolution && (
                           <div className="text-center mb-10">
                             <button
@@ -395,8 +397,8 @@ export default function AiVideoWatch() {
                             💡 전문가의 상세 풀이
                           </h4>
 
-                          {/* 해설용 그래프/그림 (Matplotlib) */}
-                          {renderImage(solutionImage, "해설 이미지")}
+                          {/* 💡 해설용 그래프/그림 (Matplotlib) */}
+                          {renderImage(solutionImage)}
 
                           {stepsList.length > 0 && (
                             <div className="space-y-4">
@@ -417,12 +419,12 @@ export default function AiVideoWatch() {
                                     <div className="mt-1 w-full overflow-hidden">
                                       {stepText && (
                                         <p className="text-gray-700 font-bold mb-3">
-                                          <MixedText text={stepText} />
+                                          <SmartMathRenderer text={stepText} />
                                         </p>
                                       )}
                                       {stepMath && (
                                         <div className="bg-white p-4 rounded-xl shadow-sm overflow-x-auto">
-                                          <KatexBlock math={stepMath} />
+                                          <BlockMath math={stepMath} />
                                         </div>
                                       )}
                                     </div>
@@ -432,13 +434,14 @@ export default function AiVideoWatch() {
                             </div>
                           )}
 
+                          {/* 최종 정답 출력 */}
                           {answerText && (
                             <div className="mt-10 p-8 bg-[#0047a5] text-white rounded-3xl text-center shadow-lg">
                               <p className="text-blue-200 text-sm font-black mb-2 uppercase tracking-widest">
                                 Final Answer
                               </p>
                               <div className="text-4xl font-black overflow-x-auto">
-                                <MixedText text={answerText} />
+                                <SmartMathRenderer text={answerText} />
                               </div>
                             </div>
                           )}
