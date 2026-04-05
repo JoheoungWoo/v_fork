@@ -2,7 +2,7 @@ import apiClient from "@/api/core/apiClient";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Loader2, MoveLeft, Sparkles } from "lucide-react";
-import { Suspense, useEffect, useState } from "react"; // Suspense 추가
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 // 컴포넌트 Import
@@ -12,23 +12,19 @@ import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import VideoPlayerList from "@/components/video/VideoPlayList";
 
+// 💡 위젯 데이터 맵 Import
+import WIDGET_MAP from "@/utils/widgetData";
+
 import {
   circuitLectures,
   emLectures,
   mathLectures,
   visionLectures,
 } from "@/constants/videoData";
-import WIDGET_MAP from "@/utils/widgetData";
 
 // ==========================================
 // 💡 커스텀 Katex 컴포넌트
 // ==========================================
-const KatexInline = ({ math }) => {
-  if (!math) return null;
-  const html = katex.renderToString(String(math), { throwOnError: false });
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-};
-
 const KatexBlock = ({ math }) => {
   if (!math) return null;
   const html = katex.renderToString(String(math), {
@@ -49,37 +45,30 @@ export default function AiVideoWatch() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // 🌟 상태 관리 강화
-  const [videoInfo, setVideoInfo] = useState(null); // URL뿐만 아니라 전체 정보를 담습니다.
+  const [videoInfo, setVideoInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("quiz"); // "quiz" | "widget" | "qna"
-
+  const [activeTab, setActiveTab] = useState("quiz");
   const [problemData, setProblemData] = useState(null);
   const [isFetchingProblem, setIsFetchingProblem] = useState(false);
 
-  // 로컬 상수에 데이터가 있는지 확인
   const localVideoData = ALL_LECTURES.find((l) => l.id === id);
   const isVision = id.startsWith("vision_");
 
-  // AiVideoWatch.jsx 내부 useEffect 수정
   useEffect(() => {
     const fetchVideoData = async () => {
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${id}`);
-        console.log("res: ", res);
-        // 💡 핵심: API 데이터와 로컬 데이터를 합쳐서 widget_type을 반드시 확보합니다.
-        const mergedData = {
-          ...localVideoData, // 로컬의 widget_type을 먼저 가져옴
-          ...res.data, // API에서 온 실시간 정보를 덮어씌움
+
+        // 💡 1. 백엔드 데이터와 로컬 데이터를 합칩니다.
+        // 콘솔에 찍힌 'widget_type'을 우선적으로 챙깁니다.
+        const merged = {
+          ...localVideoData, // 기본 로컬 데이터
+          ...res.data, // 백엔드 실시간 데이터 (widget_type 포함)
         };
 
-        // 만약 API에서 온 데이터에 widget_type이 없으면 로컬 것을 강제로 씁니다.
-        if (!res.data.widget_type && localVideoData?.widget_type) {
-          mergedData.widget_type = localVideoData.widget_type;
-        }
-
-        setVideoInfo(mergedData);
+        console.log("🚀 최종 병합된 데이터:", merged);
+        setVideoInfo(merged);
       } catch (error) {
         console.warn("API 호출 실패, 로컬 데이터를 사용합니다.");
         setVideoInfo(localVideoData);
@@ -90,9 +79,15 @@ export default function AiVideoWatch() {
 
     setProblemData(null);
     if (id) fetchVideoData();
-  }, [id, localVideoData]); // localVideoData 의존성 추가
+  }, [id, localVideoData]);
 
-  // 💡 문제 생성 로직 (Matplotlib 이미지 및 LaTeX 대응)
+  // 💡 2. 위젯 컴포넌트를 찾는 로직 (widget_type 필드 엄격 체크)
+  const WidgetComponent = useMemo(() => {
+    const type = videoInfo?.widget_type || videoInfo?.widgetType;
+    if (!type) return null;
+    return WIDGET_MAP[type] || null;
+  }, [videoInfo]);
+
   const handleFetchProblem = async () => {
     setIsFetchingProblem(true);
     try {
@@ -110,9 +105,8 @@ export default function AiVideoWatch() {
 
   if (loading)
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4">
+      <div className="flex h-screen items-center justify-center">
         <Loader2 className="animate-spin text-[#0047a5]" size={48} />
-        <p className="text-gray-500 font-bold">강의를 준비하는 중입니다...</p>
       </div>
     );
 
@@ -122,11 +116,6 @@ export default function AiVideoWatch() {
         영상을 찾을 수 없습니다.
       </div>
     );
-
-  // 🌟 위젯 컴포넌트 추출 (WIDGET_MAP 활용)
-  const WidgetComponent = videoInfo.widget_type
-    ? WIDGET_MAP[videoInfo.widget_type]
-    : null;
 
   return (
     <main className="pt-24 pb-12 px-6 max-w-7xl mx-auto font-body">
@@ -139,9 +128,9 @@ export default function AiVideoWatch() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-8">
-          <section className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-gray-800 flex items-center justify-center">
+          <section className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-gray-800">
             <VideoPlayer
-              videoUrl={videoInfo.video_url}
+              videoUrl={videoInfo.video_url || videoInfo.videoUrls?.[0]}
               title={videoInfo.title}
             />
           </section>
@@ -154,19 +143,18 @@ export default function AiVideoWatch() {
 
           {!isVision && (
             <section className="scroll-mt-24">
-              {/* 🌟 탭 UI 개선 (실습 도구 추가) */}
-              <div className="flex border-b border-gray-200 mt-8 mb-2 overflow-x-auto">
+              <div className="flex border-b border-gray-200 mt-8 mb-2">
                 <button
-                  className={`flex-1 min-w-[100px] py-4 px-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
                   onClick={() => setActiveTab("quiz")}
                 >
                   실전 퀴즈
                 </button>
 
-                {/* 💡 위젯이 있는 경우에만 '실습 도구' 탭을 활성화합니다. */}
+                {/* 💡 3. 위젯 탭 노출 조건 강화 */}
                 {WidgetComponent && (
                   <button
-                    className={`flex-1 min-w-[100px] py-4 px-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400"}`}
+                    className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400"}`}
                     onClick={() => setActiveTab("widget")}
                   >
                     <Sparkles
@@ -180,31 +168,26 @@ export default function AiVideoWatch() {
                 )}
 
                 <button
-                  className={`flex-1 min-w-[100px] py-4 px-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
+                  className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400"}`}
                   onClick={() => setActiveTab("qna")}
                 >
                   질문 및 A/S
                 </button>
               </div>
 
-              {/* 🌟 탭별 렌더링 */}
               {activeTab === "quiz" && (
-                <div className="mt-8">
-                  <div className="w-full text-center mb-8">
-                    <button
-                      onClick={handleFetchProblem}
-                      disabled={isFetchingProblem}
-                      className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md transition-all active:scale-[0.98] ${isFetchingProblem ? "bg-gray-400" : "bg-[#0047a5] text-white"}`}
-                    >
-                      {isFetchingProblem
-                        ? "⏳ 문제 생성 중..."
-                        : "🎯 랜덤 문제 가져오기"}
-                    </button>
-                  </div>
-
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={handleFetchProblem}
+                    disabled={isFetchingProblem}
+                    className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md ${isFetchingProblem ? "bg-gray-400" : "bg-[#0047a5] text-white"}`}
+                  >
+                    {isFetchingProblem
+                      ? "⏳ 문제 생성 중..."
+                      : "🎯 랜덤 문제 가져오기"}
+                  </button>
                   {problemData && (
-                    <div className="mt-8 p-8 bg-white border border-gray-100 rounded-2xl shadow-sm animate-fade-in">
-                      {/* Matplotlib 이미지 출력 */}
+                    <div className="mt-8 p-8 bg-white border rounded-2xl shadow-sm text-left">
                       {(problemData.image || problemData.image_url) && (
                         <div className="mb-6 flex justify-center bg-gray-50 p-4 rounded-xl border">
                           <img
@@ -221,13 +204,12 @@ export default function AiVideoWatch() {
                       <KatexBlock
                         math={problemData.problem || problemData.problem_latex}
                       />
-                      {/* ... (해설 및 정답 생략, 기존과 동일) ... */}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* 💡 🌟 실습 위젯 렌더링 영역 (WIDGET_MAP 활용) */}
+              {/* 💡 4. 실습 위젯 렌더링 영역 */}
               {activeTab === "widget" && WidgetComponent && (
                 <div className="mt-8 p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 min-h-[500px]">
                   <Suspense
