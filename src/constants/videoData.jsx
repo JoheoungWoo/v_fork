@@ -146,6 +146,7 @@ export const mathLectures = [
       "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/c3d27bab5e1cf6ae9f07f70ae08c1e26/watch", // 일반 시청용
       "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/c3d27bab5e1cf6ae9f07f70ae08c1e26/manifest/video.m3u8", // HLS 스트리밍용
     ],
+    widget_type: "trig_circle", // 💡 이 줄을 추가하세요! (WIDGET_MAP의 키값)
   },
   {
     id: "8fc05f0f6c31f19deeb976cb2b1562cf",
@@ -218,6 +219,7 @@ export const mathLectures = [
       "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/c44dc0cd81fbb02320299a7bff062e4d/watch",
       "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/c44dc0cd81fbb02320299a7bff062e4d/manifest/video.m3u8",
     ],
+    widget_type: "derivative", // 💡 이 줄을 추가하세요!
     useBackend: true, // 💡 FastAPI 백엔드의 무한 문제풀이(generate_derivative_problem)를 호출하기 위해 반드시 true로 설정
   },
   {
@@ -346,6 +348,7 @@ export const circuitLectures = [
     videoUrls: [
       "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/99ba85e1fdd547f5cdc6e4afd17e03ce/watch", // 시청용 링크
     ],
+    widget_type: "ohms_law", // 💡 이 줄을 추가하세요!
   },
 ];
 

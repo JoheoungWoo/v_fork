@@ -61,13 +61,25 @@ export default function AiVideoWatch() {
   const localVideoData = ALL_LECTURES.find((l) => l.id === id);
   const isVision = id.startsWith("vision_");
 
+  // AiVideoWatch.jsx 내부 useEffect 수정
   useEffect(() => {
     const fetchVideoData = async () => {
       try {
         setLoading(true);
-        // 💡 백엔드에서 영상의 전체 데이터(widget_type 포함)를 가져옵니다.
         const res = await apiClient.get(`/api/video/url/${id}`);
-        setVideoInfo(res.data);
+
+        // 💡 핵심: API 데이터와 로컬 데이터를 합쳐서 widget_type을 반드시 확보합니다.
+        const mergedData = {
+          ...localVideoData, // 로컬의 widget_type을 먼저 가져옴
+          ...res.data, // API에서 온 실시간 정보를 덮어씌움
+        };
+
+        // 만약 API에서 온 데이터에 widget_type이 없으면 로컬 것을 강제로 씁니다.
+        if (!res.data.widget_type && localVideoData?.widget_type) {
+          mergedData.widget_type = localVideoData.widget_type;
+        }
+
+        setVideoInfo(mergedData);
       } catch (error) {
         console.warn("API 호출 실패, 로컬 데이터를 사용합니다.");
         setVideoInfo(localVideoData);
@@ -78,7 +90,7 @@ export default function AiVideoWatch() {
 
     setProblemData(null);
     if (id) fetchVideoData();
-  }, [id]);
+  }, [id, localVideoData]); // localVideoData 의존성 추가
 
   // 💡 문제 생성 로직 (Matplotlib 이미지 및 LaTeX 대응)
   const handleFetchProblem = async () => {
