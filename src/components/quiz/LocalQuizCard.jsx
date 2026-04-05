@@ -1,6 +1,21 @@
-import React, { useState } from "react";
-import { BlockMath, InlineMath } from "react-katex";
+import katex from "katex";
+import { useState } from "react";
 
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 const LocalQuizCard = ({ title, generateFunc }) => {
   const [quizData, setQuizData] = useState(null);
   const [showSolution, setShowSolution] = useState(false);

@@ -1,16 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
-import CytoscapeComponent from 'react-cytoscapejs';
-import { X, BookOpen, FileText, RotateCcw } from 'lucide-react';
-import { BlockMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
+import katex from "katex";
+import { BookOpen, FileText, RotateCcw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import CytoscapeComponent from "react-cytoscapejs";
+
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
 // ✅ 계층별 색상 정의
 const NODE_COLORS = {
-  subject: { bg: '#1e3a8a', border: '#1e40af', text: '#ffffff' },
-  chapter: { bg: '#3b82f6', border: '#2563eb', text: '#ffffff' },
-  topic: { bg: '#10b981', border: '#059669', text: '#ffffff' },
-  concept: { bg: '#f59e0b', border: '#d97706', text: '#ffffff' },
-  formula: { bg: '#ef4444', border: '#dc2626', text: '#ffffff' },
+  subject: { bg: "#1e3a8a", border: "#1e40af", text: "#ffffff" },
+  chapter: { bg: "#3b82f6", border: "#2563eb", text: "#ffffff" },
+  topic: { bg: "#10b981", border: "#059669", text: "#ffffff" },
+  concept: { bg: "#f59e0b", border: "#d97706", text: "#ffffff" },
+  formula: { bg: "#ef4444", border: "#dc2626", text: "#ffffff" },
 };
 
 const GraphVisualization = ({ items, subjectInfo }) => {
@@ -27,12 +42,12 @@ const GraphVisualization = ({ items, subjectInfo }) => {
     const nodeSet = new Set();
 
     // Subject 노드 (중앙)
-    const subjectId = `S-${subjectInfo?.code || 'ALL'}`;
+    const subjectId = `S-${subjectInfo?.code || "ALL"}`;
     nodes.push({
       data: {
         id: subjectId,
-        label: subjectInfo?.title || '전체',
-        type: 'subject',
+        label: subjectInfo?.title || "전체",
+        type: "subject",
       },
       position: { x: 0, y: 0 }, // ✅ 중앙 고정
     });
@@ -41,23 +56,23 @@ const GraphVisualization = ({ items, subjectInfo }) => {
     // Chapter 그룹핑
     const chapterMap = new Map();
     const chapterList = [];
-    
-    items.forEach(item => {
-      const chapterCode = item.code.split('-').slice(0, 2).join('-');
-      
+
+    items.forEach((item) => {
+      const chapterCode = item.code.split("-").slice(0, 2).join("-");
+
       if (!chapterMap.has(chapterCode)) {
         const chapterId = `C-${chapterCode}`;
         chapterList.push(chapterId);
-        
+
         nodes.push({
           data: {
             id: chapterId,
-            label: `Ch.${chapterCode.split('-')[1]}`,
-            type: 'chapter',
+            label: `Ch.${chapterCode.split("-")[1]}`,
+            type: "chapter",
             chapterCode: chapterCode,
           },
         });
-        
+
         edges.push({
           data: {
             id: `${subjectId}-${chapterId}`,
@@ -65,7 +80,7 @@ const GraphVisualization = ({ items, subjectInfo }) => {
             target: chapterId,
           },
         });
-        
+
         chapterMap.set(chapterCode, { id: chapterId, topics: [] });
       }
 
@@ -76,7 +91,7 @@ const GraphVisualization = ({ items, subjectInfo }) => {
           data: {
             id: topicId,
             label: item.title,
-            type: 'topic',
+            type: "topic",
             parentChapter: chapterMap.get(chapterCode).id,
           },
         });
@@ -94,16 +109,16 @@ const GraphVisualization = ({ items, subjectInfo }) => {
       }
 
       // Concept 노드
-      item.concepts?.forEach(concept => {
+      item.concepts?.forEach((concept) => {
         const conceptId = `K-${concept.uid}`;
         if (!nodeSet.has(conceptId)) {
           nodes.push({
             data: {
               id: conceptId,
               label: concept.name,
-              type: 'concept',
-              description: concept.summary || '',
-              definition: concept.definition || '',
+              type: "concept",
+              description: concept.summary || "",
+              definition: concept.definition || "",
               formulas: concept.formulas || [],
               parentTopic: topicId,
             },
@@ -126,8 +141,8 @@ const GraphVisualization = ({ items, subjectInfo }) => {
             nodes.push({
               data: {
                 id: formulaId,
-                label: 'ƒ',
-                type: 'formula',
+                label: "ƒ",
+                type: "formula",
                 latex: formula,
                 parentConcept: conceptId,
               },
@@ -152,49 +167,49 @@ const GraphVisualization = ({ items, subjectInfo }) => {
     setTimeout(() => {
       if (cyRef.current) {
         const cy = cyRef.current;
-        
+
         // 1. Subject를 중앙에 고정
         const subjectNode = cy.getElementById(subjectId);
         subjectNode.position({ x: 0, y: 0 });
-        
+
         // 2. Chapter들을 Subject 주변에 원형 배치
         const chapterNodes = cy.nodes('[type="chapter"]');
         const chapterCount = chapterNodes.length;
         const chapterRadius = 300; // Subject로부터의 거리
-        
+
         chapterNodes.forEach((chNode, index) => {
           const angle = (index * 2 * Math.PI) / chapterCount;
           const x = chapterRadius * Math.cos(angle);
           const y = chapterRadius * Math.sin(angle);
           chNode.position({ x, y });
-          
+
           // 3. 각 Chapter의 Topic들을 원형 배치
           const topics = cy.nodes(`[parentChapter="${chNode.id()}"]`);
           const topicCount = topics.length;
           const topicRadius = 200; // Chapter로부터의 거리
-          
+
           topics.forEach((tNode, tIndex) => {
             const tAngle = (tIndex * 2 * Math.PI) / topicCount;
             const tX = x + topicRadius * Math.cos(tAngle);
             const tY = y + topicRadius * Math.sin(tAngle);
             tNode.position({ x: tX, y: tY });
-            
+
             // 4. Topic의 Concept들을 원형 배치
             const concepts = cy.nodes(`[parentTopic="${tNode.id()}"]`);
             const conceptCount = concepts.length;
             const conceptRadius = 120;
-            
+
             concepts.forEach((cNode, cIndex) => {
               const cAngle = (cIndex * 2 * Math.PI) / conceptCount;
               const cX = tX + conceptRadius * Math.cos(cAngle);
               const cY = tY + conceptRadius * Math.sin(cAngle);
               cNode.position({ x: cX, y: cY });
-              
+
               // 5. Concept의 Formula들을 원형 배치
               const formulas = cy.nodes(`[parentConcept="${cNode.id()}"]`);
               const formulaCount = formulas.length;
               const formulaRadius = 80;
-              
+
               formulas.forEach((fNode, fIndex) => {
                 const fAngle = (fIndex * 2 * Math.PI) / formulaCount;
                 const fX = cX + formulaRadius * Math.cos(fAngle);
@@ -204,124 +219,123 @@ const GraphVisualization = ({ items, subjectInfo }) => {
             });
           });
         });
-        
+
         // 6. 전체 뷰 맞추기
         cy.fit(100);
         cy.center();
       }
     }, 200);
-
   }, [items, subjectInfo]);
 
   // ✅ Cytoscape 스타일시트
   const stylesheet = [
     {
-      selector: 'node',
+      selector: "node",
       style: {
-        'label': 'data(label)',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        'font-family': 'Pretendard, sans-serif',
-        'font-weight': 700,
-        'text-wrap': 'wrap',
-        'text-max-width': '120px',
-        'font-size': '12px',
-        'overlay-opacity': 0,
+        label: "data(label)",
+        "text-valign": "center",
+        "text-halign": "center",
+        "font-family": "Pretendard, sans-serif",
+        "font-weight": 700,
+        "text-wrap": "wrap",
+        "text-max-width": "120px",
+        "font-size": "12px",
+        "overlay-opacity": 0,
       },
     },
     {
       selector: 'node[type="subject"]',
       style: {
-        'width': 120,
-        'height': 120,
-        'background-color': NODE_COLORS.subject.bg,
-        'border-width': 5,
-        'border-color': NODE_COLORS.subject.border,
-        'color': NODE_COLORS.subject.text,
-        'font-size': '22px',
-        'shape': 'round-rectangle',
+        width: 120,
+        height: 120,
+        "background-color": NODE_COLORS.subject.bg,
+        "border-width": 5,
+        "border-color": NODE_COLORS.subject.border,
+        color: NODE_COLORS.subject.text,
+        "font-size": "22px",
+        shape: "round-rectangle",
       },
     },
     {
       selector: 'node[type="chapter"]',
       style: {
-        'width': 90,
-        'height': 90,
-        'background-color': NODE_COLORS.chapter.bg,
-        'border-width': 4,
-        'border-color': NODE_COLORS.chapter.border,
-        'color': NODE_COLORS.chapter.text,
-        'font-size': '16px',
-        'shape': 'round-rectangle',
+        width: 90,
+        height: 90,
+        "background-color": NODE_COLORS.chapter.bg,
+        "border-width": 4,
+        "border-color": NODE_COLORS.chapter.border,
+        color: NODE_COLORS.chapter.text,
+        "font-size": "16px",
+        shape: "round-rectangle",
       },
     },
     {
       selector: 'node[type="topic"]',
       style: {
-        'width': 70,
-        'height': 70,
-        'background-color': NODE_COLORS.topic.bg,
-        'border-width': 3,
-        'border-color': NODE_COLORS.topic.border,
-        'color': NODE_COLORS.topic.text,
-        'font-size': '12px',
-        'shape': 'ellipse',
+        width: 70,
+        height: 70,
+        "background-color": NODE_COLORS.topic.bg,
+        "border-width": 3,
+        "border-color": NODE_COLORS.topic.border,
+        color: NODE_COLORS.topic.text,
+        "font-size": "12px",
+        shape: "ellipse",
       },
     },
     {
       selector: 'node[type="concept"]',
       style: {
-        'width': 55,
-        'height': 55,
-        'background-color': NODE_COLORS.concept.bg,
-        'border-width': 2,
-        'border-color': NODE_COLORS.concept.border,
-        'color': NODE_COLORS.concept.text,
-        'font-size': '10px',
-        'shape': 'cut-rectangle',
+        width: 55,
+        height: 55,
+        "background-color": NODE_COLORS.concept.bg,
+        "border-width": 2,
+        "border-color": NODE_COLORS.concept.border,
+        color: NODE_COLORS.concept.text,
+        "font-size": "10px",
+        shape: "cut-rectangle",
       },
     },
     {
       selector: 'node[type="formula"]',
       style: {
-        'width': 40,
-        'height': 40,
-        'background-color': NODE_COLORS.formula.bg,
-        'border-width': 2,
-        'border-color': NODE_COLORS.formula.border,
-        'color': NODE_COLORS.formula.text,
-        'font-size': '18px',
-        'font-family': 'serif',
-        'font-style': 'italic',
-        'shape': 'ellipse',
+        width: 40,
+        height: 40,
+        "background-color": NODE_COLORS.formula.bg,
+        "border-width": 2,
+        "border-color": NODE_COLORS.formula.border,
+        color: NODE_COLORS.formula.text,
+        "font-size": "18px",
+        "font-family": "serif",
+        "font-style": "italic",
+        shape: "ellipse",
       },
     },
     {
-      selector: 'edge',
+      selector: "edge",
       style: {
-        'width': 2,
-        'line-color': '#64748b',
-        'target-arrow-color': '#64748b',
-        'target-arrow-shape': 'triangle',
-        'curve-style': 'bezier',
-        'arrow-scale': 1,
-        'opacity': 0.6,
+        width: 2,
+        "line-color": "#64748b",
+        "target-arrow-color": "#64748b",
+        "target-arrow-shape": "triangle",
+        "curve-style": "bezier",
+        "arrow-scale": 1,
+        opacity: 0.6,
       },
     },
     {
-      selector: '.highlighted',
+      selector: ".highlighted",
       style: {
-        'border-width': 5,
-        'border-color': '#fbbf24',
-        'z-index': 999,
+        "border-width": 5,
+        "border-color": "#fbbf24",
+        "z-index": 999,
       },
     },
   ];
 
   const handleNodeClick = (node) => {
     const data = node.data();
-    
-    if (data.type === 'concept') {
+
+    if (data.type === "concept") {
       setSelectedNode({
         name: data.label,
         description: data.description,
@@ -329,10 +343,10 @@ const GraphVisualization = ({ items, subjectInfo }) => {
         formulas: data.formulas || [],
       });
       setIsModalOpen(true);
-      
+
       if (cyRef.current) {
-        cyRef.current.elements().removeClass('highlighted');
-        node.addClass('highlighted');
+        cyRef.current.elements().removeClass("highlighted");
+        node.addClass("highlighted");
       }
     }
   };
@@ -375,10 +389,15 @@ const GraphVisualization = ({ items, subjectInfo }) => {
                 }}
               />
               <span className="text-xs font-medium text-slate-700 capitalize">
-                {type === 'subject' ? '과목' :
-                 type === 'chapter' ? '챕터' :
-                 type === 'topic' ? '주제' :
-                 type === 'concept' ? '개념' : '공식'}
+                {type === "subject"
+                  ? "과목"
+                  : type === "chapter"
+                    ? "챕터"
+                    : type === "topic"
+                      ? "주제"
+                      : type === "concept"
+                        ? "개념"
+                        : "공식"}
               </span>
             </div>
           ))}
@@ -397,11 +416,11 @@ const GraphVisualization = ({ items, subjectInfo }) => {
       <CytoscapeComponent
         elements={elements}
         stylesheet={stylesheet}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: "100%", height: "100%" }}
         cy={(cy) => {
           cyRef.current = cy;
-          cy.on('tap', 'node', (evt) => handleNodeClick(evt.target));
-          
+          cy.on("tap", "node", (evt) => handleNodeClick(evt.target));
+
           // ✅ 마우스 휠 줌 활성화
           cy.userZoomingEnabled(true);
           cy.panningEnabled(true);
@@ -490,12 +509,14 @@ const GraphVisualization = ({ items, subjectInfo }) => {
                 </div>
               )}
 
-              {!selectedNode.description && !selectedNode.definition && 
-               (!selectedNode.formulas || selectedNode.formulas.length === 0) && (
-                <div className="text-center py-10 text-gray-400">
-                  등록된 상세 정보가 없습니다.
-                </div>
-              )}
+              {!selectedNode.description &&
+                !selectedNode.definition &&
+                (!selectedNode.formulas ||
+                  selectedNode.formulas.length === 0) && (
+                  <div className="text-center py-10 text-gray-400">
+                    등록된 상세 정보가 없습니다.
+                  </div>
+                )}
             </div>
           </div>
         </div>

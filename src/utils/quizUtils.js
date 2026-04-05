@@ -183,7 +183,47 @@ export const generateCompositeFunctionQuiz = () => {
   };
 };
 
-// src/utils/quizUtils.js 맨 아래에 추가
+// 💡 [추가] 완전제곱식 인수분해 문제 생성기
+export const generatePerfectSquareQuiz = () => {
+  // a는 1~9 사이의 무작위 정수
+  const a = Math.floor(Math.random() * 9) + 1;
+  // 부호는 50% 확률로 플러스 또는 마이너스
+  const isPositive = Math.random() > 0.5;
+
+  const middleTerm = 2 * a;
+  const lastTerm = a * a;
+
+  const signStr = isPositive ? "+" : "-";
+  const middleStr = isPositive ? `+ ${middleTerm}x` : `- ${middleTerm}x`;
+
+  // 문제: x^2 ± 2ax + a^2
+  const problem = `다음 이차식을 완전제곱식으로 인수분해 하시오. \\\\[10pt] x^2 ${middleStr} + ${lastTerm}`;
+
+  // 정답: (x ± a)^2
+  const answer = `(x ${signStr} ${a})^2`;
+
+  // 풀이 과정 (Steps)
+  const steps = [
+    {
+      text: "완전제곱식의 기본 형태를 떠올립니다.",
+      math: "(x \\pm A)^2 = x^2 \\pm 2Ax + A^2",
+    },
+    {
+      text: `주어진 식에서 x의 계수가 ${isPositive ? "" : "-"}${middleTerm}이므로, 2A = ${middleTerm}에서 A = ${a} 임을 알 수 있습니다.`,
+      math: "",
+    },
+    {
+      text: `상수항을 확인해보면 A^2 = ${a}^2 = ${lastTerm} 으로 일치하므로, 이 식은 완전제곱식입니다.`,
+      math: "",
+    },
+    {
+      text: "따라서 인수분해 결과는 다음과 같습니다.",
+      math: answer,
+    },
+  ];
+
+  return { problem, answer, steps };
+};
 
 // [6강용] 오옴의 법칙과 병렬 합성저항 퀴즈
 export const generateOhmQuiz = () => {
@@ -218,4 +258,50 @@ export const generateOhmQuiz = () => {
   ];
 
   return { problem, answer, steps };
+};
+
+// 💡 [심화 수학] 다항함수의 미분계수 구하기 퀴즈 생성기
+export const generateDerivativeQuiz = () => {
+  // f(x) = ax^3 + bx^2 + cx 형태의 3차 다항함수 생성
+  const a = Math.floor(Math.random() * 3) + 1; // 1 ~ 3 (최고차항 계수는 0이 되지 않도록)
+  const b = Math.floor(Math.random() * 7) - 3; // -3 ~ 3
+  const c = Math.floor(Math.random() * 9) - 4; // -4 ~ 4
+  const k = Math.floor(Math.random() * 5) - 2; // x = k 에서의 미분계수 (-2 ~ 2)
+
+  // f(x) 수식 문자열 조합
+  const bStr = b === 0 ? "" : b > 0 ? `+ ${b}x^2` : `- ${Math.abs(b)}x^2`;
+  const cStr = c === 0 ? "" : c > 0 ? `+ ${c}x` : `- ${Math.abs(c)}x`;
+  const fx = `${a}x^3 ${bStr} ${cStr}`.trim();
+
+  // 도함수 f'(x) = 3ax^2 + 2bx + c 계수 계산
+  const aPrime = 3 * a;
+  const bPrime = 2 * b;
+
+  // f'(x) 수식 문자열 조합
+  const bPrimeStr =
+    bPrime === 0 ? "" : bPrime > 0 ? `+ ${bPrime}x` : `- ${Math.abs(bPrime)}x`;
+  const cPrimeStr = c === 0 ? "" : c > 0 ? `+ ${c}` : `- ${Math.abs(c)}`;
+  const fPrimeX = `${aPrime}x^2 ${bPrimeStr} ${cPrimeStr}`.trim();
+
+  // 미분계수 f'(k) 정답 계산
+  const answer = aPrime * (k * k) + bPrime * k + c;
+
+  return {
+    problem: `함수 f(x) = ${fx} \\text{ 에 대하여, } x = ${k} \\text{ 에서의 미분계수 } f'(${k}) \\text{ 의 값을 구하시오.}`,
+    answer: `${answer}`,
+    steps: [
+      {
+        text: "가장 먼저 주어진 함수의 도함수 f'(x)를 구합니다.",
+        math: `f'(x) = ${fPrimeX}`,
+      },
+      {
+        text: `구한 도함수의 x 자리에 ${k}을(를) 대입합니다.`,
+        math: `f'(${k}) = ${aPrime}(${k})^2 ${bPrime >= 0 ? "+" : "-"} ${Math.abs(bPrime)}(${k}) ${c >= 0 ? "+" : "-"} ${Math.abs(c)}`,
+      },
+      {
+        text: "계산 결과, 정답은 다음과 같습니다.",
+        math: `f'(${k}) = ${answer}`,
+      },
+    ],
+  };
 };

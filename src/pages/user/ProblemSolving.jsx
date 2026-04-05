@@ -1,13 +1,27 @@
+import { aiChatGraph } from "@/api/aiApi";
+import { submitAnswer } from "@/api/answerApi";
+import apiClient from "@/api/core/apiClient"; // ✅ axios 대신 apiClient 임포트
+import { getQuestionById } from "@/api/questionApi";
+import useCustomLogin from "@/hooks/useCustomLogin";
+import katex from "katex";
 import { useEffect, useRef, useState } from "react";
-import { BlockMath, InlineMath } from "react-katex";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-import { submitAnswer } from "@/api/answerApi";
-import { getQuestionById } from "@/api/questionApi";
-import { aiChatGraph } from "@/api/aiApi";
-import useCustomLogin from "@/hooks/useCustomLogin";
-import apiClient from "@/api/core/apiClient"; // ✅ axios 대신 apiClient 임포트
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 export default function QuestionSolvePage() {
   const { id } = useParams();
   const navigate = useNavigate();

@@ -1,6 +1,20 @@
-import React from "react";
-import { BlockMath, InlineMath } from "react-katex";
+import katex from "katex";
 
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 const ApiQuizCard = ({
   quizData,
   selectedIndex,
