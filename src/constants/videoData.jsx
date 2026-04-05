@@ -358,12 +358,40 @@ export const emLectures = [
     id: "em_coulomb",
     subject: "전자기학",
     title: "1강. 쿨롱의 법칙",
-    duration: "-",
+    duration: "10:00",
     description:
-      "전하 간에 작용하는 힘을 벡터와 분수식을 이용해 정확히 계산합니다.",
-    thumbnail: "",
+      "두 전하 사이에 작용하는 전기력(쿨롱의 힘)을 3D 시뮬레이션을 통해 직관적으로 이해하고 계산해 봅니다.",
+    thumbnail:
+      "https://placehold.co/600x400/0f172a/ffffff?text=Coulomb%27s+Law+3D",
     thumbnailTime: "",
-    videoUrls: [""],
+    videoUrls: [""], // 영상 준비 중
+    widget_type: "coulombs_law", // 💡 WIDGET_MAP 연결 완료!
+  },
+  {
+    id: "lec_poten_3d", // 이전 캡처에서 확인된 ID
+    subject: "전자기학",
+    title: "2강. 등전위선 3D 시각화",
+    duration: "12:30",
+    description:
+      "전기장 내에서 전위가 같은 점들을 연결한 등전위선을 3D 공간에서 확인하고 전하의 움직임을 예측해 봅니다.",
+    thumbnail:
+      "https://placehold.co/600x400/1e293b/ffffff?text=Equipotential+3D",
+    thumbnailTime: "",
+    videoUrls: [""], // 영상 준비 중
+    widget_type: "equipotential", // 💡 WIDGET_MAP 연결 완료!
+  },
+  {
+    id: "em_ampere_law",
+    subject: "전자기학",
+    title: "3강. 앙페르의 오른나사 법칙",
+    duration: "08:45",
+    description:
+      "직선 전류 주위에 생성되는 자기장의 방향을 앙페르의 오른나사 법칙을 통해 입체적으로 학습합니다.",
+    thumbnail:
+      "https://placehold.co/600x400/334155/ffffff?text=Ampere%27s+Law+3D",
+    thumbnailTime: "",
+    videoUrls: [""], // 영상 준비 중
+    widget_type: "ampere_law", // 💡 WIDGET_MAP 연결 완료!
   },
 ];
 
