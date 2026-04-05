@@ -364,11 +364,12 @@ export const emLectures = [
     thumbnail:
       "https://placehold.co/600x400/0f172a/ffffff?text=Coulomb%27s+Law+3D",
     thumbnailTime: "",
-    videoUrls: [""], // 영상 준비 중
-    widget_type: "coulombs_law", // 💡 WIDGET_MAP 연결 완료!
+    // 💡 잠금 해제를 위한 임시 더미 영상 URL 삽입!
+    videoUrls: ["https://www.w3schools.com/html/mov_bbb.mp4"],
+    widget_type: "coulombs_law",
   },
   {
-    id: "lec_poten_3d", // 이전 캡처에서 확인된 ID
+    id: "lec_poten_3d",
     subject: "전자기학",
     title: "2강. 등전위선 3D 시각화",
     duration: "12:30",
@@ -377,8 +378,9 @@ export const emLectures = [
     thumbnail:
       "https://placehold.co/600x400/1e293b/ffffff?text=Equipotential+3D",
     thumbnailTime: "",
-    videoUrls: [""], // 영상 준비 중
-    widget_type: "equipotential", // 💡 WIDGET_MAP 연결 완료!
+    // 💡 잠금 해제를 위한 임시 더미 영상 URL 삽입!
+    videoUrls: ["https://www.w3schools.com/html/mov_bbb.mp4"],
+    widget_type: "equipotential",
   },
   {
     id: "em_ampere_law",
@@ -390,11 +392,11 @@ export const emLectures = [
     thumbnail:
       "https://placehold.co/600x400/334155/ffffff?text=Ampere%27s+Law+3D",
     thumbnailTime: "",
-    videoUrls: [""], // 영상 준비 중
-    widget_type: "ampere_law", // 💡 WIDGET_MAP 연결 완료!
+    // 💡 잠금 해제를 위한 임시 더미 영상 URL 삽입!
+    videoUrls: ["https://www.w3schools.com/html/mov_bbb.mp4"],
+    widget_type: "ampere_law",
   },
 ];
-
 // 4. AI Company Vision 데이터
 export const visionLectures = [
   {
