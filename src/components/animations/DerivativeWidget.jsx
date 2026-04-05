@@ -1,113 +1,166 @@
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 
-export default function DerivativeWidget({ data }) {
-  const [selectedIdx, setSelectedIdx] = useState(null);
-  const [isCorrect, setIsCorrect] = useState(null);
+export default function DerivativeWidget() {
+  // h: x의 변화량 (델타 x)
+  const [h, setH] = useState(2.0);
 
-  // 데이터가 로드되지 않았을 때의 예외 처리
-  if (!data) {
-    return (
-      <div className="flex items-center justify-center w-full h-48 bg-slate-50 rounded-xl">
-        <p className="text-slate-500 font-medium">
-          문제를 불러오는 중입니다...
-        </p>
-      </div>
-    );
-  }
+  // 함수: f(x) = x^2 (단순화를 위해)
+  const f = (x) => x * x;
 
-  const { problem_latex, graph_image, choices, correct_index, steps } = data;
+  // 고정점 A (x=1)
+  const x1 = 1;
+  const y1 = f(x1);
 
-  const handleChoiceClick = (idx) => {
-    if (selectedIdx !== null) return; // 이미 풀었다면 클릭 방지
+  // 이동점 B (x=1+h)
+  const x2 = x1 + parseFloat(h);
+  const y2 = f(x2);
 
-    setSelectedIdx(idx);
-    setIsCorrect(idx === correct_index);
-  };
+  // 두 점을 지나는 할선의 기울기 (평균변화율)
+  const slope = h === 0 ? 2 * x1 : (y2 - y1) / h;
 
   return (
-    <div className="flex flex-col items-center w-full max-w-2xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
-      {/* 1. 문제 영역 */}
-      <div className="w-full mb-6 text-center">
-        <h3 className="text-[15px] md:text-[16px] font-bold text-slate-800 leading-relaxed break-keep">
-          {/* 💡 실제 환경에서는 아래 텍스트 대신 LaTeX 렌더링 컴포넌트를 사용하세요 */}
-          {/* <InlineMath math={problem_latex} /> */}
-          {problem_latex}
-        </h3>
+    <div className="flex flex-col items-center justify-center w-full h-full font-body">
+      <div className="text-center mb-8 space-y-3">
+        <h2 className="text-3xl font-black text-[#0047a5]">
+          순간변화율 (미분)의 시각화
+        </h2>
+        <p className="text-gray-600 font-medium">
+          <span className="text-blue-600 font-bold">x의 변화량(h)</span>을 0에
+          가깝게 줄여보세요. <br />두 점을 지나는 선(할선)이 한 점을 지나는 선(
+          <strong className="text-red-500">접선</strong>)으로 바뀝니다!
+        </p>
       </div>
 
-      {/* 2. 시각화 그래프 영역 (SVG) */}
-      {graph_image && (
-        <div className="w-full flex justify-center mb-8">
-          {/* 백엔드에서 Base64로 인코딩된 SVG 데이터를 이미지로 렌더링합니다 */}
-          <img
-            src={`data:image/svg+xml;base64,${graph_image}`}
-            alt="이차함수와 도함수 그래프"
-            className="w-full max-w-sm h-auto object-contain pointer-events-none"
-          />
-        </div>
-      )}
+      <div className="flex flex-col lg:flex-row items-center gap-12 w-full max-w-4xl bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+        {/* 조작 및 수식 패널 */}
+        <div className="flex-1 w-full space-y-8">
+          <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+            <label className="flex justify-between font-black text-gray-800 mb-4 text-lg">
+              <span>점 B의 이동 거리 (h)</span>
+              <span className={h == 0 ? "text-red-500" : "text-blue-600"}>
+                {h == 0 ? "h → 0 (접선!)" : `h = ${h}`}
+              </span>
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="3"
+              step="0.1"
+              value={h}
+              onChange={(e) => setH(Number(e.target.value))}
+              className="w-full accent-blue-600 h-2 bg-gray-200 rounded-lg cursor-pointer"
+            />
+          </div>
 
-      {/* 3. 객관식 보기 영역 */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4 w-full mb-6">
-        {choices.map((choice, idx) => {
-          // 버튼 상태에 따른 스타일링 로직
-          let btnStyle =
-            "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300";
-
-          if (selectedIdx !== null) {
-            if (idx === correct_index) {
-              // 정답인 버튼 (내가 선택했든 안 했든 초록색으로 표시)
-              btnStyle =
-                "bg-green-50 border-green-500 text-green-700 ring-1 ring-green-500";
-            } else if (idx === selectedIdx) {
-              // 내가 선택했는데 오답인 버튼 (빨간색으로 표시)
-              btnStyle =
-                "bg-red-50 border-red-500 text-red-700 ring-1 ring-red-500";
-            } else {
-              // 선택받지 못한 나머지 오답 버튼
-              btnStyle =
-                "bg-slate-50 border-slate-200 text-slate-400 opacity-60";
-            }
-          }
-
-          return (
-            <button
-              key={idx}
-              onClick={() => handleChoiceClick(idx)}
-              disabled={selectedIdx !== null}
-              className={`py-3 px-4 rounded-xl border-2 transition-all duration-200 font-medium ${btnStyle}`}
-            >
-              {/* <InlineMath math={choice.replace(/\$/g, '')} /> */}
-              {choice}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 4. 해설 (단계별 풀이) 영역 - 문제를 푼 후에만 노출 */}
-      {selectedIdx !== null && (
-        <div className="w-full mt-4 p-5 bg-blue-50/50 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <h4 className="flex items-center gap-2 font-bold text-blue-800 mb-4">
-            <span className="text-lg">💡</span> AI 단계별 풀이
-          </h4>
-          <div className="flex flex-col gap-4">
-            {steps.map((step, i) => (
-              <div key={i} className="flex flex-col gap-1.5">
-                <p className="text-[14px] font-medium text-slate-700 break-keep">
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-200 text-blue-800 text-[11px] font-bold mr-2">
-                    {step.step_num}
-                  </span>
-                  {step.description}
-                </p>
-                <div className="pl-7 text-blue-600 font-semibold text-[15px]">
-                  {/* <BlockMath math={step.latex} /> */}
-                  {step.latex}
-                </div>
+          <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4 text-lg text-center">
+            <div className="flex justify-center items-center gap-4 font-bold text-gray-700">
+              <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
+                점 A (1, 1)
               </div>
-            ))}
+              <ArrowRight className="text-gray-400" />
+              <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200 text-blue-600">
+                점 B ({x2.toFixed(1)}, {y2.toFixed(1)})
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-200">
+              <span className="text-gray-500 text-sm block mb-1">
+                현재 선의 기울기 (평균변화율)
+              </span>
+              <span className="text-3xl font-black text-[#0047a5]">
+                {slope.toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
-      )}
+
+        {/* 그래프 렌더링 영역 (SVG) */}
+        <div className="flex-1 w-full flex justify-center">
+          <svg
+            viewBox="0 0 200 200"
+            className="w-full max-w-sm bg-gray-50 rounded-2xl border border-gray-200 overflow-visible"
+          >
+            {/* 그리드 */}
+            <g stroke="#e2e8f0" strokeWidth="0.5">
+              {[0, 50, 100, 150, 200].map((v) => (
+                <line key={`h${v}`} x1="0" y1={v} x2="200" y2={v} />
+              ))}
+              {[0, 50, 100, 150, 200].map((v) => (
+                <line key={`v${v}`} x1={v} y1="0" x2={v} y2="200" />
+              ))}
+            </g>
+
+            {/* 좌표축 */}
+            <line
+              x1="20"
+              y1="180"
+              x2="190"
+              y2="180"
+              stroke="#64748b"
+              strokeWidth="2"
+              markerEnd="url(#arrow)"
+            />
+            <line
+              x1="20"
+              y1="180"
+              x2="20"
+              y2="10"
+              stroke="#64748b"
+              strokeWidth="2"
+              markerEnd="url(#arrow)"
+            />
+
+            {/* 곡선 y = x^2 (대략적인 베지어 곡선으로 표현) */}
+            <path
+              d="M 20 180 Q 80 180 140 20"
+              fill="none"
+              stroke="#94a3b8"
+              strokeWidth="3"
+            />
+
+            {/* 선 그리기 (할선 또는 접선) */}
+            <line
+              x1="20"
+              y1={180 - slope * (0 - 1) * 20}
+              x2="180"
+              y2={180 - slope * (8 - 1) * 20}
+              stroke={h == 0 ? "#ef4444" : "#3b82f6"}
+              strokeWidth={h == 0 ? "3" : "2"}
+              className="transition-all duration-300"
+            />
+
+            {/* 점 A */}
+            <circle cx="50" cy="160" r="5" fill="#0f172a" />
+            <text x="35" y="155" fontSize="10" fontWeight="bold">
+              A
+            </text>
+
+            {/* 점 B */}
+            {h > 0 && (
+              <>
+                <circle
+                  cx={50 + h * 30}
+                  cy={180 - y2 * 20}
+                  r="5"
+                  fill="#2563eb"
+                  className="transition-all duration-300"
+                />
+                <text
+                  x={60 + h * 30}
+                  y={180 - y2 * 20}
+                  fontSize="10"
+                  fill="#2563eb"
+                  fontWeight="bold"
+                  className="transition-all duration-300"
+                >
+                  B
+                </text>
+              </>
+            )}
+          </svg>
+        </div>
+      </div>
     </div>
   );
 }
