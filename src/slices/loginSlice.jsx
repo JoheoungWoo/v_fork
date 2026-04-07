@@ -1,8 +1,7 @@
 // slices/loginSlice.js
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import apiClient from "../api/core/apiClient"; // 👈 axios 대신 우리가 만든 apiClient 사용!
-
-const STORAGE_KEY = "electric_login";
+import { STORAGE_KEY } from "@/utils/storageKey";
 
 // 로컬 스토리지에서 초기 상태 불러오기
 const loadSaved = () => {

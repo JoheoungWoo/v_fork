@@ -8,6 +8,7 @@ import {
   circuitLectures,
   emLectures,
   visionLectures,
+  controlLectures,
 } from "@/constants/videoData";
 
 // ==========================================
@@ -18,12 +19,14 @@ const ALL_LECTURES = [
   ...circuitLectures,
   ...emLectures,
   ...visionLectures,
+  ...controlLectures,
 ];
 
 const getCategory = (lecture) => {
   if (lecture.subject?.includes("수학")) return "기초 수학";
   if (lecture.subject?.includes("회로")) return "회로이론";
   if (lecture.subject?.includes("전자기")) return "전자기학";
+  if (lecture.subject?.includes("제어")) return "제어공학";
   if (lecture.subject?.includes("AI") || lecture.subject?.includes("Vision"))
     return "Vision";
   return "전체";
@@ -50,6 +53,11 @@ const CATEGORY_INFO = {
     desc: "눈에 보이지 않는 전기장과 자기장의 원리를 3D 시각화 자료를 통해 직관적으로 이해합니다.",
     bgIcon: "🧲",
   },
+  제어공학: {
+    title: "전자기학 핵심 요약",
+    desc: "눈에 보이지 않는 전기장과 자기장의 원리를 3D 시각화 자료를 통해 직관적으로 이해합니다.",
+    bgIcon: "🧲",
+  },
   Vision: {
     title: "머신 비전 & AI",
     desc: "최신 AI 기술을 활용한 이미지 프로세싱과 머신 비전의 기초를 다집니다.",
@@ -62,6 +70,7 @@ const CATEGORIES = [
   { id: "기초 수학", label: "기초 수학", icon: "📐" },
   { id: "회로이론", label: "회로이론", icon: "⚡" },
   { id: "전자기학", label: "전자기학", icon: "🧲" },
+  { id: "제어공학", label: "제어공학", icon: "🧲" },
   { id: "Vision", label: "Vision", icon: "🚀" },
 ];
 

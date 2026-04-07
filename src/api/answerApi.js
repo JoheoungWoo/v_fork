@@ -1,5 +1,6 @@
 import apiClient from "@/api/core/apiClient";
 
+// Supabase 답변요청
 export const submitAnswer = async (payload, token) => {
   const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   console.log("config:", ",payload:", payload, config);

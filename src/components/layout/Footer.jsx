@@ -25,14 +25,13 @@ export default function Footer1() {
             <div className="text-[12px] md:text-[13px] font-medium text-slate-600 leading-relaxed space-y-1">
               <div className="space-y-1.5 md:space-y-2">
                 <p>
-                  상호명: (주)에듀스파크{" "}
+                  상호명: (주)에이아이컴퍼니
                   <span className="mx-1 md:mx-2 text-slate-300">|</span> 대표자:
-                  홍길동
+                  이재오
                 </p>
-                <p>주소: 서울특별시 강남구 테헤란로 123 에듀스파크 빌딩</p>
+                <p>주소: 수원시 권선구 구운중로 11번길 15, 103호</p>
                 <div className="pt-1 flex flex-col md:flex-row md:gap-4 text-slate-500">
-                  <p>사업자등록번호: 123-45-67890</p>
-                  <p>통신판매업신고: 제2024-서울강남-0000호</p>
+                  <p>사업자등록번호: 824-87-03549</p>
                 </div>
               </div>
             </div>
@@ -123,10 +122,10 @@ export default function Footer1() {
           {/* 하단 좌측: 링크 */}
           <div className="flex flex-wrap justify-center lg:justify-start gap-x-4 gap-y-2 text-[13px] md:text-[14px] text-slate-700 lg:flex-1">
             <a
+              href="https://www.aicompany.co.kr/"
               className="font-bold hover:text-[#0059bb] transition-colors cursor-pointer"
-              onClick={() => move("/about")}
             >
-              회사소개
+              <img src="@/../public/icons/favicon.ico" />
             </a>
             <a
               className="font-bold hover:text-[#0059bb] transition-colors cursor-pointer"
@@ -179,7 +178,7 @@ export default function Footer1() {
           {/* 하단 우측: 카피라이트 */}
           <div className="flex justify-center lg:justify-end lg:flex-1">
             <p className="text-[12px] md:text-[13px] font-bold text-slate-500 md:text-slate-600 text-center">
-              © 2024 {COMPANY_NAME} Corp. All rights reserved.
+              © 2026 {COMPANY_NAME} Corp. All rights reserved.
             </p>
           </div>
         </div>

@@ -27,7 +27,25 @@ const WIDGET_MAP = {
   vectorInnerProject: lazy(
     () => import("@/components/animations/VectorInnerProductWidget"),
   ),
+  vector_cross_product: lazy(
+    // 💡 새롭게 추가된 외적 위젯
+    () => import("@/components/animations/VectorCrossProductWidget"),
+  ),
   derivative: lazy(() => import("@/components/animations/DerivativeWidget")),
+  partial_derivative: lazy(
+    () => import("@/components/animations/PartialDerivativeWidget"),
+  ),
+  math_integral_3d: lazy(
+    () => import("@/components/animations/Integral3DWidget"),
+  ),
+  angular_velocity: lazy(
+    () => import("@/components/animations/AngularVelocityWidget"),
+  ),
+  reactance_3d: lazy(() => import("@/components/animations/Reactance3DWidget")),
+
+  laplace_3d: lazy(
+    () => import("@/components/animations/controls/Laplace3DWidget"), // 만드신 경로에 맞게 지정
+  ),
 };
 
 export default WIDGET_MAP;

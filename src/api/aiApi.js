@@ -1,7 +1,7 @@
 // src/api/ai.js (또는 해당 API 파일 위치)
 import apiClient from "@/api/core/apiClient";
 
-export const aiChatGraph = async (payload, token) => {
+export const aiChat = async (payload, token) => {
   console.log("payload:", payload, ",token:", token);
   const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 

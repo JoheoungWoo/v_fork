@@ -1,4 +1,4 @@
-import { aiChatGraph } from "@/api/aiApi";
+import { aiChat } from "@/api/aiApi";
 import { submitAnswer } from "@/api/answerApi";
 import apiClient from "@/api/core/apiClient"; // ✅ axios 대신 apiClient 임포트
 import { getQuestionById } from "@/api/questionApi";
@@ -150,6 +150,11 @@ export default function QuestionSolvePage() {
   // AI 질문하기 핸들러
   const handleAiSearch = async (e) => {
     e.preventDefault();
+
+    // 향후 적용 예정
+    // 클로드 ai에게 질문한다.
+    // 하루 n회 무료 질문
+
     if (!aiQuestion.trim()) return;
 
     setAiLoading(true);
@@ -157,7 +162,7 @@ export default function QuestionSolvePage() {
     setAiError(null);
 
     try {
-      const data = await aiChatGraph({ question: aiQuestion }, token);
+      const data = await aiChat({ question: aiQuestion }, token);
       setAiAnswer(data.answer);
       if (data.remaining_count !== undefined) {
         console.log(`남은 횟수: ${data.remaining_count}`);
