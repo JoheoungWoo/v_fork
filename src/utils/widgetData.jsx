@@ -46,6 +46,10 @@ const WIDGET_MAP = {
   laplace_3d: lazy(
     () => import("@/components/animations/controls/Laplace3DWidget"), // 만드신 경로에 맞게 지정
   ),
+  // 💡 [추가] 직각 좌표계 & 극좌표계 위젯 연결
+  polar_coordinate: lazy(
+    () => import("@/components/animations/PolarCoordinateWidget"),
+  ),
 };
 
 export default WIDGET_MAP;

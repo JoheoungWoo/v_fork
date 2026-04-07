@@ -282,6 +282,24 @@ export const mathLectures = [
     widget_type: "angular_velocity",
     useBackend: true,
   },
+  // 💡 [추가] 19강. 직각 좌표계와 극좌표계
+  {
+    id: "1da7f54684d76e361736580a26e6917c",
+    subject: "기초수학",
+    title: "19강. 직각 좌표계와 극좌표계",
+    duration: "-",
+    description:
+      "평면의 위치를 표현하는 두 가지 방법! 직각 좌표계(x, y)와 극좌표계(r, θ)의 변환 원리를 이해하고, 원운동에서 파생되는 3차원 sin/cos 파형을 시각적으로 학습합니다.",
+    thumbnail:
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/1da7f54684d76e361736580a26e6917c/thumbnails/thumbnail.jpg",
+    thumbnailTime: "10s",
+    videoUrls: [
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/1da7f54684d76e361736580a26e6917c/watch",
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/1da7f54684d76e361736580a26e6917c/manifest/video.m3u8",
+    ],
+    widget_type: "polar_coordinate", // 💡 WIDGET_MAP과 연결되는 키
+    useBackend: true, // 💡 Python 백엔드에서 문제 생성
+  },
   {
     id: "math_equation",
     subject: "기초수학",
