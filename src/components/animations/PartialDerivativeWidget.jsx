@@ -1,275 +1,285 @@
-import { Activity } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
-const PartialDerivativeWidget = () => {
-  const mountRef = useRef(null);
-  const [sliceX, setSliceX] = useState(2); // X=2 고정 (슬라이스 평면 위치)
-  const [pointY, setPointY] = useState(0); // Y 지점 (접선을 그릴 위치)
+const PolarCoordinateWidget = () => {
+  const [radius, setRadius] = useState(3);
+  const [angleDeg, setAngleDeg] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const requestRef = useRef(null);
 
-  // 3차원 함수 정의 (z = x^2 - y^2 형태의 말안장 곡면, 시각화를 위해 스케일 조정)
-  const calculateZ = (x, y) => (Math.pow(x, 2) - Math.pow(y, 2)) * 0.2;
+  // 자동 재생 애니메이션 루프 (requestAnimationFrame 사용으로 부드럽게)
+  const animate = () => {
+    setAngleDeg((prevAngle) => (prevAngle + 1) % 361);
+    requestRef.current = requestAnimationFrame(animate);
+  };
 
   useEffect(() => {
-    if (!mountRef.current) return;
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f172a); // slate-900
-    const width = mountRef.current.clientWidth;
-    const height = mountRef.current.clientHeight;
-
-    // 카메라 설정
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(15, 12, 15);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    mountRef.current.appendChild(renderer.domElement);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-
-    // 조명 설정
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(10, 20, 10);
-    scene.add(dirLight);
-
-    // 축 도우미 (X: Red, Y: Green, Z: Blue)
-    const axesHelper = new THREE.AxesHelper(10);
-    scene.add(axesHelper);
-
-    // 🌟 1. 3D 곡면(Surface) 생성
-    const gridSize = 10;
-    const segments = 40;
-    const geometry = new THREE.PlaneGeometry(
-      gridSize,
-      gridSize,
-      segments,
-      segments,
-    );
-
-    // PlaneGeometry의 꼭짓점의 Z값을 함수에 맞게 변형
-    const posAttribute = geometry.attributes.position;
-    for (let i = 0; i < posAttribute.count; i++) {
-      const x = posAttribute.getX(i);
-      const y = posAttribute.getY(i);
-      const z = calculateZ(x, y);
-      posAttribute.setZ(i, z);
+    if (isPlaying) {
+      requestRef.current = requestAnimationFrame(animate);
+    } else {
+      cancelAnimationFrame(requestRef.current);
     }
-    geometry.computeVertexNormals();
+    return () => cancelAnimationFrame(requestRef.current);
+  }, [isPlaying]);
 
-    // 곡면 매트리얼 (양면 렌더링, 약간 투명하게)
-    const material = new THREE.MeshPhysicalMaterial({
-      color: 0x3b82f6, // blue-500
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.6,
-      wireframe: false,
-      roughness: 0.4,
-    });
+  // --------------------------------------------------------
+  // SVG 렌더링용 변수 및 스케일 계산
+  // --------------------------------------------------------
+  const scale = 25; // 반지름 1 = 25px
+  const cx = 150; // 왼쪽 원운동 영역 중심 X
+  const cy = 150; // 왼쪽 원운동 영역 중심 Y
 
-    // Three.js는 Y가 위쪽이므로, Plane을 눕힙니다 (X-Z 평면이 수학적 X-Y 평면이 되도록)
-    const surface = new THREE.Mesh(geometry, material);
-    surface.rotation.x = -Math.PI / 2;
-    scene.add(surface);
+  const waveStartX = 350; // 오른쪽 파형 영역 시작 X
+  const maxWaveWidth = 360; // 360도는 360px로 매핑
 
-    // 🌟 2. 잘라내는 평면 (Slicing Plane: X = C)
-    const planeGeo = new THREE.PlaneGeometry(gridSize, gridSize * 2);
-    const planeMat = new THREE.MeshBasicMaterial({
-      color: 0xf59e0b, // amber-500
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.3,
-      depthWrite: false, // 다른 객체 위에 예쁘게 렌더링되도록
-    });
-    const slicePlane = new THREE.Mesh(planeGeo, planeMat);
-    slicePlane.rotation.y = Math.PI / 2; // X축과 수직이 되도록 회전
-    scene.add(slicePlane);
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const currentR = radius * scale;
 
-    // 🌟 3. 교선 (Intersection Curve)
-    const curveMat = new THREE.LineBasicMaterial({
-      color: 0xff0000,
-      linewidth: 3,
-    });
-    let curveLine = new THREE.Line(new THREE.BufferGeometry(), curveMat);
-    scene.add(curveLine);
+  // 원 위의 현재 점 좌표 (SVG는 Y축이 아래로 갈수록 +이므로 -sin을 적용)
+  const px = cx + currentR * Math.cos(angleRad);
+  const py = cy - currentR * Math.sin(angleRad);
 
-    // 🌟 4. 접점 및 접선 (Tangent Line)
-    const pointGeo = new THREE.SphereGeometry(0.2, 16, 16);
-    const pointMat = new THREE.MeshBasicMaterial({ color: 0x10b981 }); // emerald-500
-    const tangentPoint = new THREE.Mesh(pointGeo, pointMat);
-    scene.add(tangentPoint);
+  // 0도부터 현재 각도까지의 Sin, Cos 파형 경로(Path) 생성
+  const sinPoints = [];
+  const cosPoints = [];
+  for (let t = 0; t <= angleDeg; t++) {
+    const tRad = (t * Math.PI) / 180;
+    const x = waveStartX + t;
+    const sinY = cy - currentR * Math.sin(tRad);
+    const cosY = cy - currentR * Math.cos(tRad); // 코사인 파형
+    sinPoints.push(`${x},${sinY}`);
+    cosPoints.push(`${x},${cosY}`);
+  }
 
-    const tangentMat = new THREE.LineBasicMaterial({
-      color: 0x10b981,
-      linewidth: 4,
-    });
-    let tangentLine = new THREE.Line(new THREE.BufferGeometry(), tangentMat);
-    scene.add(tangentLine);
-
-    // 객체들을 ref에 저장하여 업데이트 시 접근
-    mountRef.current.sceneObjects = {
-      slicePlane,
-      curveLine,
-      tangentPoint,
-      tangentLine,
-    };
-
-    let animationFrameId;
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    // 리사이즈 처리
-    const resizeObserver = new ResizeObserver(() => {
-      if (!mountRef.current) return;
-      const w = mountRef.current.clientWidth;
-      const h = mountRef.current.clientHeight;
-      renderer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-    });
-    resizeObserver.observe(mountRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-      cancelAnimationFrame(animationFrameId);
-      if (mountRef.current) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-    };
-  }, []);
-
-  // 🌟 State(X, Y) 변경 시 기하학 업데이트
-  useEffect(() => {
-    if (!mountRef.current?.sceneObjects) return;
-    const { slicePlane, curveLine, tangentPoint, tangentLine } =
-      mountRef.current.sceneObjects;
-
-    // 1. 슬라이스 평면 위치 업데이트 (수학적 X축은 Three.js 씬에서 X축)
-    slicePlane.position.x = sliceX;
-
-    // 2. 교선 업데이트 (X=sliceX 로 고정된 곡선 그리기)
-    const curvePoints = [];
-    for (let i = -5; i <= 5; i += 0.1) {
-      // Three.js 좌표계: x = 수학적x, y = 수학적z, z = -수학적y
-      // 수학적으로 z = calculateZ(sliceX, y)
-      // 코딩 매핑: Three.X = sliceX, Three.Z = y, Three.Y = z
-      curvePoints.push(new THREE.Vector3(sliceX, calculateZ(sliceX, i), -i));
-    }
-    curveLine.geometry.dispose();
-    curveLine.geometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
-
-    // 3. 접점 위치 업데이트
-    const mathZ = calculateZ(sliceX, pointY);
-    tangentPoint.position.set(sliceX, mathZ, -pointY);
-
-    // 4. 접선 업데이트 (편미분 값 적용)
-    // z = (x^2 - y^2) * 0.2 이므로, y에 대한 편미분 dz/dy = -2y * 0.2 = -0.4 * y
-    const slopeY = -0.4 * pointY;
-
-    // 접선의 방향 벡터 (X는 고정이므로 0, Y는 1 변할 때 Z는 slopeY 변함)
-    // Three.js 맵핑: Three.X 변화량 0, Three.Z 변화량 -1(수학적 y 1증가), Three.Y 변화량 slopeY
-    const tangentDir = new THREE.Vector3(0, slopeY, -1).normalize();
-
-    const tangentLength = 4;
-    const p1 = tangentPoint.position
-      .clone()
-      .add(tangentDir.clone().multiplyScalar(-tangentLength / 2));
-    const p2 = tangentPoint.position
-      .clone()
-      .add(tangentDir.clone().multiplyScalar(tangentLength / 2));
-
-    tangentLine.geometry.dispose();
-    tangentLine.geometry = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-  }, [sliceX, pointY]);
-
-  // 화면에 표시할 실제 편미분 값 (기울기)
-  const currentSlope = (-0.4 * pointY).toFixed(2);
+  const sinPath = sinPoints.length > 0 ? `M ${sinPoints.join(" L ")}` : "";
+  const cosPath = cosPoints.length > 0 ? `M ${cosPoints.join(" L ")}` : "";
 
   return (
-    <div className="relative w-full h-[600px] bg-[#0f172a] rounded-2xl overflow-hidden border border-slate-800 font-sans">
-      <div ref={mountRef} className="absolute inset-0 w-full h-full" />
-
-      {/* 왼쪽 컨트롤 패널 */}
-      <div className="absolute top-4 left-4 w-72 bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-2xl z-10 space-y-4">
-        <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
-          <Activity className="text-blue-600" /> 편미분 시각화
-        </h2>
-
-        <div>
-          <label className="flex justify-between text-xs font-bold text-gray-600 mb-1">
-            <span>고정할 평면 위치 (X)</span>
-            <span className="text-amber-600">X = {sliceX}</span>
+    <div className="flex flex-col w-full h-full bg-slate-900 text-white p-4 rounded-xl border border-slate-700 shadow-xl">
+      {/* 1. 상단 컨트롤 패널 */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 bg-slate-800 p-4 rounded-lg">
+        <div className="flex-1 min-w-[200px]">
+          <label className="flex justify-between text-sm text-slate-300 mb-1 font-mono">
+            <span>반지름 (r)</span>
+            <span className="text-sky-400 font-bold">{radius}</span>
           </label>
           <input
             type="range"
-            min="-5"
+            min="1"
             max="5"
-            step="0.1"
-            value={sliceX}
-            onChange={(e) => setSliceX(Number(e.target.value))}
-            className="w-full h-1.5 accent-amber-500"
+            step="0.5"
+            value={radius}
+            onChange={(e) => setRadius(parseFloat(e.target.value))}
+            className="w-full accent-sky-500 cursor-pointer"
           />
-          <p className="text-[10px] text-gray-500 mt-1">
-            이 값을 조절하여 곡면을 싹둑 자릅니다 (Slicing).
-          </p>
         </div>
 
-        <div>
-          <label className="flex justify-between text-xs font-bold text-gray-600 mb-1">
-            <span>단면에서의 위치 (Y)</span>
-            <span className="text-emerald-600">Y = {pointY}</span>
+        <div className="flex-1 min-w-[200px]">
+          <label className="flex justify-between text-sm text-slate-300 mb-1 font-mono">
+            <span>각도 (θ)</span>
+            <span className="text-rose-400 font-bold">{angleDeg}°</span>
           </label>
           <input
             type="range"
-            min="-5"
-            max="5"
-            step="0.1"
-            value={pointY}
-            onChange={(e) => setPointY(Number(e.target.value))}
-            className="w-full h-1.5 accent-emerald-500"
+            min="0"
+            max="360"
+            step="1"
+            value={angleDeg}
+            onChange={(e) => {
+              setAngleDeg(parseInt(e.target.value));
+              setIsPlaying(false); // 수동 조작시 자동재생 멈춤
+            }}
+            className="w-full accent-rose-500 cursor-pointer"
           />
         </div>
+
+        <button
+          onClick={() => setIsPlaying(!isPlaying)}
+          className={`px-6 py-2 rounded-md font-bold transition-colors ${
+            isPlaying
+              ? "bg-red-500 hover:bg-red-600"
+              : "bg-emerald-500 hover:bg-emerald-600"
+          }`}
+        >
+          {isPlaying ? "⏸ 일시정지" : "▶ 자동 재생"}
+        </button>
       </div>
 
-      {/* 오른쪽 결과 패널 */}
-      <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md p-6 rounded-2xl shadow-2xl z-10 w-80 text-center">
-        <p className="text-sm font-bold text-gray-500 mb-2 border-b pb-2">
-          편미분 계산 결과
-        </p>
-        <div className="text-3xl font-serif mb-4 flex items-center justify-center gap-2">
-          <div className="flex flex-col items-center justify-center">
-            <span className="border-b-2 border-black px-1 pb-0.5">∂z</span>
-            <span className="px-1 pt-0.5">∂y</span>
+      {/* 2. 애니메이션 시각화 영역 (순수 SVG) */}
+      <div className="flex-1 relative bg-slate-950 rounded-lg overflow-hidden flex flex-col items-center justify-center p-4">
+        {/* 상단 수치 정보 */}
+        <div className="absolute top-4 left-6 flex space-x-6 font-mono text-sm z-10">
+          <div className="text-slate-400">
+            직각좌표: (
+            <span className="text-emerald-400">
+              {(radius * Math.cos(angleRad)).toFixed(2)}
+            </span>
+            ,
+            <span className="text-rose-400">
+              {(radius * Math.sin(angleRad)).toFixed(2)}
+            </span>
+            )
           </div>
-          <span>=</span>
-          <span className="font-bold text-emerald-600">{currentSlope}</span>
+          <div className="text-slate-400">
+            극좌표: (<span className="text-sky-400">{radius}</span>,
+            <span className="text-yellow-400">{angleDeg}°</span>)
+          </div>
         </div>
 
-        <div className="text-left text-sm bg-slate-50 text-slate-900 p-3 rounded-lg font-medium leading-relaxed shadow-inner">
-          <p>
-            <span className="text-amber-600 font-bold">X={sliceX}</span>로
-            고정했을 때 생성된 빨간색 교선 위에서,
-          </p>
-          <p className="mt-2">
-            초록색 점(
-            <span className="text-emerald-600 font-bold">Y={pointY}</span>)이
-            가리키는 <b>접선의 기울기</b>가 바로 편미분 값입니다.
-          </p>
-        </div>
-      </div>
+        {/* 메인 SVG 캔버스 */}
+        <svg viewBox="0 0 750 300" className="w-full max-w-4xl h-auto">
+          {/* 그리드 및 축 (왼쪽 원 영역) */}
+          <line
+            x1="0"
+            y1={cy}
+            x2="300"
+            y2={cy}
+            stroke="#334155"
+            strokeWidth="1"
+          />
+          <line
+            x1={cx}
+            y1="0"
+            x2={cx}
+            y2="300"
+            stroke="#334155"
+            strokeWidth="1"
+          />
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-1.5 rounded-full text-[10px] backdrop-blur-sm pointer-events-none">
-        마우스로 드래그하여 3차원 공간을 회전해 보세요.
+          {/* 그리드 및 축 (오른쪽 파형 영역) */}
+          <line
+            x1={waveStartX}
+            y1={cy}
+            x2={waveStartX + 380}
+            y2={cy}
+            stroke="#334155"
+            strokeWidth="1"
+          />
+          <line
+            x1={waveStartX}
+            y1="0"
+            x2={waveStartX}
+            y2="300"
+            stroke="#334155"
+            strokeWidth="1"
+          />
+
+          {/* 원 그리기 */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={currentR}
+            stroke="#475569"
+            strokeWidth="2"
+            fill="none"
+            strokeDasharray="4 4"
+          />
+
+          {/* ---------------- 원 안의 벡터 ---------------- */}
+          {/* 중심에서 현재 점까지의 선 (반지름 r) */}
+          <line
+            x1={cx}
+            y1={cy}
+            x2={px}
+            y2={py}
+            stroke="#38bdf8"
+            strokeWidth="3"
+          />
+          {/* x축 투영선 (cos) */}
+          <line
+            x1={cx}
+            y1={cy}
+            x2={px}
+            y2={cy}
+            stroke="#34d399"
+            strokeWidth="2"
+            opacity="0.8"
+          />
+          {/* y축 투영선 (sin) */}
+          <line
+            x1={px}
+            y1={cy}
+            x2={px}
+            y2={py}
+            stroke="#fb7185"
+            strokeWidth="2"
+            opacity="0.8"
+          />
+          {/* 현재 점 표시 */}
+          <circle cx={px} cy={py} r="5" fill="#fff" />
+
+          {/* ---------------- 파형 영역 ---------------- */}
+          {/* 사인(Sin) 파형 - 빨간색 */}
+          {sinPath && (
+            <path d={sinPath} stroke="#fb7185" strokeWidth="3" fill="none" />
+          )}
+          {/* 코사인(Cos) 파형 - 초록색 */}
+          {cosPath && (
+            <path
+              d={cosPath}
+              stroke="#34d399"
+              strokeWidth="3"
+              fill="none"
+              opacity="0.6"
+            />
+          )}
+
+          {/* 현재 값의 끝점들 */}
+          {angleDeg > 0 && (
+            <>
+              {/* 원 위의 Y위치와 파형의 Y위치를 연결하는 점선 (Sin 관계 보여주기) */}
+              <line
+                x1={px}
+                y1={py}
+                x2={waveStartX + angleDeg}
+                y2={py}
+                stroke="#fb7185"
+                strokeWidth="1"
+                strokeDasharray="5 5"
+                opacity="0.6"
+              />
+              <circle cx={waveStartX + angleDeg} cy={py} r="4" fill="#fb7185" />
+
+              {/* Cos 끝점 */}
+              <circle
+                cx={waveStartX + angleDeg}
+                cy={cy - currentR * Math.cos(angleRad)}
+                r="4"
+                fill="#34d399"
+              />
+            </>
+          )}
+
+          {/* 텍스트 라벨 */}
+          <text x={waveStartX + 365} y={cy - 5} fill="#94a3b8" fontSize="12">
+            360°
+          </text>
+          <text x={waveStartX + 180} y={cy - 5} fill="#94a3b8" fontSize="12">
+            180°
+          </text>
+
+          {/* 범례 */}
+          <text
+            x={waveStartX + 20}
+            y="30"
+            fill="#fb7185"
+            fontSize="14"
+            fontWeight="bold"
+          >
+            y = r·sin(θ)
+          </text>
+          <text
+            x={waveStartX + 20}
+            y="50"
+            fill="#34d399"
+            fontSize="14"
+            fontWeight="bold"
+          >
+            x = r·cos(θ)
+          </text>
+        </svg>
       </div>
     </div>
   );
 };
 
-export default PartialDerivativeWidget;
+export default PolarCoordinateWidget;
