@@ -10,7 +10,7 @@ import {
   visionLectures,
 } from "@/constants/videoData";
 
-// 🌟 [핵심 추가] 이전 해시/영문 ID를 직관적인 새 ID로 변환하는 매핑 테이블
+// 🌟 [핵심] 이전 해시/영문 ID를 직관적인 새 ID로 변환하는 매핑 테이블
 const ID_MAPPING = {
   "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
   "1234qwer": "21_control_test",
@@ -47,9 +47,6 @@ const ID_MAPPING = {
   math_radian: "12_math_radian",
 };
 
-// ==========================================
-// 1. 데이터 및 설정값
-// ==========================================
 const ALL_LECTURES = [
   ...mathLectures,
   ...circuitLectures,
@@ -110,10 +107,6 @@ const CATEGORIES = [
   { id: "Vision", label: "Vision", icon: "🚀" },
 ];
 
-// ==========================================
-// 2. 하위 컴포넌트들
-// ==========================================
-
 const HeroBanner = ({ currentCategoryData, total }) => (
   <div className="bg-[#0047a5] rounded-2xl p-10 md:p-14 mb-10 text-white relative overflow-hidden shadow-lg transition-colors duration-500">
     <div className="absolute right-10 top-1/2 -translate-y-1/2 text-[180px] opacity-10 font-serif font-bold pointer-events-none select-none">
@@ -138,35 +131,24 @@ const HeroBanner = ({ currentCategoryData, total }) => (
   </div>
 );
 
-// ✅ 리팩토링: ActiveVideoCard와 LockedVideoCard를 하나로 통합
 const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
   let finalThumbnail =
     video.thumbnail ||
     "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
-
   if (!isLocked && video.thumbnail && video.thumbnailTime) {
     finalThumbnail = `${video.thumbnail}?time=${video.thumbnailTime}`;
   }
 
-  // 🌟 [안전장치] video.id가 맵핑 테이블에 있으면 변환하고, 없으면 그대로 사용
+  // 🌟 새 ID로 변환하여 라우팅 준비
   const normalizedId = ID_MAPPING[video.id] || video.id;
 
   return (
     <article
-      className={`flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 transition-all duration-300 ${
-        isLocked
-          ? "opacity-60"
-          : "shadow-sm hover:shadow-xl group cursor-pointer"
-      }`}
-      onClick={() => !isLocked && onRead(normalizedId)} // 💡 여기서 새 ID로 라우팅!
+      className={`flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 transition-all duration-300 ${isLocked ? "opacity-60" : "shadow-sm hover:shadow-xl group cursor-pointer"}`}
+      onClick={() => !isLocked && onRead(normalizedId)}
     >
-      {/* 썸네일 영역 */}
       <div
-        className={`relative h-56 ${
-          isLocked
-            ? "bg-gray-200 flex items-center justify-center"
-            : "overflow-hidden bg-gray-100"
-        }`}
+        className={`relative h-56 ${isLocked ? "bg-gray-200 flex items-center justify-center" : "overflow-hidden bg-gray-100"}`}
       >
         {isLocked ? (
           <Lock className="text-gray-400" size={48} />
@@ -185,20 +167,14 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
           </>
         )}
         <div
-          className={`absolute top-4 left-4 text-white px-3 py-1 rounded-lg font-bold text-sm tracking-wider uppercase ${
-            isLocked ? "bg-gray-500" : "bg-[#0047a5]"
-          }`}
+          className={`absolute top-4 left-4 text-white px-3 py-1 rounded-lg font-bold text-sm tracking-wider uppercase ${isLocked ? "bg-gray-500" : "bg-[#0047a5]"}`}
         >
           {video.category || "STEP"}
         </div>
       </div>
-
-      {/* 텍스트 영역 */}
       <div className="p-8 flex flex-col flex-grow">
         <span
-          className={`font-bold text-xs uppercase tracking-widest mb-2 block ${
-            isLocked ? "text-gray-500" : "text-[#0047a5]"
-          }`}
+          className={`font-bold text-xs uppercase tracking-widest mb-2 block ${isLocked ? "text-gray-500" : "text-[#0047a5]"}`}
         >
           {video.subject || "영상 강의"}
         </span>
@@ -208,8 +184,6 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
         <p className="text-gray-500 text-base mb-8 font-medium line-clamp-2">
           {video.description || (isLocked ? "준비 중인 강의입니다." : "")}
         </p>
-
-        {/* 하단 버튼 영역 */}
         <div
           className={`mt-auto ${!isLocked && "flex items-center justify-between"}`}
         >
@@ -234,7 +208,7 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRead(normalizedId); // 💡 여기서 새 ID로 라우팅!
+                  onRead(normalizedId);
                 }}
                 className="bg-[#e5edff] text-[#0047a5] text-lg px-8 py-3 rounded-xl font-bold shadow-sm hover:bg-[#0047a5] hover:text-white transition-colors"
               >
@@ -250,10 +224,7 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
 
 const DetailModal = ({ selectedVideo, onClose, onRead }) => {
   if (!selectedVideo) return null;
-
-  // 🌟 [안전장치] 모달에서 이동할 때도 깨끗한 새 ID로!
   const normalizedId = ID_MAPPING[selectedVideo.id] || selectedVideo.id;
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
@@ -309,7 +280,7 @@ const DetailModal = ({ selectedVideo, onClose, onRead }) => {
           <button
             onClick={() => {
               onClose();
-              onRead(normalizedId); // 💡 여기서 새 ID로 라우팅!
+              onRead(normalizedId);
             }}
             className="w-full py-5 bg-[#0047a5] text-white text-xl font-extrabold rounded-xl shadow-lg hover:bg-blue-800 transition-colors"
           >
@@ -321,12 +292,8 @@ const DetailModal = ({ selectedVideo, onClose, onRead }) => {
   );
 };
 
-// ==========================================
-// 3. 메인 컴포넌트
-// ==========================================
 export default function VideoListPage() {
   const { page, size, moveToList, moveToRead } = useCustomMove("/user/videos");
-
   const [activeTab, setActiveTab] = useState("전체");
   const [selectedVideo, setSelectedVideo] = useState(null);
 
@@ -339,10 +306,8 @@ export default function VideoListPage() {
       isLocked:
         !v.videoUrls || v.videoUrls.length === 0 || v.videoUrls[0] === "",
     }));
-
     if (activeTab !== "전체")
       result = result.filter((video) => video.category === activeTab);
-
     return {
       activeVideos: result.filter((v) => !v.isLocked),
       lockedVideos: result.filter((v) => v.isLocked),
@@ -365,30 +330,21 @@ export default function VideoListPage() {
         currentCategoryData={CATEGORY_INFO[activeTab]}
         total={total}
       />
-
-      {/* 탭 컨트롤 */}
       <div className="flex flex-wrap items-center justify-start gap-4 mb-10">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
             onClick={() => handleTabClick(cat.id)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all shadow-sm ${
-              activeTab === cat.id
-                ? "bg-[#0047a5] text-white shadow-md scale-105"
-                : "bg-[#f3f4f6] text-gray-700 hover:bg-gray-200"
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all shadow-sm ${activeTab === cat.id ? "bg-[#0047a5] text-white shadow-md scale-105" : "bg-[#f3f4f6] text-gray-700 hover:bg-gray-200"}`}
           >
             <span className="text-xl">{cat.icon}</span>
             <span>{cat.label}</span>
           </button>
         ))}
       </div>
-
       <div className="mb-6 text-gray-500 font-medium">
         총 {total}개의 시청 가능 강의 중 {page}페이지를 탐색 중입니다.
       </div>
-
-      {/* 비디오 리스트 */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16">
         {currentList.length > 0 ? (
           currentList.map((video) => (
@@ -405,15 +361,11 @@ export default function VideoListPage() {
             시청 가능한 강의가 없습니다. 😢
           </div>
         )}
-
-        {/* 잠금 비디오 (마지막 페이지이거나 데이터 없을 때 렌더링) */}
         {(page === totalPages || currentList.length === 0) &&
           lockedVideos.map((locked) => (
             <VideoCard key={locked.id} video={locked} isLocked={true} />
           ))}
       </section>
-
-      {/* 페이지네이션 */}
       {total > 0 && (
         <nav className="flex justify-center items-center gap-2">
           <button
@@ -427,11 +379,7 @@ export default function VideoListPage() {
             <button
               key={i + 1}
               onClick={() => moveToList({ page: i + 1, size })}
-              className={`w-10 h-10 rounded-xl font-bold transition-all ${
-                page === i + 1
-                  ? "bg-[#0047a5] text-white shadow-lg scale-110"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
+              className={`w-10 h-10 rounded-xl font-bold transition-all ${page === i + 1 ? "bg-[#0047a5] text-white shadow-lg scale-110" : "text-gray-600 hover:bg-gray-100"}`}
             >
               {i + 1}
             </button>
@@ -445,8 +393,6 @@ export default function VideoListPage() {
           </button>
         </nav>
       )}
-
-      {/* 모달 */}
       <DetailModal
         selectedVideo={selectedVideo}
         onClose={() => setSelectedVideo(null)}
