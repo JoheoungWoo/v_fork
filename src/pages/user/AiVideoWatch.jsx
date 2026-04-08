@@ -64,28 +64,25 @@ export default function AiVideoWatch() {
   const cleanId = useMemo(() => ID_MAPPING[id] || id, [id]);
   const isVision = cleanId.startsWith("vision_");
 
-  // 1. 영상 데이터 페칭 (백엔드 DB 중심)
+  // AiVideoWatch.jsx 내의 fetchVideoData 함수 부분 수정
   useEffect(() => {
     const fetchVideoData = async () => {
       if (!cleanId) return;
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${cleanId}`);
+        console.log("res:", res);
+        // 🌟 [보정] res.data.data 또는 res.data 둘 다 지원하도록 수정
+        const backendData = res.data?.data || res.data;
 
-        // 백엔드 응답 구조(res.data.data)에 따른 안전한 데이터 추출
-        const backendData = res.data?.data || res.data || {};
-
-        if (
-          !backendData ||
-          Object.keys(backendData).length === 0 ||
-          backendData.error
-        ) {
-          throw new Error("데이터를 찾을 수 없습니다.");
+        if (!backendData || backendData.id === undefined) {
+          console.warn("⚠️ 강의 데이터를 찾지 못함:", cleanId);
+          setVideoInfo(null);
+        } else {
+          setVideoInfo(backendData);
         }
-
-        setVideoInfo(backendData);
       } catch (error) {
-        console.error("영상 데이터 로드 실패:", error);
+        console.error("❌ 데이터 페칭 실패:", error);
         setVideoInfo(null);
       } finally {
         setLoading(false);
@@ -94,7 +91,6 @@ export default function AiVideoWatch() {
 
     fetchVideoData();
   }, [cleanId]);
-
   // 2. 인터랙티브 위젯 컴포넌트 매핑
   const WidgetComponent = useMemo(() => {
     if (!cleanId) return null;
