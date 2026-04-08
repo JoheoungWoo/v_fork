@@ -409,7 +409,7 @@ export const circuitLectures = [
     useBackend: true, // 문제는 백엔드에서 생성
   },
   {
-    id: "time_constant_lecture_001", // 백엔드 라우터에 매핑한 ID와 반드시 일치해야 함
+    id: "0439b5168355bedd244f2c4cbd79c82f", // 백엔드 라우터에 매핑한 ID와 반드시 일치해야 함
     subject: "회로이론",
     title: "8강. 과도현상과 시정수 (RC)",
     duration: "-",
