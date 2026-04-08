@@ -12,16 +12,16 @@ const ID_MAPPING = {
 };
 
 export default function VideoCard({ video, onRead, onOpenModal }) {
-  // 🌟 [수정] 배열 체크 삭제 -> 단일 문자열(video_url)만 확인
-  const hasVideo = !!video.video_url && video.video_url.trim() !== "";
+  // 1. 영상 유무 체크 (시청하기 버튼 활성화용)
+  const hasVideo =
+    !!video.video_url && video.video_url !== "" && video.video_url !== "null";
   const isLocked = !hasVideo;
 
-  // Supabase 데이터 구조에 맞춰 thumb_url 또는 thumbnail 선택
+  // 2. 썸네일 우선순위: 백엔드에서 준 thumbnail -> thumb_url -> 기본 이미지
   const thumbnailSrc =
-    video.thumb_url ||
     video.thumbnail ||
+    video.thumb_url ||
     "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
-
   // 정화된 ID 체계 적용 (lecture_id 우선)
   const targetId = video.lecture_id || video.id;
   const normalizedId = ID_MAPPING[targetId] || targetId;
