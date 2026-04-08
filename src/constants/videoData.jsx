@@ -411,15 +411,15 @@ export const circuitLectures = [
   {
     id: "time_constant_lecture_001", // 백엔드 라우터에 매핑한 ID와 반드시 일치해야 함
     subject: "회로이론",
-    title: "8강. 과도현상과 시정수 (RL / RC)",
+    title: "8강. 과도현상과 시정수 (RC)",
     duration: "-",
     description:
       "스위치를 닫는 순간 코일과 콘덴서는 어떻게 반응할까? 회로가 최종 목표값의 63.2%에 도달하는 시간인 '시정수(τ)'의 개념을 실시간 그래프로 학습합니다.",
     thumbnail:
-      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/3f7922ad516ac8204da5edd6e6b310a1/thumbnails/thumbnail.jpg", // 적절한 이미지로 교체하세요
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/0439b5168355bedd244f2c4cbd79c82f/thumbnails/thumbnail.jpg", // 적절한 이미지로 교체하세요
     thumbnailTime: "",
     videoUrls: [
-      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/3f7922ad516ac8204da5edd6e6b310a1/manifest/video.m3u8",
+      "https://customer-w4c7tmh3vvpu6ohy.cloudflarestream.com/0439b5168355bedd244f2c4cbd79c82f/manifest/video.m3u8",
     ], // 임시 더미 영상
     widget_type: "time_constant", // WIDGET_MAP에 등록한 키값
     useBackend: true, // 파이썬 백엔드에서 퀴즈 데이터 가져옴
