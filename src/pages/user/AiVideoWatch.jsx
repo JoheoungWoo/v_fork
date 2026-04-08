@@ -115,12 +115,13 @@ export default function AiVideoWatch() {
   }, [cleanId, localVideoData]);
 
   // 인터랙티브 위젯 컴포넌트 memoization
+  // 인터랙티브 위젯 컴포넌트 memoization
   const WidgetComponent = useMemo(() => {
-    // 🌟 [핵심 변경] DB에서 위젯 타입이 없어도, 이제 cleanId 자체가 위젯 타입 역할을 합니다!
-    const type = videoInfo?.widget_type || videoInfo?.widgetType || cleanId;
-    if (!type) return null;
-    return WIDGET_MAP[type] || null;
-  }, [videoInfo, cleanId]);
+    // 🚨 [핵심 수정] videoInfo.widget_type을 읽지 않습니다! (DB에 잘못된 값이 있을 수 있으므로)
+    // 오직 무조건 깨끗하게 정화된 cleanId만 사용하여 WIDGET_MAP에서 찾습니다.
+    if (!cleanId) return null;
+    return WIDGET_MAP[cleanId] || null;
+  }, [cleanId]); // 의존성 배열도 cleanId로 변경
 
   // 로딩 화면
   if (loading)

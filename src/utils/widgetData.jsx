@@ -32,7 +32,7 @@ const WIDGET_MAP = {
     () => import("@/components/animations/VectorCrossProductWidget"),
   ),
   derivative: lazy(() => import("@/components/animations/DerivativeWidget")),
-  partial_derivative: lazy(
+  "16_partial_derivative": lazy(
     () => import("@/components/animations/PartialDerivativeWidget"),
   ),
   math_integral_3d: lazy(
