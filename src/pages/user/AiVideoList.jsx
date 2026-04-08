@@ -3,39 +3,89 @@ import useCustomMove from "@/hooks/useCustomMove";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-// ✅ 하위 컴포넌트 임포트 (파일을 분리했을 경우)
+import DetailModal from "./DetailModal";
+import HeroBanner from "./HeroBanner";
 import VideoCard from "./VideoCard";
 
-import VideoDetailModal from "./DetailModal";
-import VideoHeroBanner from "./HeroBanner";
-import VideoCategoryTabs from "./VideoCategoryTabs";
+// 🌟 [핵심 추가] DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
+const getCategory = (video) => {
+  const subject = video.subject || "";
+  const idStr = String(video.lecture_id || video.id || "").toLowerCase();
 
-/**
- * AiVideoList 메인 페이지 컴포넌트
- */
+  if (
+    subject.includes("수학") ||
+    idStr.includes("math") ||
+    idStr.includes("derivative") ||
+    idStr.includes("square") ||
+    idStr.includes("trig") ||
+    idStr.includes("vector") ||
+    idStr.includes("parabola") ||
+    idStr.includes("intersection")
+  )
+    return "기초 수학";
+
+  if (
+    subject.includes("회로") ||
+    idStr.includes("circuit") ||
+    idStr.includes("ohm") ||
+    idStr.includes("voltage") ||
+    idStr.includes("reactance")
+  )
+    return "회로이론";
+
+  if (
+    subject.includes("전자기") ||
+    idStr.includes("em_") ||
+    idStr.includes("coulomb") ||
+    idStr.includes("ampere") ||
+    idStr.includes("poten")
+  )
+    return "전자기학";
+
+  if (
+    subject.includes("제어") ||
+    idStr.includes("control") ||
+    idStr.includes("laplace") ||
+    idStr.includes("time_constant") ||
+    idStr.includes("angular_velocity")
+  )
+    return "제어공학";
+
+  if (
+    subject.includes("Vision") ||
+    subject.includes("AI") ||
+    idStr.includes("vision")
+  )
+    return "Vision";
+
+  return "기타"; // 매칭되지 않는 잉여 영상
+};
+
 export default function AiVideoList() {
-  // 1. 커스텀 훅을 통한 페이지네이션 및 이동 로직
   const { page, size, moveToList, moveToRead } = useCustomMove("/user/videos");
 
-  // 2. 상태 관리
   const [activeTab, setActiveTab] = useState("전체");
   const [allLectures, setAllLectures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  // 3. 백엔드 데이터 로드 (Supabase 기반 API)
   useEffect(() => {
     const fetchLectures = async () => {
       try {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
-        console.log("res:", res);
-        // 🌟 [보정] 콘솔 데이터 확인 결과: res.data.data 가 실제 배열임
-        const lectureArray =
-          res.data?.data || (Array.isArray(res.data) ? res.data : []);
-        setAllLectures(lectureArray);
 
-        console.log("✅ 강의 데이터 로드 완료:", lectureArray.length, "건");
+        const rawArray =
+          res.data?.data || (Array.isArray(res.data) ? res.data : []);
+
+        // 🌟 [수정] 데이터가 들어올 때 모든 영상에 category 속성을 강제로 부여합니다.
+        const categorizedArray = rawArray.map((video) => ({
+          ...video,
+          category: getCategory(video),
+        }));
+
+        setAllLectures(categorizedArray);
+        console.log("✅ 카테고리 분류 완료 데이터:", categorizedArray);
       } catch (err) {
         console.error("❌ 강의 목록 로드 실패:", err);
       } finally {
@@ -45,21 +95,15 @@ export default function AiVideoList() {
     fetchLectures();
   }, []);
 
-  // 4. 카테고리 필터링 로직
   const filteredVideos = useMemo(() => {
-    if (!allLectures) return [];
+    if (!allLectures || allLectures.length === 0) return [];
     let list = [...allLectures];
 
+    // 🌟 [수정] 복잡한 문자열 검색 대신, 위에서 부여한 category 속성과 탭 이름이 일치하는지만 봅니다.
     if (activeTab !== "전체") {
-      // 과목명에 카테고리 키워드가 포함되어 있는지 확인 (수학, 회로, 제어 등)
-      list = list.filter((v) =>
-        (v.subject || "").includes(
-          activeTab.replace("공학", "").replace("이론", ""),
-        ),
-      );
+      list = list.filter((v) => v.category === activeTab);
     }
 
-    // 시청 가능한 강의(video_url이 있는 것)를 상단으로 정렬
     return list.sort((a, b) => {
       const aPlayable = a.video_url ? 1 : 0;
       const bPlayable = b.video_url ? 1 : 0;
@@ -67,12 +111,10 @@ export default function AiVideoList() {
     });
   }, [allLectures, activeTab]);
 
-  // 5. 페이지네이션 계산
   const total = filteredVideos.length;
   const totalPages = Math.ceil(total / size) || 1;
   const currentList = filteredVideos.slice((page - 1) * size, page * size);
 
-  // 로딩 중 화면
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center">
@@ -82,20 +124,12 @@ export default function AiVideoList() {
 
   return (
     <main className="mx-auto px-8 py-12 max-w-7xl w-[85%] font-body relative">
-      {/* 상단 히어로 배너 영역 */}
-      <VideoHeroBanner category={activeTab} total={total} />
+      <HeroBanner category={activeTab} total={total} />
 
-      {/* 카테고리 탭 영역 */}
-      <VideoCategoryTabs
-        activeTab={activeTab}
-        onTabChange={(id) => {
-          setActiveTab(id);
-          moveToList({ page: 1, size }); // 탭 변경 시 1페이지로 리셋
-        }}
-      />
+      {/* 탭 영역 (직접 구현하셨거나 VideoCategoryTabs 사용) */}
+      {/* <VideoCategoryTabs activeTab={activeTab} onTabChange={(id) => { setActiveTab(id); moveToList({ page: 1, size }); }} /> */}
 
-      {/* 강의 카드 그리드 영역 */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16 mt-8">
         {currentList.length > 0 ? (
           currentList.map((video) => (
             <VideoCard
@@ -112,7 +146,6 @@ export default function AiVideoList() {
         )}
       </section>
 
-      {/* 하단 페이지네이션 네비게이션 */}
       {total > 0 && (
         <nav className="flex justify-center items-center gap-2">
           <button
@@ -127,11 +160,7 @@ export default function AiVideoList() {
             <button
               key={i + 1}
               onClick={() => moveToList({ page: i + 1, size })}
-              className={`w-10 h-10 rounded-xl font-bold transition-all ${
-                page === i + 1
-                  ? "bg-[#0047a5] text-white shadow-lg scale-110"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
+              className={`w-10 h-10 rounded-xl font-bold transition-all ${page === i + 1 ? "bg-[#0047a5] text-white shadow-lg scale-110" : "text-gray-600 hover:bg-gray-100"}`}
             >
               {i + 1}
             </button>
@@ -147,8 +176,7 @@ export default function AiVideoList() {
         </nav>
       )}
 
-      {/* 상세보기 모달 */}
-      <VideoDetailModal
+      <DetailModal
         video={selectedVideo}
         onClose={() => setSelectedVideo(null)}
         onRead={moveToRead}
