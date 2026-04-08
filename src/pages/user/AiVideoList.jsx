@@ -204,16 +204,25 @@ export default function VideoListPage() {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
 
-        // 🌟 [수정 포인트] 콘솔 로그를 보면 실제 배열은 res.data.data 에 들어있습니다.
-        // res.data 가 배열인지 확인 후 처리하는 방어 로직 추가
+        // 🔍 데이터 구조 상세 확인을 위한 로그 복구
+        console.log("--- 백엔드 응답 전체 데이터 ---");
+        console.log(res);
+
+        // 데이터 경로 추출
         const lectureArray = Array.isArray(res.data)
           ? res.data
           : res.data?.data || [];
 
+        // 🔍 추출된 배열의 실제 내용 확인
+        console.log("--- 추출된 강의 배열 (첫 번째 항목) ---");
+        if (lectureArray.length > 0) {
+          console.log(lectureArray[0]);
+        }
+
         setAllLectures(lectureArray);
-        console.log("강의 로드 완료:", lectureArray.length, "건");
+        console.log(`✅ 강의 로드 완료: 총 ${lectureArray.length}건`);
       } catch (err) {
-        console.error("강의 목록 로드 실패:", err);
+        console.error("❌ 강의 목록 로드 실패:", err);
       } finally {
         setLoading(false);
       }
