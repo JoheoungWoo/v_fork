@@ -1,109 +1,157 @@
-import { Lock, Play } from "lucide-react";
+import apiClient from "@/api/core/apiClient";
+import useCustomMove from "@/hooks/useCustomMove";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-// 🌟 이전 ID 하위 호환성을 위한 매핑
-const ID_MAPPING = {
-  "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
-  "1da7f54684d76e361736580a26e6917c": "207_cho_hw_cheer",
-  "201092af306ff8cb381808e4c3f45e0c": "13_vector_dot_product",
-  "30d2bd6d1675fb17fe237d8c9d930413": "14_vector_cross_product",
-  a778e615bf667e6db830b498baa5ec66: "16_partial_derivative",
-  c44dc0cd81fbb02320299a7bff062e4d: "15_derivative",
-  e935dc2d2e592a79688c5f40da5fbe23: "9_perfect_square",
-};
+// ✅ 하위 컴포넌트 임포트 (파일을 분리했을 경우)
+import VideoCard from "./VideoCard";
+import VideoCategoryTabs from "./VideoCategoryTabs";
+import VideoDetailModal from "./VideoDetailModal";
+import VideoHeroBanner from "./VideoHeroBanner";
 
-export default function VideoCard({ video, onRead, onOpenModal }) {
-  console.log("video card : ", video);
-  // 1. 영상 유무 체크 (시청하기 버튼 활성화용)
-  const hasVideo =
-    !!video.video_url && video.video_url !== "" && video.video_url !== "null";
-  const isLocked = !hasVideo;
+/**
+ * AiVideoList 메인 페이지 컴포넌트
+ */
+export default function AiVideoList() {
+  // 1. 커스텀 훅을 통한 페이지네이션 및 이동 로직
+  const { page, size, moveToList, moveToRead } = useCustomMove("/user/videos");
 
-  // 2. 썸네일 우선순위: 백엔드에서 준 thumbnail -> thumb_url -> 기본 이미지
-  const thumbnailSrc =
-    video.thumbnail ||
-    video.thumb_url ||
-    "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
-  // 정화된 ID 체계 적용 (lecture_id 우선)
-  const targetId = video.lecture_id || video.id;
-  const normalizedId = ID_MAPPING[targetId] || targetId;
+  // 2. 상태 관리
+  const [activeTab, setActiveTab] = useState("전체");
+  const [allLectures, setAllLectures] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+
+  // 3. 백엔드 데이터 로드 (Supabase 기반 API)
+  useEffect(() => {
+    const fetchLectures = async () => {
+      try {
+        setLoading(true);
+        const res = await apiClient.get("/api/video/list/all");
+
+        // 🌟 [보정] 콘솔 데이터 확인 결과: res.data.data 가 실제 배열임
+        const lectureArray =
+          res.data?.data || (Array.isArray(res.data) ? res.data : []);
+        setAllLectures(lectureArray);
+
+        console.log("✅ 강의 데이터 로드 완료:", lectureArray.length, "건");
+      } catch (err) {
+        console.error("❌ 강의 목록 로드 실패:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLectures();
+  }, []);
+
+  // 4. 카테고리 필터링 로직
+  const filteredVideos = useMemo(() => {
+    if (!allLectures) return [];
+    let list = [...allLectures];
+
+    if (activeTab !== "전체") {
+      // 과목명에 카테고리 키워드가 포함되어 있는지 확인 (수학, 회로, 제어 등)
+      list = list.filter((v) =>
+        (v.subject || "").includes(
+          activeTab.replace("공학", "").replace("이론", ""),
+        ),
+      );
+    }
+
+    // 시청 가능한 강의(video_url이 있는 것)를 상단으로 정렬
+    return list.sort((a, b) => {
+      const aPlayable = a.video_url ? 1 : 0;
+      const bPlayable = b.video_url ? 1 : 0;
+      return bPlayable - aPlayable;
+    });
+  }, [allLectures, activeTab]);
+
+  // 5. 페이지네이션 계산
+  const total = filteredVideos.length;
+  const totalPages = Math.ceil(total / size) || 1;
+  const currentList = filteredVideos.slice((page - 1) * size, page * size);
+
+  // 로딩 중 화면
+  if (loading)
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="animate-spin text-[#0047a5]" size={48} />
+      </div>
+    );
 
   return (
-    <article
-      className={`flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 transition-all duration-300 ${
-        isLocked
-          ? "opacity-60 grayscale-[0.3]"
-          : "shadow-sm hover:shadow-xl group cursor-pointer"
-      }`}
-      onClick={() => !isLocked && onRead(normalizedId)}
-    >
-      {/* 썸네일 영역 */}
-      <div
-        className={`relative h-56 ${
-          isLocked
-            ? "bg-gray-200 flex items-center justify-center"
-            : "overflow-hidden bg-gray-100"
-        }`}
-      >
-        {isLocked ? (
-          <div className="flex flex-col items-center gap-2">
-            <Lock className="text-gray-400" size={48} />
-            <span className="text-sm font-bold text-gray-400">
-              준비 중인 강의
-            </span>
-          </div>
-        ) : (
-          <>
-            <img
-              src={thumbnailSrc}
-              alt={video.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+    <main className="mx-auto px-8 py-12 max-w-7xl w-[85%] font-body relative">
+      {/* 상단 히어로 배너 영역 */}
+      <VideoHeroBanner category={activeTab} total={total} />
+
+      {/* 카테고리 탭 영역 */}
+      <VideoCategoryTabs
+        activeTab={activeTab}
+        onTabChange={(id) => {
+          setActiveTab(id);
+          moveToList({ page: 1, size }); // 탭 변경 시 1페이지로 리셋
+        }}
+      />
+
+      {/* 강의 카드 그리드 영역 */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16">
+        {currentList.length > 0 ? (
+          currentList.map((video) => (
+            <VideoCard
+              key={video.id}
+              video={video}
+              onRead={moveToRead}
+              onOpenModal={setSelectedVideo}
             />
-            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-2xl scale-75 group-hover:scale-100 transition-transform">
-                <Play className="text-[#0047a5] fill-current ml-1" size={28} />
-              </div>
-            </div>
-          </>
+          ))
+        ) : (
+          <div className="col-span-full text-center py-20 text-gray-400 text-lg">
+            선택한 카테고리에 해당하는 강의가 아직 없습니다. 😢
+          </div>
         )}
-      </div>
+      </section>
 
-      {/* 텍스트 영역 */}
-      <div className="p-8 flex flex-col flex-grow">
-        <span className="font-bold text-xs uppercase tracking-widest mb-2 block text-[#0047a5]">
-          {video.subject || "전기공학 핵심"}
-        </span>
-        <h2 className="text-2xl font-bold text-gray-900 mb-3 leading-tight line-clamp-2 min-h-[3.5rem]">
-          {video.title}
-        </h2>
-        <p className="text-gray-500 text-base mb-8 font-medium line-clamp-2">
-          {video.description ||
-            "해당 강의의 상세 정보를 곧 업데이트할 예정입니다."}
-        </p>
-
-        {/* 버튼 영역 */}
-        <div className="mt-auto flex items-center justify-between">
+      {/* 하단 페이지네이션 네비게이션 */}
+      {total > 0 && (
+        <nav className="flex justify-center items-center gap-2">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenModal(video);
-            }}
-            className="text-[#0047a5] font-bold text-lg hover:underline underline-offset-4 decoration-2"
+            onClick={() => moveToList({ page: page - 1, size })}
+            disabled={page <= 1}
+            className="p-2 text-gray-500 disabled:opacity-30 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            상세보기
+            <ChevronLeft size={24} />
           </button>
-          {!isLocked && (
+
+          {Array.from({ length: totalPages }).map((_, i) => (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRead(normalizedId);
-              }}
-              className="bg-[#e5edff] text-[#0047a5] text-lg px-8 py-3 rounded-xl font-bold hover:bg-[#0047a5] hover:text-white transition-all shadow-sm active:scale-95"
+              key={i + 1}
+              onClick={() => moveToList({ page: i + 1, size })}
+              className={`w-10 h-10 rounded-xl font-bold transition-all ${
+                page === i + 1
+                  ? "bg-[#0047a5] text-white shadow-lg scale-110"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
             >
-              시청하기
+              {i + 1}
             </button>
-          )}
-        </div>
-      </div>
-    </article>
+          ))}
+
+          <button
+            onClick={() => moveToList({ page: page + 1, size })}
+            disabled={page >= totalPages}
+            className="p-2 text-gray-500 disabled:opacity-30 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ChevronRight size={24} />
+          </button>
+        </nav>
+      )}
+
+      {/* 상세보기 모달 */}
+      <VideoDetailModal
+        video={selectedVideo}
+        onClose={() => setSelectedVideo(null)}
+        onRead={moveToRead}
+      />
+    </main>
   );
 }
