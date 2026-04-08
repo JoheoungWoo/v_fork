@@ -1,9 +1,6 @@
 import { Lock, Play } from "lucide-react";
 
-/**
- * 이전 해시/영문 ID를 직관적인 새 ID로 변환하는 매핑 테이블
- * (하위 호환성 유지용)
- */
+// 🌟 이전 ID 하위 호환성을 위한 매핑
 const ID_MAPPING = {
   "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
   "1da7f54684d76e361736580a26e6917c": "207_cho_hw_cheer",
@@ -14,24 +11,28 @@ const ID_MAPPING = {
   e935dc2d2e592a79688c5f40da5fbe23: "9_perfect_square",
 };
 
-/**
- * @param {Object} video - 백엔드에서 가져온 개별 강의 객체
- * @param {Function} onRead - 시청하기 클릭 시 실행될 이동 함수
- * @param {Function} onOpenModal - 상세보기 클릭 시 실행될 모달 오픈 함수
- */
 export default function VideoCard({ video, onRead, onOpenModal }) {
-  // 1. 영상 유무 체크 (백엔드에서 문자열 video_url로 전달됨)
+  // 1. 영상 유무 체크
   const hasVideo =
     !!video.video_url && video.video_url !== "" && video.video_url !== "null";
   const isLocked = !hasVideo;
 
-  // 2. 썸네일 경로 결정
-  const thumbnailSrc =
-    video.thumbnail ||
-    video.thumb_url ||
-    "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
+  // 🌟 2. 썸네일 스마트 추출 로직 (에러의 원인 해결)
+  let thumbnailSrc = "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
 
-  // 3. ID 정화 (lecture_id가 있으면 우선 사용, 없으면 매핑 테이블 참조)
+  if (hasVideo && video.video_url.includes("cloudflarestream.com")) {
+    // [최고 우선순위] Cloudflare Stream 영상이면 자동으로 생성된 고화질 썸네일 주소 사용
+    // 예: .../1da7f.../manifest/video.m3u8 -> .../1da7f.../thumbnails/thumbnail.jpg
+    const streamBaseUrl = video.video_url.split("/manifest")[0];
+    thumbnailSrc = `${streamBaseUrl}/thumbnails/thumbnail.jpg`;
+  } else if (video.thumbnail && !video.thumbnail.includes("undefined")) {
+    // Cloudflare Stream이 아닌 다른 영상일 경우 백엔드가 준 데이터 사용
+    thumbnailSrc = video.thumbnail;
+  } else if (video.thumb_url) {
+    thumbnailSrc = video.thumb_url;
+  }
+
+  // 3. 정화된 ID 체계 적용 (lecture_id 우선)
   const targetId = video.lecture_id || video.id;
   const normalizedId = ID_MAPPING[targetId] || targetId;
 
@@ -61,6 +62,7 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
           </div>
         ) : (
           <>
+            {/* 🌟 썸네일 이미지 에러 발생 시 처리하는 onError 추가 */}
             <img
               src={thumbnailSrc}
               alt={video.title}
@@ -79,12 +81,10 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
         )}
       </div>
 
-      {/* 정보 텍스트 영역 */}
+      {/* 텍스트 영역 */}
       <div className="p-8 flex flex-col flex-grow">
-        <span
-          className={`font-bold text-xs uppercase tracking-widest mb-2 block ${isLocked ? "text-gray-500" : "text-[#0047a5]"}`}
-        >
-          {video.subject || "전기공학 핵심이론"}
+        <span className="font-bold text-xs uppercase tracking-widest mb-2 block text-[#0047a5]">
+          {video.subject || "전기공학 핵심"}
         </span>
         <h2 className="text-2xl font-bold text-gray-900 mb-3 leading-tight line-clamp-2 min-h-[3.5rem]">
           {video.title}
@@ -94,18 +94,17 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
             "해당 강의의 상세 정보를 곧 업데이트할 예정입니다."}
         </p>
 
-        {/* 하단 인터랙션 영역 */}
+        {/* 버튼 영역 */}
         <div className="mt-auto flex items-center justify-between">
           <button
             onClick={(e) => {
-              e.stopPropagation(); // 카드 전체 클릭 이벤트 방지
+              e.stopPropagation();
               onOpenModal(video);
             }}
             className="text-[#0047a5] font-bold text-lg hover:underline underline-offset-4 decoration-2"
           >
             상세보기
           </button>
-
           {!isLocked && (
             <button
               onClick={(e) => {
