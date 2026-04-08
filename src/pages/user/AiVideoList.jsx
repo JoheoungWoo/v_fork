@@ -12,6 +12,7 @@ const ID_MAPPING = {
 };
 
 export default function VideoCard({ video, onRead, onOpenModal }) {
+  console.log("video card : ", video);
   // 1. 영상 유무 체크 (시청하기 버튼 활성화용)
   const hasVideo =
     !!video.video_url && video.video_url !== "" && video.video_url !== "null";
