@@ -50,6 +50,9 @@ const WIDGET_MAP = {
   polar_coordinate: lazy(
     () => import("@/components/animations/PolarCoordinateWidget"),
   ),
+  polar_coordinate: lazy(
+    () => import("@/components/animations/controls/TimeConstantWidget"),
+  ),
 };
 
 export default WIDGET_MAP;
