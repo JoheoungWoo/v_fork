@@ -29,7 +29,7 @@ export default function AiVideoList() {
       try {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
-
+        console.log("res:", res);
         // 🌟 [보정] 콘솔 데이터 확인 결과: res.data.data 가 실제 배열임
         const lectureArray =
           res.data?.data || (Array.isArray(res.data) ? res.data : []);
