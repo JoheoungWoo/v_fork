@@ -134,10 +134,7 @@ export default function AiVideoWatch() {
         {/* 메인 콘텐츠 (좌측) */}
         <div className="lg:col-span-8 space-y-8">
           <section className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-gray-800">
-            <VideoPlayer
-              videoUrl={videoInfo.video_url || videoInfo.video_urls?.[0]}
-              title={videoInfo.title}
-            />
+            <VideoPlayer title={videoInfo.title} />
           </section>
 
           <VideoInfo
