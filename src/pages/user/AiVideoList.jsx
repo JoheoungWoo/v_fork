@@ -3,13 +3,13 @@ import useCustomMove from "@/hooks/useCustomMove";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-// ✅ 하위 컴포넌트 불러오기 (반드시 같은 폴더에 해당 파일들이 있어야 합니다)
+// ✅ 하위 컴포넌트 불러오기
 import DetailModal from "./DetailModal";
 import HeroBanner from "./HeroBanner";
 import VideoCard from "./VideoCard";
-import VideoCategoryTabs from "./VideoCategoryTabs"; // 🌟 누락되었던 탭 컴포넌트 Import 추가
+import VideoCategoryTabs from "./VideoCategoryTabs";
 
-// 🌟 DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
+// 🌟 백엔드(Python)의 ID 명명 규칙을 기반으로 카테고리를 유추하는 강력한 분류기
 const getCategory = (video) => {
   const subject = video.subject || "";
   const idStr = String(video.lecture_id || video.id || "").toLowerCase();
@@ -60,7 +60,7 @@ const getCategory = (video) => {
   )
     return "Vision";
 
-  return "기타"; // 매칭되지 않는 잉여 영상
+  return "기타"; // 매칭되지 않는 영상
 };
 
 export default function AiVideoList() {
@@ -71,24 +71,23 @@ export default function AiVideoList() {
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  // 1. 데이터 페칭 및 카테고리 자동 분류
+  // 1. 백엔드에서 데이터 페칭 및 카테고리 속성 부여
   useEffect(() => {
     const fetchLectures = async () => {
       try {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
 
+        // 백엔드 응답이 res.data.data 인지 res.data 인지 안전하게 파싱
         const rawArray =
           res.data?.data || (Array.isArray(res.data) ? res.data : []);
 
-        // 🌟 데이터가 들어올 때 모든 영상에 category 속성을 강제로 부여합니다.
         const categorizedArray = rawArray.map((video) => ({
           ...video,
           category: getCategory(video),
         }));
 
         setAllLectures(categorizedArray);
-        console.log("✅ 카테고리 분류 완료 데이터:", categorizedArray);
       } catch (err) {
         console.error("❌ 강의 목록 로드 실패:", err);
       } finally {
@@ -98,17 +97,17 @@ export default function AiVideoList() {
     fetchLectures();
   }, []);
 
-  // 2. 선택된 탭에 맞게 목록 필터링
+  // 2. 현재 활성화된 탭(activeTab)에 따라 필터링 및 정렬
   const filteredVideos = useMemo(() => {
     if (!allLectures || allLectures.length === 0) return [];
-    let list = [...allLectures];
 
-    // 🌟 위에서 부여한 category 속성과 현재 누른 탭 이름이 일치하는지만 검사
-    if (activeTab !== "전체") {
-      list = list.filter((v) => v.category === activeTab);
-    }
+    // 카테고리 필터링
+    let list =
+      activeTab === "전체"
+        ? [...allLectures]
+        : allLectures.filter((v) => v.category === activeTab);
 
-    // 영상이 있는(시청 가능한) 강의를 먼저 보여주도록 정렬
+    // 시청 가능한(video_url이 있는) 강의를 무조건 상단으로 정렬
     return list.sort((a, b) => {
       const aPlayable = a.video_url ? 1 : 0;
       const bPlayable = b.video_url ? 1 : 0;
@@ -116,33 +115,34 @@ export default function AiVideoList() {
     });
   }, [allLectures, activeTab]);
 
-  // 3. 페이지네이션 계산
+  // 3. 페이지네이션 범위 계산
   const total = filteredVideos.length;
   const totalPages = Math.ceil(total / size) || 1;
   const currentList = filteredVideos.slice((page - 1) * size, page * size);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="animate-spin text-[#0047a5]" size={48} />
       </div>
     );
+  }
 
   return (
     <main className="mx-auto px-8 py-12 max-w-7xl w-[85%] font-body relative">
       {/* 상단 다이나믹 배너 */}
       <HeroBanner category={activeTab} total={total} />
 
-      {/* 🌟 카테고리 탭 컴포넌트 렌더링 */}
+      {/* 카테고리 탭 컴포넌트 */}
       <VideoCategoryTabs
         activeTab={activeTab}
         onTabChange={(id) => {
           setActiveTab(id);
-          moveToList({ page: 1, size }); // 탭을 바꾸면 1페이지로 돌아가도록 설정
+          moveToList({ page: 1, size }); // 탭 변경 시 무조건 1페이지로 강제 이동
         }}
       />
 
-      {/* 비디오 카드 그리드 */}
+      {/* 비디오 카드 그리드 영역 */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16 mt-8">
         {currentList.length > 0 ? (
           currentList.map((video) => (
@@ -154,13 +154,13 @@ export default function AiVideoList() {
             />
           ))
         ) : (
-          <div className="col-span-full text-center py-20 text-gray-400 text-lg">
+          <div className="col-span-full text-center py-20 text-gray-400 text-lg bg-gray-50 rounded-2xl border border-gray-100">
             선택한 카테고리에 해당하는 강의가 아직 없습니다. 😢
           </div>
         )}
       </section>
 
-      {/* 페이지네이션 네비게이션 */}
+      {/* 하단 페이지네이션 네비게이션 */}
       {total > 0 && (
         <nav className="flex justify-center items-center gap-2">
           <button
