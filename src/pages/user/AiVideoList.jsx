@@ -5,9 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 
 // ✅ 하위 컴포넌트 임포트 (파일을 분리했을 경우)
 import VideoCard from "./VideoCard";
+
+import VideoDetailModal from "./DetailModal";
+import VideoHeroBanner from "./HeroBanner";
 import VideoCategoryTabs from "./VideoCategoryTabs";
-import VideoDetailModal from "./VideoDetailModal";
-import VideoHeroBanner from "./VideoHeroBanner";
 
 /**
  * AiVideoList 메인 페이지 컴포넌트
