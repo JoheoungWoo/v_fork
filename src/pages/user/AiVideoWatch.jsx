@@ -4,7 +4,7 @@ import { Loader2, MoveLeft, Sparkles } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-// ✅ 하위 컴포넌트
+// ✅ 하위 컴포넌트 임포트
 import LocalQuizCard from "@/components/quiz/LocalQuizCard";
 import QnaCard from "@/components/quiz/QnaCard";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
@@ -15,7 +15,7 @@ import VideoPlayList from "@/components/video/VideoPlayList";
 // ✅ 위젯 매핑 유틸리티
 import WIDGET_MAP from "@/utils/widgetData";
 
-// 🌟 [핵심 방어막] URL로 옛날 ID가 넘어왔을 때를 대비한 맵핑 테이블
+// 🌟 [핵심 방어막] URL의 옛날 해시 ID를 직관적인 새 ID로 변환
 const ID_MAPPING = {
   "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
   "1234qwer": "21_control_test",
@@ -60,43 +60,50 @@ export default function AiVideoWatch() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("quiz");
 
-  // 🌟 URL에서 받은 id를 무조건 새 버전으로 깨끗하게 씻어줍니다.
-  const cleanId = ID_MAPPING[id] || id;
+  // 🌟 URL에서 받은 id를 새 버전(cleanId)으로 정화
+  const cleanId = useMemo(() => ID_MAPPING[id] || id, [id]);
   const isVision = cleanId.startsWith("vision_");
 
+  // 1. 영상 데이터 페칭 (백엔드 DB 중심)
   useEffect(() => {
     const fetchVideoData = async () => {
+      if (!cleanId) return;
       try {
         setLoading(true);
-        // 💡 백엔드 DB에서 강의 상세 정보를 가져옵니다.
         const res = await apiClient.get(`/api/video/url/${cleanId}`);
-        const backendData = res.data || {};
 
-        if (Object.keys(backendData).length === 0 || backendData.error) {
-          throw new Error("영상을 찾을 수 없음");
+        // 백엔드 응답 구조(res.data.data)에 따른 안전한 데이터 추출
+        const backendData = res.data?.data || res.data || {};
+
+        if (
+          !backendData ||
+          Object.keys(backendData).length === 0 ||
+          backendData.error
+        ) {
+          throw new Error("데이터를 찾을 수 없습니다.");
         }
 
         setVideoInfo(backendData);
       } catch (error) {
-        console.error("데이터 페칭 실패:", error);
+        console.error("영상 데이터 로드 실패:", error);
         setVideoInfo(null);
       } finally {
         setLoading(false);
       }
     };
 
-    if (cleanId) fetchVideoData();
+    fetchVideoData();
   }, [cleanId]);
 
-  // 인터랙티브 위젯 컴포넌트 memoization
+  // 2. 인터랙티브 위젯 컴포넌트 매핑
   const WidgetComponent = useMemo(() => {
     if (!cleanId) return null;
-    // 💡 DB의 widget_type 필드가 있다면 우선 사용, 없으면 cleanId로 매핑 시도
+    // DB의 widget_type이 우선, 없으면 cleanId로 매핑 시도
     const type = videoInfo?.widget_type || videoInfo?.widgetType || cleanId;
     return WIDGET_MAP[type] || null;
   }, [videoInfo, cleanId]);
 
-  // 로딩 화면
+  // 로딩 및 에러 처리 UI
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center">
@@ -104,22 +111,22 @@ export default function AiVideoWatch() {
       </div>
     );
 
-  // 데이터 없음 화면
   if (!videoInfo)
     return (
-      <div className="pt-32 text-center text-xl font-bold flex flex-col items-center gap-4">
-        <span>영상을 찾을 수 없습니다.</span>
+      <div className="pt-32 text-center text-xl font-bold flex flex-col items-center gap-6">
+        <p className="text-gray-500">영상을 찾을 수 없거나 준비 중입니다. 😢</p>
         <button
           onClick={() => navigate("/user/videos")}
-          className="text-sm bg-gray-100 px-4 py-2 rounded-lg"
+          className="px-6 py-2 bg-[#0047a5] text-white rounded-full text-base font-medium hover:bg-blue-800 transition-colors"
         >
-          목록으로 돌아가기
+          강의 목록으로 돌아가기
         </button>
       </div>
     );
 
   return (
     <main className="pt-24 pb-12 px-6 max-w-7xl mx-auto font-body">
+      {/* 뒤로가기 버튼 */}
       <button
         onClick={() => navigate("/user/videos")}
         className="mb-6 text-[#0047a5] font-bold flex items-center gap-1 hover:underline active:scale-95 transition-all"
@@ -128,16 +135,15 @@ export default function AiVideoWatch() {
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* 메인 콘텐츠 (좌측) */}
         <div className="lg:col-span-8 space-y-8">
-          {/* 비디오 플레이어 영역 */}
           <section className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-gray-800">
             <VideoPlayer
-              videoUrl={videoInfo.video_url}
+              videoUrl={videoInfo.video_url || videoInfo.video_urls?.[0]}
               title={videoInfo.title}
             />
           </section>
 
-          {/* 비디오 상세 정보 영역 */}
           <VideoInfo
             title={isVision ? "🚀 AI Company 비전" : videoInfo.title}
             subject={videoInfo.subject}
@@ -178,34 +184,34 @@ export default function AiVideoWatch() {
                 </button>
               </div>
 
-              {/* 탭 내용 - 퀴즈 */}
-              {activeTab === "quiz" && <LocalQuizCard id={cleanId} />}
+              {/* 탭 내용 분기 */}
+              <div className="min-h-[400px]">
+                {activeTab === "quiz" && <LocalQuizCard id={cleanId} />}
 
-              {/* 탭 내용 - 인터랙티브 위젯 */}
-              {activeTab === "widget" && WidgetComponent && (
-                <div className="mt-8 p-6 bg-white rounded-3xl border border-gray-200 shadow-inner min-h-[600px] flex flex-col">
-                  <Suspense
-                    fallback={
-                      <div className="flex flex-1 items-center justify-center">
-                        <Loader2
-                          className="animate-spin text-[#0047a5]"
-                          size={48}
-                        />
-                      </div>
-                    }
-                  >
-                    <WidgetComponent />
-                  </Suspense>
-                </div>
-              )}
+                {activeTab === "widget" && WidgetComponent && (
+                  <div className="mt-8 p-6 bg-white rounded-3xl border border-gray-200 shadow-inner min-h-[600px] flex flex-col">
+                    <Suspense
+                      fallback={
+                        <div className="flex flex-1 items-center justify-center">
+                          <Loader2
+                            className="animate-spin text-[#0047a5]"
+                            size={48}
+                          />
+                        </div>
+                      }
+                    >
+                      <WidgetComponent />
+                    </Suspense>
+                  </div>
+                )}
 
-              {/* 탭 내용 - Q&A */}
-              {activeTab === "qna" && <QnaCard />}
+                {activeTab === "qna" && <QnaCard />}
+              </div>
             </section>
           )}
         </div>
 
-        {/* 사이드바 영역 */}
+        {/* 사이드바 (우측) */}
         <aside className="lg:col-span-4 space-y-8">
           <VideoPlayList />
           <RecommendedVideo count={4} />
