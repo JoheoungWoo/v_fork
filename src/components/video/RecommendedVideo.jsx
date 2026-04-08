@@ -1,53 +1,56 @@
-import React, { useMemo } from "react";
-import { useParams } from "react-router-dom";
+import apiClient from "@/api/core/apiClient";
 import useCustomMove from "@/hooks/useCustomMove";
-
-// ✅ 실제 데이터 임포트
-import {
-  mathLectures,
-  circuitLectures,
-  emLectures,
-  visionLectures,
-} from "@/constants/videoData";
-
-// ✅ 전체 데이터 통합
-const ALL_LECTURES = [
-  ...mathLectures,
-  ...circuitLectures,
-  ...emLectures,
-  ...visionLectures,
-];
-
-/**
- * @param {number} count 추출할 개수
- * @param {string} currentId 현재 시청 중인 강의 ID (제외용)
- */
-const getRealRecommendedVideos = (count = 4, currentId) => {
-  // 1. 영상 URL이 실제로 존재하는(빈 문자열이 아닌) 강의만 필터링
-  const playableVideos = ALL_LECTURES.filter(
-    (video) =>
-      video.videoUrls &&
-      video.videoUrls.length > 0 &&
-      video.videoUrls[0] !== "" &&
-      video.id !== currentId, // 현재 보고 있는 영상은 추천에서 제외
-  );
-
-  // 2. 만약 playable한 영상이 요청한 count보다 적으면 있는 거라도 다 보여줌
-  if (playableVideos.length <= count) {
-    return playableVideos;
-  }
-
-  // 3. 무작위 셔플 후 count만큼 추출
-  return playableVideos.sort(() => 0.5 - Math.random()).slice(0, count);
-};
+import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 
 export default function RecommendedVideo({ count = 4 }) {
-  const { id } = useParams(); // 현재 URL의 id 가져오기
+  const { id } = useParams(); // 현재 URL의 id (cleanId 형태)
   const { moveToRead } = useCustomMove("/user/videos");
 
+  const [allLectures, setAllLectures] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 1. 백엔드에서 모든 강의 리스트를 가져옵니다.
+  useEffect(() => {
+    const fetchAllLectures = async () => {
+      try {
+        setLoading(true);
+        // 전체 강의 목록을 가져오는 API 엔드포인트 (기존에 구현된 것을 활용)
+        const res = await apiClient.get("/api/video/list/all");
+        setAllLectures(res.data || []);
+      } catch (error) {
+        console.error("추천 영상을 위한 리스트 로딩 실패:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAllLectures();
+  }, []);
+
+  // 2. 가져온 데이터 중 현재 영상을 제외하고 랜덤하게 추출합니다.
   const recommendedVideos = useMemo(() => {
-    return getRealRecommendedVideos(count, id);
-  }, [count, id]);
+    if (allLectures.length === 0) return [];
+
+    // 영상 URL이 있고 현재 보고 있는 영상이 아닌 것 필터링
+    const playableVideos = allLectures.filter(
+      (video) =>
+        (video.video_url || (video.videoUrls && video.videoUrls[0])) &&
+        video.lecture_id !== id && // 정화된 lecture_id 기준으로 비교
+        video.id !== id,
+    );
+
+    // 무작위 셔플 후 count만큼 추출
+    return [...playableVideos].sort(() => 0.5 - Math.random()).slice(0, count);
+  }, [allLectures, id, count]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="animate-spin text-gray-300" size={32} />
+      </div>
+    );
+  }
 
   if (recommendedVideos.length === 0) {
     return (
@@ -59,39 +62,43 @@ export default function RecommendedVideo({ count = 4 }) {
 
   return (
     <div className="space-y-4">
-      {recommendedVideos.map((video) => (
-        <div
-          key={video.id}
-          className="flex gap-4 bg-white p-3 rounded-xl border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
-          onClick={() => moveToRead(video.id)}
-        >
-          {/* 썸네일 영역 */}
-          <div className="w-32 h-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-            <img
-              src={
-                video.thumbnailTime
-                  ? `${video.thumbnail}?time=${video.thumbnailTime}`
-                  : video.thumbnail || "https://via.placeholder.com/160x90"
-              }
-              alt={video.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-            />
-          </div>
+      <h3 className="font-bold text-slate-800 mb-2 px-1">
+        📺 함께 보면 좋은 강의
+      </h3>
+      {recommendedVideos.map((video) => {
+        // 🌟 ID 우선순위: lecture_id가 있으면 그것을 사용 (없으면 기본 id)
+        const targetId = video.lecture_id || video.id;
 
-          {/* RecommendedVideo.jsx 정보 영역 부분 */}
-          <div className="flex flex-col justify-center overflow-hidden">
-            <span className="text-[10px] font-bold text-[#0047a5] uppercase tracking-wider mb-1">
-              {video.subject}
-            </span>
-            <h4 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug group-hover:text-[#0047a5] transition-colors">
-              {video.title}
-            </h4>
-            <span className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-              {video.duration || "00:00"}
-            </span>
+        return (
+          <div
+            key={video.id}
+            className="flex gap-4 bg-white p-3 rounded-xl border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
+            onClick={() => moveToRead(targetId)}
+          >
+            {/* 썸네일 영역 */}
+            <div className="w-32 h-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
+              <img
+                src={video.thumbnail || "https://via.placeholder.com/160x90"}
+                alt={video.title}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              />
+            </div>
+
+            {/* 정보 영역 */}
+            <div className="flex flex-col justify-center overflow-hidden">
+              <span className="text-[10px] font-bold text-[#0047a5] uppercase tracking-wider mb-1">
+                {video.subject}
+              </span>
+              <h4 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug group-hover:text-[#0047a5] transition-colors">
+                {video.title}
+              </h4>
+              <span className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                {video.duration || "10:00"}
+              </span>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

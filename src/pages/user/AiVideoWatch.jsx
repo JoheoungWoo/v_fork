@@ -4,6 +4,7 @@ import { Loader2, MoveLeft, Sparkles } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+// ✅ 하위 컴포넌트
 import LocalQuizCard from "@/components/quiz/LocalQuizCard";
 import QnaCard from "@/components/quiz/QnaCard";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
@@ -11,13 +12,7 @@ import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import VideoPlayList from "@/components/video/VideoPlayList";
 
-import {
-  circuitLectures,
-  controlLectures,
-  emLectures,
-  mathLectures,
-  visionLectures,
-} from "@/constants/videoData";
+// ✅ 위젯 매핑 유틸리티
 import WIDGET_MAP from "@/utils/widgetData";
 
 // 🌟 [핵심 방어막] URL로 옛날 ID가 넘어왔을 때를 대비한 맵핑 테이블
@@ -57,14 +52,6 @@ const ID_MAPPING = {
   math_radian: "12_math_radian",
 };
 
-const ALL_LECTURES = [
-  ...mathLectures,
-  ...circuitLectures,
-  ...emLectures,
-  ...visionLectures,
-  ...controlLectures,
-];
-
 export default function AiVideoWatch() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -73,55 +60,41 @@ export default function AiVideoWatch() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("quiz");
 
-  // 🌟 [핵심 변경] URL에서 받은 id를 무조건 새 버전으로 깨끗하게 씻어줍니다.
+  // 🌟 URL에서 받은 id를 무조건 새 버전으로 깨끗하게 씻어줍니다.
   const cleanId = ID_MAPPING[id] || id;
   const isVision = cleanId.startsWith("vision_");
-
-  // 🌟 로컬 데이터 찾을 때, 원래 id나 변환된 cleanId 양쪽 모두 대응할 수 있도록 처리!
-  const localVideoData = ALL_LECTURES.find(
-    (l) => l.id === id || l.id === cleanId || ID_MAPPING[l.id] === cleanId,
-  );
 
   useEffect(() => {
     const fetchVideoData = async () => {
       try {
         setLoading(true);
-        // 💡 백엔드에 요청할 때도 정화된 새 ID로 요청합니다.
-        // 만약 백엔드 라우터가 이전 해시를 필요로 한다면 id를, 새 버전을 원하면 cleanId를 넘기세요.
-        // 현재 DB가 업데이트 되었으므로 cleanId를 넘기는 것이 안전합니다.
+        // 💡 백엔드 DB에서 강의 상세 정보를 가져옵니다.
         const res = await apiClient.get(`/api/video/url/${cleanId}`);
         const backendData = res.data || {};
-        const safeData = {};
 
-        Object.keys(backendData).forEach((key) => {
-          if (
-            backendData[key] &&
-            backendData[key] !== "null" &&
-            !String(backendData[key]).includes("찾을 수 없")
-          ) {
-            safeData[key] = backendData[key];
-          }
-        });
+        if (Object.keys(backendData).length === 0 || backendData.error) {
+          throw new Error("영상을 찾을 수 없음");
+        }
 
-        setVideoInfo({ ...localVideoData, ...safeData });
+        setVideoInfo(backendData);
       } catch (error) {
-        setVideoInfo(localVideoData);
+        console.error("데이터 페칭 실패:", error);
+        setVideoInfo(null);
       } finally {
         setLoading(false);
       }
     };
 
     if (cleanId) fetchVideoData();
-  }, [cleanId, localVideoData]);
+  }, [cleanId]);
 
   // 인터랙티브 위젯 컴포넌트 memoization
-  // 인터랙티브 위젯 컴포넌트 memoization
   const WidgetComponent = useMemo(() => {
-    // 🚨 [핵심 수정] videoInfo.widget_type을 읽지 않습니다! (DB에 잘못된 값이 있을 수 있으므로)
-    // 오직 무조건 깨끗하게 정화된 cleanId만 사용하여 WIDGET_MAP에서 찾습니다.
     if (!cleanId) return null;
-    return WIDGET_MAP[cleanId] || null;
-  }, [cleanId]); // 의존성 배열도 cleanId로 변경
+    // 💡 DB의 widget_type 필드가 있다면 우선 사용, 없으면 cleanId로 매핑 시도
+    const type = videoInfo?.widget_type || videoInfo?.widgetType || cleanId;
+    return WIDGET_MAP[type] || null;
+  }, [videoInfo, cleanId]);
 
   // 로딩 화면
   if (loading)
@@ -134,8 +107,14 @@ export default function AiVideoWatch() {
   // 데이터 없음 화면
   if (!videoInfo)
     return (
-      <div className="pt-32 text-center text-xl font-bold">
-        영상을 찾을 수 없습니다.
+      <div className="pt-32 text-center text-xl font-bold flex flex-col items-center gap-4">
+        <span>영상을 찾을 수 없습니다.</span>
+        <button
+          onClick={() => navigate("/user/videos")}
+          className="text-sm bg-gray-100 px-4 py-2 rounded-lg"
+        >
+          목록으로 돌아가기
+        </button>
       </div>
     );
 
@@ -150,13 +129,15 @@ export default function AiVideoWatch() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-8">
+          {/* 비디오 플레이어 영역 */}
           <section className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-gray-800">
             <VideoPlayer
-              videoUrl={videoInfo.video_url || videoInfo.videoUrls?.[0]}
+              videoUrl={videoInfo.video_url}
               title={videoInfo.title}
             />
           </section>
 
+          {/* 비디오 상세 정보 영역 */}
           <VideoInfo
             title={isVision ? "🚀 AI Company 비전" : videoInfo.title}
             subject={videoInfo.subject}
@@ -165,6 +146,7 @@ export default function AiVideoWatch() {
 
           {!isVision && (
             <section className="scroll-mt-24">
+              {/* 탭 헤더 */}
               <div className="flex border-b border-gray-200 mt-8 mb-2">
                 <button
                   className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
@@ -196,11 +178,10 @@ export default function AiVideoWatch() {
                 </button>
               </div>
 
-              {activeTab === "quiz" && (
-                // 💡 [핵심 방어] 깨끗하게 씻겨진 cleanId를 프롭으로 내려줍니다.
-                <LocalQuizCard id={cleanId} />
-              )}
+              {/* 탭 내용 - 퀴즈 */}
+              {activeTab === "quiz" && <LocalQuizCard id={cleanId} />}
 
+              {/* 탭 내용 - 인터랙티브 위젯 */}
               {activeTab === "widget" && WidgetComponent && (
                 <div className="mt-8 p-6 bg-white rounded-3xl border border-gray-200 shadow-inner min-h-[600px] flex flex-col">
                   <Suspense
@@ -218,11 +199,13 @@ export default function AiVideoWatch() {
                 </div>
               )}
 
+              {/* 탭 내용 - Q&A */}
               {activeTab === "qna" && <QnaCard />}
             </section>
           )}
         </div>
 
+        {/* 사이드바 영역 */}
         <aside className="lg:col-span-4 space-y-8">
           <VideoPlayList />
           <RecommendedVideo count={4} />

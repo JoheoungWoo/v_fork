@@ -1,16 +1,16 @@
+import apiClient from "@/api/core/apiClient";
 import useCustomMove from "@/hooks/useCustomMove";
-import { ChevronLeft, ChevronRight, Lock, Play, X } from "lucide-react";
-import { useMemo, useState } from "react";
-
 import {
-  circuitLectures,
-  controlLectures,
-  emLectures,
-  mathLectures,
-  visionLectures,
-} from "@/constants/videoData";
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Lock,
+  Play,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-// 🌟 [핵심] 이전 해시/영문 ID를 직관적인 새 ID로 변환하는 매핑 테이블
+// 🌟 [핵심] 이전 해시/영문 ID를 직관적인 새 ID로 변환하는 매핑 테이블 (하위 호환성 유지)
 const ID_MAPPING = {
   "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
   "1234qwer": "21_control_test",
@@ -27,73 +27,47 @@ const ID_MAPPING = {
   c3d27bab5e1cf6ae9f07f70ae08c1e26: "10_trig_function_1",
   c44dc0cd81fbb02320299a7bff062e4d: "15_derivative",
   e935dc2d2e592a79688c5f40da5fbe23: "9_perfect_square",
-  circuit_ohm_law_equivalent: "6_ohms_law",
-  circuit_power: "2_circuit_power",
-  circuit_reactance_3d: "7_reactance_3d",
-  circuit_resistance: "1_circuit_resistance",
-  circuit_y_voltage: "4_circuit_y_voltage",
-  circuit_ydelta: "3_circuit_ydelta",
-  control_laplace_stability: "1_laplace_stability",
-  em_ampere_law: "3_ampere_law",
-  em_coulomb: "1_coulombs_law",
-  lec_poten_3d: "2_equipotential_3d",
-  math_exponent: "2_math_exponent",
-  math_factorization: "4_math_factorization",
-  math_fraction: "1_math_fraction",
-  math_function: "5_math_function",
-  math_integral_3d: "17_math_integral_3d",
-  math_logarithm: "3_math_logarithm",
-  math_polynomial: "6_math_polynomial",
-  math_radian: "12_math_radian",
 };
 
-const ALL_LECTURES = [
-  ...mathLectures,
-  ...circuitLectures,
-  ...emLectures,
-  ...visionLectures,
-  ...controlLectures,
-];
-
 const getCategory = (lecture) => {
-  if (lecture.subject?.includes("수학")) return "기초 수학";
-  if (lecture.subject?.includes("회로")) return "회로이론";
-  if (lecture.subject?.includes("전자기")) return "전자기학";
-  if (lecture.subject?.includes("제어")) return "제어공학";
-  if (lecture.subject?.includes("AI") || lecture.subject?.includes("Vision"))
-    return "Vision";
-  return "전체";
+  const subject = lecture.subject || "";
+  if (subject.includes("수학")) return "기초 수학";
+  if (subject.includes("회로")) return "회로이론";
+  if (subject.includes("전자기")) return "전자기학";
+  if (subject.includes("제어")) return "제어공학";
+  if (subject.includes("AI") || subject.includes("Vision")) return "Vision";
+  return "기타";
 };
 
 const CATEGORY_INFO = {
   전체: {
     title: "알기 쉬운 AI 영상 강의",
-    desc: "전기 공학의 기초부터 실무 응용까지, 전문가가 직접 가르치는 고품격 커리큘럼입니다.",
+    desc: "전기 공학의 기초부터 실무 응용까지, 전문가가 직접 가르치는 커리큘럼입니다.",
     bgIcon: "A",
   },
   "기초 수학": {
     title: "기초 수학 마스터 클래스",
-    desc: "전기 공학 계산의 뼈대가 되는 핵심 수학 이론! 수포자도 이해할 수 있게 쉽게 풀어드립니다.",
+    desc: "전기 공학 계산의 뼈대가 되는 핵심 수학 이론을 쉽게 풀어드립니다.",
     bgIcon: "∑",
   },
   회로이론: {
     title: "회로이론 완벽 정복",
-    desc: "전압, 전류, 저항의 관계부터 복잡한 회로망 해석까지 한 번에 끝내는 필수 코스입니다.",
+    desc: "전압, 전류, 저항의 관계부터 회로망 해석까지 한 번에 끝내는 코스입니다.",
     bgIcon: "Ω",
   },
   전자기학: {
     title: "전자기학 핵심 요약",
-    desc: "눈에 보이지 않는 전기장과 자기장의 원리를 3D 시각화 자료를 통해 직관적으로 이해합니다.",
+    desc: "전기장과 자기장의 원리를 시각화 자료를 통해 직관적으로 이해합니다.",
     bgIcon: "🧲",
   },
   제어공학: {
     title: "제어공학 기초와 실무",
-    desc: "시스템의 동적 특성을 분석하고, 안정적인 피드백 제어 시스템을 설계하는 방법을 배웁니다.",
+    desc: "동적 특성 분석과 피드백 제어 시스템 설계 방법을 배웁니다.",
     bgIcon: "⚙️",
   },
   Vision: {
     title: "머신 비전 & AI",
-    desc: "최신 AI 기술을 활용한 이미지 프로세싱과 머신 비전의 기초를 다집니다.",
+    desc: "최신 AI 기술을 활용한 이미지 프로세싱의 기초를 다집니다.",
     bgIcon: "👁️",
   },
 };
@@ -107,40 +81,36 @@ const CATEGORIES = [
   { id: "Vision", label: "Vision", icon: "🚀" },
 ];
 
-const HeroBanner = ({ currentCategoryData, total }) => (
-  <div className="bg-[#0047a5] rounded-2xl p-10 md:p-14 mb-10 text-white relative overflow-hidden shadow-lg transition-colors duration-500">
-    <div className="absolute right-10 top-1/2 -translate-y-1/2 text-[180px] opacity-10 font-serif font-bold pointer-events-none select-none">
-      {currentCategoryData.bgIcon}
-    </div>
-    <div className="relative z-10 max-w-2xl">
-      <h1 className="text-4xl font-extrabold mb-4 font-headline tracking-tight">
-        {currentCategoryData.title}
-      </h1>
-      <p className="text-blue-100 text-lg mb-8 leading-relaxed opacity-90">
-        {currentCategoryData.desc}
-      </p>
-      <div className="flex items-center gap-3">
-        <span className="bg-white/20 px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm">
-          총 {total}개의 강의
-        </span>
-        <span className="bg-[#d7e2ff] text-[#003f87] px-4 py-1.5 rounded-full text-sm font-bold shadow-sm">
-          인기 코스
-        </span>
+// --- Sub Components ---
+const HeroBanner = ({ category, total }) => {
+  const info = CATEGORY_INFO[category] || CATEGORY_INFO["전체"];
+  return (
+    <div className="bg-[#0047a5] rounded-2xl p-10 md:p-14 mb-10 text-white relative overflow-hidden shadow-lg">
+      <div className="absolute right-10 top-1/2 -translate-y-1/2 text-[180px] opacity-10 font-serif font-bold pointer-events-none select-none">
+        {info.bgIcon}
+      </div>
+      <div className="relative z-10 max-w-2xl">
+        <h1 className="text-4xl font-extrabold mb-4 tracking-tight">
+          {info.title}
+        </h1>
+        <p className="text-blue-100 text-lg mb-8 leading-relaxed opacity-90">
+          {info.desc}
+        </p>
+        <div className="flex items-center gap-3">
+          <span className="bg-white/20 px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm">
+            총 {total}개의 강의
+          </span>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
-  let finalThumbnail =
-    video.thumbnail ||
-    "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
-  if (!isLocked && video.thumbnail && video.thumbnailTime) {
-    finalThumbnail = `${video.thumbnail}?time=${video.thumbnailTime}`;
-  }
-
-  // 🌟 새 ID로 변환하여 라우팅 준비
-  const normalizedId = ID_MAPPING[video.id] || video.id;
+const VideoCard = ({ video, onRead, onOpenModal }) => {
+  const isLocked =
+    !video.video_url && (!video.videoUrls || video.videoUrls[0] === "");
+  const targetId = video.lecture_id || video.id;
+  const normalizedId = ID_MAPPING[targetId] || targetId;
 
   return (
     <article
@@ -155,7 +125,10 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
         ) : (
           <>
             <img
-              src={finalThumbnail}
+              src={
+                video.thumbnail ||
+                "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image"
+              }
               alt={video.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
@@ -166,33 +139,24 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
             </div>
           </>
         )}
-        <div
-          className={`absolute top-4 left-4 text-white px-3 py-1 rounded-lg font-bold text-sm tracking-wider uppercase ${isLocked ? "bg-gray-500" : "bg-[#0047a5]"}`}
-        >
-          {video.category || "STEP"}
-        </div>
       </div>
       <div className="p-8 flex flex-col flex-grow">
-        <span
-          className={`font-bold text-xs uppercase tracking-widest mb-2 block ${isLocked ? "text-gray-500" : "text-[#0047a5]"}`}
-        >
+        <span className="font-bold text-xs uppercase tracking-widest mb-2 block text-[#0047a5]">
           {video.subject || "영상 강의"}
         </span>
         <h2 className="text-2xl font-bold text-gray-900 mb-3 leading-tight line-clamp-2 min-h-[3.5rem]">
           {video.title}
         </h2>
         <p className="text-gray-500 text-base mb-8 font-medium line-clamp-2">
-          {video.description || (isLocked ? "준비 중인 강의입니다." : "")}
+          {video.description}
         </p>
-        <div
-          className={`mt-auto ${!isLocked && "flex items-center justify-between"}`}
-        >
+        <div className="mt-auto flex items-center justify-between">
           {isLocked ? (
             <button
               disabled
               className="w-full py-3 bg-gray-100 text-gray-400 text-lg font-bold rounded-xl cursor-not-allowed"
             >
-              수강 불가 (영상 준비중)
+              준비 중
             </button>
           ) : (
             <>
@@ -201,7 +165,7 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
                   e.stopPropagation();
                   onOpenModal(video);
                 }}
-                className="text-[#0047a5] font-bold text-lg hover:underline underline-offset-4 decoration-2"
+                className="text-[#0047a5] font-bold text-lg hover:underline"
               >
                 상세보기
               </button>
@@ -210,7 +174,7 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
                   e.stopPropagation();
                   onRead(normalizedId);
                 }}
-                className="bg-[#e5edff] text-[#0047a5] text-lg px-8 py-3 rounded-xl font-bold shadow-sm hover:bg-[#0047a5] hover:text-white transition-colors"
+                className="bg-[#e5edff] text-[#0047a5] text-lg px-8 py-3 rounded-xl font-bold hover:bg-[#0047a5] hover:text-white transition-colors"
               >
                 시청하기
               </button>
@@ -222,164 +186,102 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
   );
 };
 
-const DetailModal = ({ selectedVideo, onClose, onRead }) => {
-  if (!selectedVideo) return null;
-  const normalizedId = ID_MAPPING[selectedVideo.id] || selectedVideo.id;
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-8 border-b border-gray-100 flex justify-between items-start shrink-0">
-          <div>
-            <div className="bg-[#e5edff] text-[#0047a5] px-3 py-1 rounded text-xs font-bold uppercase tracking-widest mb-3 inline-block">
-              강의 상세 안내
-            </div>
-            <h2 className="text-3xl font-extrabold text-gray-900 leading-tight">
-              {selectedVideo.title}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-red-500 transition-colors p-2 -mr-2"
-          >
-            <X size={32} />
-          </button>
-        </div>
-        <div className="p-8 overflow-y-auto">
-          <div className="space-y-8">
-            <p className="text-xl text-gray-600 leading-relaxed font-medium">
-              {selectedVideo.description}
-            </p>
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-              <h4 className="text-base font-bold text-[#0047a5] uppercase tracking-wider mb-4 border-b border-gray-200 pb-2">
-                강의 정보
-              </h4>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-lg">카테고리</span>
-                  <span className="text-gray-900 font-bold text-lg">
-                    {selectedVideo.category || "미분류"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-lg">과목명</span>
-                  <span className="text-gray-900 font-bold text-lg">
-                    {selectedVideo.subject || "-"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="p-8 bg-gray-50 flex flex-col gap-4 shrink-0 rounded-b-2xl border-t border-gray-100">
-          <button
-            onClick={() => {
-              onClose();
-              onRead(normalizedId);
-            }}
-            className="w-full py-5 bg-[#0047a5] text-white text-xl font-extrabold rounded-xl shadow-lg hover:bg-blue-800 transition-colors"
-          >
-            지금 바로 학습 시작하기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
+// --- Main Page Component ---
 export default function VideoListPage() {
   const { page, size, moveToList, moveToRead } = useCustomMove("/user/videos");
   const [activeTab, setActiveTab] = useState("전체");
+  const [allLectures, setAllLectures] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  const { activeVideos, lockedVideos } = useMemo(() => {
-    let result = ALL_LECTURES.map((v) => ({
-      ...v,
-      category: getCategory(v),
-      duration: v.duration || "10:00",
-      createdAt: v.createdAt || "2026-01-01",
-      isLocked:
-        !v.videoUrls || v.videoUrls.length === 0 || v.videoUrls[0] === "",
-    }));
-    if (activeTab !== "전체")
-      result = result.filter((video) => video.category === activeTab);
-    return {
-      activeVideos: result.filter((v) => !v.isLocked),
-      lockedVideos: result.filter((v) => v.isLocked),
+  // 1. 백엔드에서 데이터 로드
+  useEffect(() => {
+    const fetchLectures = async () => {
+      try {
+        setLoading(true);
+        const res = await apiClient.get("/api/video/list/all");
+        setAllLectures(res.data || []);
+      } catch (err) {
+        console.error("강의 목록 로드 실패:", err);
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [activeTab]);
+    fetchLectures();
+  }, []);
 
-  const total = activeVideos.length;
+  // 2. 카테고리 필터링 및 정렬 로직 (메모이제이션)
+  const filteredVideos = useMemo(() => {
+    let list = allLectures.map((v) => ({ ...v, category: getCategory(v) }));
+    if (activeTab !== "전체") {
+      list = list.filter((v) => v.category === activeTab);
+    }
+    // 시청 가능한 강의 우선, 그 다음 최신순 (id 내림차순)
+    return list.sort((a, b) => {
+      const aPlayable = a.video_url ? 1 : 0;
+      const bPlayable = b.video_url ? 1 : 0;
+      if (aPlayable !== bPlayable) return bPlayable - aPlayable;
+      return b.id - a.id;
+    });
+  }, [allLectures, activeTab]);
+
+  // 3. 페이지네이션 계산
+  const total = filteredVideos.length;
   const totalPages = Math.ceil(total / size) || 1;
-  const start = (page - 1) * size;
-  const currentList = activeVideos.slice(start, start + size);
+  const currentList = filteredVideos.slice((page - 1) * size, page * size);
 
-  const handleTabClick = (categoryId) => {
-    setActiveTab(categoryId);
-    moveToList({ page: 1, size });
-  };
+  if (loading)
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="animate-spin text-[#0047a5]" size={48} />
+      </div>
+    );
 
   return (
     <main className="mx-auto px-8 py-12 max-w-7xl w-[85%] font-body relative">
-      <HeroBanner
-        currentCategoryData={CATEGORY_INFO[activeTab]}
-        total={total}
-      />
+      <HeroBanner category={activeTab} total={total} />
+
       <div className="flex flex-wrap items-center justify-start gap-4 mb-10">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
-            onClick={() => handleTabClick(cat.id)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all shadow-sm ${activeTab === cat.id ? "bg-[#0047a5] text-white shadow-md scale-105" : "bg-[#f3f4f6] text-gray-700 hover:bg-gray-200"}`}
+            onClick={() => {
+              setActiveTab(cat.id);
+              moveToList({ page: 1, size });
+            }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all shadow-sm ${activeTab === cat.id ? "bg-[#0047a5] text-white scale-105" : "bg-[#f3f4f6] text-gray-700 hover:bg-gray-200"}`}
           >
             <span className="text-xl">{cat.icon}</span>
             <span>{cat.label}</span>
           </button>
         ))}
       </div>
-      <div className="mb-6 text-gray-500 font-medium">
-        총 {total}개의 시청 가능 강의 중 {page}페이지를 탐색 중입니다.
-      </div>
+
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16">
-        {currentList.length > 0 ? (
-          currentList.map((video) => (
-            <VideoCard
-              key={video.id}
-              video={video}
-              isLocked={false}
-              onRead={moveToRead}
-              onOpenModal={setSelectedVideo}
-            />
-          ))
-        ) : (
-          <div className="col-span-full text-center py-20 text-gray-500 text-lg font-medium">
-            시청 가능한 강의가 없습니다. 😢
-          </div>
-        )}
-        {(page === totalPages || currentList.length === 0) &&
-          lockedVideos.map((locked) => (
-            <VideoCard key={locked.id} video={locked} isLocked={true} />
-          ))}
+        {currentList.map((video) => (
+          <VideoCard
+            key={video.id}
+            video={video}
+            onRead={moveToRead}
+            onOpenModal={setSelectedVideo}
+          />
+        ))}
       </section>
+
       {total > 0 && (
         <nav className="flex justify-center items-center gap-2">
           <button
             onClick={() => moveToList({ page: page - 1, size })}
             disabled={page <= 1}
-            className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-500"
+            className="p-2 text-gray-500 disabled:opacity-30"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft />
           </button>
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i + 1}
               onClick={() => moveToList({ page: i + 1, size })}
-              className={`w-10 h-10 rounded-xl font-bold transition-all ${page === i + 1 ? "bg-[#0047a5] text-white shadow-lg scale-110" : "text-gray-600 hover:bg-gray-100"}`}
+              className={`w-10 h-10 rounded-xl font-bold ${page === i + 1 ? "bg-[#0047a5] text-white shadow-lg" : "text-gray-600 hover:bg-gray-100"}`}
             >
               {i + 1}
             </button>
@@ -387,17 +289,44 @@ export default function VideoListPage() {
           <button
             onClick={() => moveToList({ page: page + 1, size })}
             disabled={page >= totalPages}
-            className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-500"
+            className="p-2 text-gray-500 disabled:opacity-30"
           >
-            <ChevronRight size={24} />
+            <ChevronRight />
           </button>
         </nav>
       )}
-      <DetailModal
-        selectedVideo={selectedVideo}
-        onClose={() => setSelectedVideo(null)}
-        onRead={moveToRead}
-      />
+
+      {/* 모달 창 */}
+      {selectedVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setSelectedVideo(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-8 max-w-2xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between mb-4">
+              <h2 className="text-3xl font-extrabold">{selectedVideo.title}</h2>
+              <button onClick={() => setSelectedVideo(null)}>
+                <X size={32} />
+              </button>
+            </div>
+            <p className="text-lg text-gray-600 mb-6">
+              {selectedVideo.description}
+            </p>
+            <button
+              onClick={() => {
+                const id = selectedVideo.lecture_id || selectedVideo.id;
+                moveToRead(ID_MAPPING[id] || id);
+              }}
+              className="w-full py-4 bg-[#0047a5] text-white font-bold rounded-xl"
+            >
+              학습 시작하기
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
