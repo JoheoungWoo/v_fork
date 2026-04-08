@@ -86,7 +86,7 @@ export default function AiVideoList() {
           ...video,
           category: getCategory(video),
         }));
-
+        console.log("catotried data:", categorizedArray);
         setAllLectures(categorizedArray);
       } catch (err) {
         console.error("❌ 강의 목록 로드 실패:", err);
