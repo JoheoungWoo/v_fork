@@ -203,6 +203,7 @@ export default function VideoListPage() {
       try {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
+        console.log("res:", res);
         setAllLectures(res.data || []);
       } catch (err) {
         console.error("강의 목록 로드 실패:", err);
