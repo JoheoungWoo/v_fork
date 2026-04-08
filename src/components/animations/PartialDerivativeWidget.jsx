@@ -1,6 +1,22 @@
+import katex from "katex";
 import "katex/dist/katex.min.css";
 import { useState } from "react";
-import { BlockMath } from "react-katex";
+
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
 const PartialDerivativeWidget = () => {
   const [x, setX] = useState(2);
