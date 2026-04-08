@@ -10,6 +10,43 @@ import {
   visionLectures,
 } from "@/constants/videoData";
 
+// 🌟 [핵심 추가] 이전 해시/영문 ID를 직관적인 새 ID로 변환하는 매핑 테이블
+const ID_MAPPING = {
+  "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
+  "1234qwer": "21_control_test",
+  "1da7f54684d76e361736580a26e6917c": "207_cho_hw_cheer",
+  "201092af306ff8cb381808e4c3f45e0c": "13_vector_dot_product",
+  "30d2bd6d1675fb17fe237d8c9d930413": "14_vector_cross_product",
+  "5f16ede4e7730bdbf86da518cfd232e9": "25_circuit_test_video",
+  "605e4d59a8fdcfe8f914734370c726f4": "18_angular_velocity",
+  "61b1ec56bcd7e87535d18c40bb9afb21": "8_parabola_line_intersection",
+  "62069c25429c16e898888d5611eb67b4": "7_line_intersection",
+  "8fc05f0f6c31f19deeb976cb2b1562cf": "11_trig_function_2",
+  a778e615bf667e6db830b498baa5ec66: "16_partial_derivative",
+  acf4500a94d8492cde7139e71760ff71: "25_control_test_video",
+  c3d27bab5e1cf6ae9f07f70ae08c1e26: "10_trig_function_1",
+  c44dc0cd81fbb02320299a7bff062e4d: "15_derivative",
+  e935dc2d2e592a79688c5f40da5fbe23: "9_perfect_square",
+  circuit_ohm_law_equivalent: "6_ohms_law",
+  circuit_power: "2_circuit_power",
+  circuit_reactance_3d: "7_reactance_3d",
+  circuit_resistance: "1_circuit_resistance",
+  circuit_y_voltage: "4_circuit_y_voltage",
+  circuit_ydelta: "3_circuit_ydelta",
+  control_laplace_stability: "1_laplace_stability",
+  em_ampere_law: "3_ampere_law",
+  em_coulomb: "1_coulombs_law",
+  lec_poten_3d: "2_equipotential_3d",
+  math_exponent: "2_math_exponent",
+  math_factorization: "4_math_factorization",
+  math_fraction: "1_math_fraction",
+  math_function: "5_math_function",
+  math_integral_3d: "17_math_integral_3d",
+  math_logarithm: "3_math_logarithm",
+  math_polynomial: "6_math_polynomial",
+  math_radian: "12_math_radian",
+};
+
 // ==========================================
 // 1. 데이터 및 설정값
 // ==========================================
@@ -111,6 +148,9 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
     finalThumbnail = `${video.thumbnail}?time=${video.thumbnailTime}`;
   }
 
+  // 🌟 [안전장치] video.id가 맵핑 테이블에 있으면 변환하고, 없으면 그대로 사용
+  const normalizedId = ID_MAPPING[video.id] || video.id;
+
   return (
     <article
       className={`flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 transition-all duration-300 ${
@@ -118,7 +158,7 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
           ? "opacity-60"
           : "shadow-sm hover:shadow-xl group cursor-pointer"
       }`}
-      onClick={() => !isLocked && onRead(video.id)}
+      onClick={() => !isLocked && onRead(normalizedId)} // 💡 여기서 새 ID로 라우팅!
     >
       {/* 썸네일 영역 */}
       <div
@@ -194,7 +234,7 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRead(video.id);
+                  onRead(normalizedId); // 💡 여기서 새 ID로 라우팅!
                 }}
                 className="bg-[#e5edff] text-[#0047a5] text-lg px-8 py-3 rounded-xl font-bold shadow-sm hover:bg-[#0047a5] hover:text-white transition-colors"
               >
@@ -210,6 +250,10 @@ const VideoCard = ({ video, isLocked, onRead, onOpenModal }) => {
 
 const DetailModal = ({ selectedVideo, onClose, onRead }) => {
   if (!selectedVideo) return null;
+
+  // 🌟 [안전장치] 모달에서 이동할 때도 깨끗한 새 ID로!
+  const normalizedId = ID_MAPPING[selectedVideo.id] || selectedVideo.id;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
@@ -265,7 +309,7 @@ const DetailModal = ({ selectedVideo, onClose, onRead }) => {
           <button
             onClick={() => {
               onClose();
-              onRead(selectedVideo.id);
+              onRead(normalizedId); // 💡 여기서 새 ID로 라우팅!
             }}
             className="w-full py-5 bg-[#0047a5] text-white text-xl font-extrabold rounded-xl shadow-lg hover:bg-blue-800 transition-colors"
           >
