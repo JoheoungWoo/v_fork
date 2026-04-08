@@ -107,8 +107,10 @@ const HeroBanner = ({ category, total }) => {
 };
 
 const VideoCard = ({ video, onRead, onOpenModal }) => {
-  const isLocked =
-    !video.video_url && (!video.videoUrls || video.videoUrls[0] === "");
+  // 🌟 백엔드 필드명(video_url)에 맞춰 잠금 로직 수정
+  const isLocked = !video.video_url || video.video_url === "";
+
+  // 🌟 lecture_id가 있으면 그것을, 없으면 id를 사용
   const targetId = video.lecture_id || video.id;
   const normalizedId = ID_MAPPING[targetId] || targetId;
 
@@ -124,6 +126,7 @@ const VideoCard = ({ video, onRead, onOpenModal }) => {
           <Lock className="text-gray-400" size={48} />
         ) : (
           <>
+            {/* 🌟 video.thumbnail이 올바르게 들어오는지 확인 */}
             <img
               src={
                 video.thumbnail ||
@@ -210,21 +213,27 @@ export default function VideoListPage() {
     fetchLectures();
   }, []);
 
-  // 2. 카테고리 필터링 및 정렬 로직 (메모이제이션)
   const filteredVideos = useMemo(() => {
-    let list = allLectures.map((v) => ({ ...v, category: getCategory(v) }));
+    // 🌟 데이터가 없을 경우 빈 배열 반환
+    if (!allLectures || allLectures.length === 0) return [];
+
+    let list = allLectures.map((v) => ({
+      ...v,
+      category: getCategory(v),
+    }));
+
     if (activeTab !== "전체") {
       list = list.filter((v) => v.category === activeTab);
     }
-    // 시청 가능한 강의 우선, 그 다음 최신순 (id 내림차순)
+
+    // 🌟 정렬: 시청 가능한 것 먼저, 그 다음 제목순
     return list.sort((a, b) => {
       const aPlayable = a.video_url ? 1 : 0;
       const bPlayable = b.video_url ? 1 : 0;
       if (aPlayable !== bPlayable) return bPlayable - aPlayable;
-      return b.id - a.id;
+      return (a.title || "").localeCompare(b.title || "");
     });
   }, [allLectures, activeTab]);
-
   // 3. 페이지네이션 계산
   const total = filteredVideos.length;
   const totalPages = Math.ceil(total / size) || 1;
