@@ -3,11 +3,13 @@ import useCustomMove from "@/hooks/useCustomMove";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+// ✅ 하위 컴포넌트 불러오기 (반드시 같은 폴더에 해당 파일들이 있어야 합니다)
 import DetailModal from "./DetailModal";
 import HeroBanner from "./HeroBanner";
 import VideoCard from "./VideoCard";
+import VideoCategoryTabs from "./VideoCategoryTabs"; // 🌟 누락되었던 탭 컴포넌트 Import 추가
 
-// 🌟 [핵심 추가] DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
+// 🌟 DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
 const getCategory = (video) => {
   const subject = video.subject || "";
   const idStr = String(video.lecture_id || video.id || "").toLowerCase();
@@ -69,6 +71,7 @@ export default function AiVideoList() {
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
+  // 1. 데이터 페칭 및 카테고리 자동 분류
   useEffect(() => {
     const fetchLectures = async () => {
       try {
@@ -78,7 +81,7 @@ export default function AiVideoList() {
         const rawArray =
           res.data?.data || (Array.isArray(res.data) ? res.data : []);
 
-        // 🌟 [수정] 데이터가 들어올 때 모든 영상에 category 속성을 강제로 부여합니다.
+        // 🌟 데이터가 들어올 때 모든 영상에 category 속성을 강제로 부여합니다.
         const categorizedArray = rawArray.map((video) => ({
           ...video,
           category: getCategory(video),
@@ -95,15 +98,17 @@ export default function AiVideoList() {
     fetchLectures();
   }, []);
 
+  // 2. 선택된 탭에 맞게 목록 필터링
   const filteredVideos = useMemo(() => {
     if (!allLectures || allLectures.length === 0) return [];
     let list = [...allLectures];
 
-    // 🌟 [수정] 복잡한 문자열 검색 대신, 위에서 부여한 category 속성과 탭 이름이 일치하는지만 봅니다.
+    // 🌟 위에서 부여한 category 속성과 현재 누른 탭 이름이 일치하는지만 검사
     if (activeTab !== "전체") {
       list = list.filter((v) => v.category === activeTab);
     }
 
+    // 영상이 있는(시청 가능한) 강의를 먼저 보여주도록 정렬
     return list.sort((a, b) => {
       const aPlayable = a.video_url ? 1 : 0;
       const bPlayable = b.video_url ? 1 : 0;
@@ -111,6 +116,7 @@ export default function AiVideoList() {
     });
   }, [allLectures, activeTab]);
 
+  // 3. 페이지네이션 계산
   const total = filteredVideos.length;
   const totalPages = Math.ceil(total / size) || 1;
   const currentList = filteredVideos.slice((page - 1) * size, page * size);
@@ -124,11 +130,19 @@ export default function AiVideoList() {
 
   return (
     <main className="mx-auto px-8 py-12 max-w-7xl w-[85%] font-body relative">
+      {/* 상단 다이나믹 배너 */}
       <HeroBanner category={activeTab} total={total} />
 
-      {/* 탭 영역 (직접 구현하셨거나 VideoCategoryTabs 사용) */}
-      {/* <VideoCategoryTabs activeTab={activeTab} onTabChange={(id) => { setActiveTab(id); moveToList({ page: 1, size }); }} /> */}
+      {/* 🌟 카테고리 탭 컴포넌트 렌더링 */}
+      <VideoCategoryTabs
+        activeTab={activeTab}
+        onTabChange={(id) => {
+          setActiveTab(id);
+          moveToList({ page: 1, size }); // 탭을 바꾸면 1페이지로 돌아가도록 설정
+        }}
+      />
 
+      {/* 비디오 카드 그리드 */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16 mt-8">
         {currentList.length > 0 ? (
           currentList.map((video) => (
@@ -146,6 +160,7 @@ export default function AiVideoList() {
         )}
       </section>
 
+      {/* 페이지네이션 네비게이션 */}
       {total > 0 && (
         <nav className="flex justify-center items-center gap-2">
           <button
@@ -160,7 +175,11 @@ export default function AiVideoList() {
             <button
               key={i + 1}
               onClick={() => moveToList({ page: i + 1, size })}
-              className={`w-10 h-10 rounded-xl font-bold transition-all ${page === i + 1 ? "bg-[#0047a5] text-white shadow-lg scale-110" : "text-gray-600 hover:bg-gray-100"}`}
+              className={`w-10 h-10 rounded-xl font-bold transition-all ${
+                page === i + 1
+                  ? "bg-[#0047a5] text-white shadow-lg scale-110"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
             >
               {i + 1}
             </button>
@@ -176,6 +195,7 @@ export default function AiVideoList() {
         </nav>
       )}
 
+      {/* 상세 보기 모달창 */}
       <DetailModal
         video={selectedVideo}
         onClose={() => setSelectedVideo(null)}
