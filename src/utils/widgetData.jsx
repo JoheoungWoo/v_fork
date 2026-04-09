@@ -22,6 +22,7 @@ const WIDGET_MAP = {
       () =>
         import("@/components/animations/circuits/MobileCoilAndCapacitorWidget"),
     ),
+    lazy(() => import("@/components/animations/circuits/LCSimulator")),
   ],
   "8_time_constant": [
     lazy(() => import("@/components/animations/controls/TimeConstantWidget")),
