@@ -1,57 +1,84 @@
 import { lazy } from "react";
 
+/**
+ * 🌟 [Single Source of Truth]
+ * DB의 'lecture_id'를 키(Key) 값으로 사용하여 위젯을 직접 연결합니다.
+ * 주소창의 ID(cleanId)가 이 키 값과 일치하면 탭이 자동으로 열립니다.
+ */
 const WIDGET_MAP = {
-  trig_circle: lazy(
-    () => import("@/components/animations/InteractiveUnitCircle"),
-  ),
-  ohms_law: lazy(
+  // ==========================================
+  // ⚡ 회로이론 (Circuit Theory)
+  // ==========================================
+  "6_ohms_law": lazy(
     () => import("@/components/animations/ParallelResistanceWidget"),
   ),
-  y_delta_converter: lazy(
+  "3_circuit_ydelta": lazy(
     () => import("@/components/animations/YDeltaConverterWidget"),
   ),
-  coulombs_law: lazy(() => import("@/components/animations/CoulombsLaw3DPage")),
+  "7_reactance_3d": lazy(
+    () => import("@/components/animations/Reactance3DWidget"),
+  ),
+  "8_time_constant": lazy(
+    () => import("@/components/animations/controls/TimeConstantWidget"),
+  ),
+
+  // ==========================================
+  // 🧲 전자기학 (Electromagnetics)
+  // ==========================================
+  "1_coulombs_law": lazy(
+    () => import("@/components/animations/CoulombsLaw3DPage"),
+  ),
+  "2_equipotential_3d": lazy(
+    () => import("@/components/animations/Equipotential3DWidget"),
+  ),
+  "3_ampere_law": lazy(() => import("@/components/animations/AmpereLawWidget")),
+
+  // ==========================================
+  // 📐 기초수학 (Basic Math)
+  // ==========================================
+  "10_trig_function_1": lazy(
+    () => import("@/components/animations/InteractiveUnitCircle"),
+  ),
+  "8_parabola_line_intersection": lazy(
+    () => import("@/components/animations/ParabolaIntersection"),
+  ),
+  "13_vector_dot_product": lazy(
+    () => import("@/components/animations/VectorInnerProductWidget"),
+  ),
+  "14_vector_cross_product": lazy(
+    () => import("@/components/animations/VectorCrossProductWidget"),
+  ),
+  "15_derivative": lazy(
+    () => import("@/components/animations/DerivativeWidget"),
+  ),
+  "16_partial_derivative": lazy(
+    () => import("@/components/animations/PartialDerivativeWidget"),
+  ),
+  "17_math_integral_3d": lazy(
+    () => import("@/components/animations/Integral3DWidget"),
+  ),
+  "18_angular_velocity": lazy(
+    () => import("@/components/animations/AngularVelocityWidget"),
+  ),
+
+  // ==========================================
+  // ⚙️ 제어공학 (Control Engineering)
+  // ==========================================
+  "1_laplace_stability": lazy(
+    () => import("@/components/animations/controls/Laplace3DWidget"),
+  ),
+
+  // ==========================================
+  // 💡 미연결 / 예비용 위젯 (추후 새 강의 추가 시 ID만 맞춰주면 됩니다)
+  // ==========================================
+  polar_coordinate: lazy(
+    () => import("@/components/animations/PolarCoordinateWidget"),
+  ),
   rotating_field: lazy(
     () => import("@/components/animations/RotatingMagneticFieldWidget"),
   ),
   dc_rectifier: lazy(
     () => import("@/components/animations/DcRectificationWidget"),
-  ),
-  equipotential: lazy(
-    () => import("@/components/animations/Equipotential3DWidget"),
-  ),
-  ampere_law: lazy(() => import("@/components/animations/AmpereLawWidget")),
-  parabolaWidget: lazy(
-    () => import("@/components/animations/ParabolaIntersection"),
-  ),
-  vectorInnerProject: lazy(
-    () => import("@/components/animations/VectorInnerProductWidget"),
-  ),
-  vector_cross_product: lazy(
-    // 💡 새롭게 추가된 외적 위젯
-    () => import("@/components/animations/VectorCrossProductWidget"),
-  ),
-  derivative: lazy(() => import("@/components/animations/DerivativeWidget")),
-  "16_partial_derivative": lazy(
-    () => import("@/components/animations/PartialDerivativeWidget"),
-  ),
-  math_integral_3d: lazy(
-    () => import("@/components/animations/Integral3DWidget"),
-  ),
-  angular_velocity: lazy(
-    () => import("@/components/animations/AngularVelocityWidget"),
-  ),
-  reactance_3d: lazy(() => import("@/components/animations/Reactance3DWidget")),
-
-  laplace_3d: lazy(
-    () => import("@/components/animations/controls/Laplace3DWidget"), // 만드신 경로에 맞게 지정
-  ),
-  // 💡 [추가] 직각 좌표계 & 극좌표계 위젯 연결
-  polar_coordinate: lazy(
-    () => import("@/components/animations/PolarCoordinateWidget"),
-  ),
-  time_constant: lazy(
-    () => import("@/components/animations/controls/TimeConstantWidget"),
   ),
 };
 
