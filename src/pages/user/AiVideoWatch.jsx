@@ -1,11 +1,11 @@
 import apiClient from "@/api/core/apiClient";
 import "katex/dist/katex.min.css";
 import { Loader2, MoveLeft, Sparkles } from "lucide-react";
-// 🌟 1. startTransition 임포트 추가!
+// 🌟 startTransition 추가
 import { startTransition, Suspense, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+// 🌟 useSearchParams 추가
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-// ✅ 하위 컴포넌트 임포트
 import LocalQuizCard from "@/components/quiz/LocalQuizCard";
 import QnaCard from "@/components/quiz/QnaCard";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
@@ -13,10 +13,9 @@ import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import VideoPlayList from "@/components/video/VideoPlayList";
 
-// ✅ 위젯 매핑 유틸리티
 import WIDGET_MAP from "@/utils/widgetData";
 
-// 🌟 [핵심 방어막] URL의 옛날 해시 ID를 직관적인 새 ID로 변환
+// 🌟 URL의 옛날 해시 ID를 직관적인 새 ID로 변환
 const ID_MAPPING = {
   "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
   "1234qwer": "21_control_test",
@@ -33,16 +32,37 @@ const ID_MAPPING = {
   c3d27bab5e1cf6ae9f07f70ae08c1e26: "10_trig_function_1",
   c44dc0cd81fbb02320299a7bff062e4d: "15_derivative",
   e935dc2d2e592a79688c5f40da5fbe23: "9_perfect_square",
-  // ... 나머지 매핑 동일 ...
+  circuit_ohm_law_equivalent: "6_ohms_law",
+  circuit_power: "2_circuit_power",
+  circuit_reactance_3d: "7_reactance_3d",
+  circuit_resistance: "1_circuit_resistance",
+  circuit_y_voltage: "4_circuit_y_voltage",
+  circuit_ydelta: "3_circuit_ydelta",
+  control_laplace_stability: "1_laplace_stability",
+  em_ampere_law: "3_ampere_law",
+  em_coulomb: "1_coulombs_law",
+  lec_poten_3d: "2_equipotential_3d",
+  math_exponent: "2_math_exponent",
+  math_factorization: "4_math_factorization",
+  math_fraction: "1_math_fraction",
+  math_function: "5_math_function",
+  math_integral_3d: "17_math_integral_3d",
+  math_logarithm: "3_math_logarithm",
+  math_polynomial: "6_math_polynomial",
+  math_radian: "12_math_radian",
 };
 
 export default function AiVideoWatch() {
   const { id } = useParams();
   const navigate = useNavigate();
+  // 🌟 URL에서 탭 상태 가져오기
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [videoInfo, setVideoInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("quiz");
+
+  // 🌟 URL의 ?tab= 값이 없으면 기본으로 "quiz"를 씁니다.
+  const activeTab = searchParams.get("tab") || "quiz";
 
   const cleanId = useMemo(() => ID_MAPPING[id] || id, [id]);
   const isVision = cleanId.startsWith("vision_");
@@ -70,11 +90,18 @@ export default function AiVideoWatch() {
     fetchVideoData();
   }, [cleanId]);
 
-  // 2. 인터랙티브 위젯 컴포넌트 매핑
+  // DB의 widget_type 무시하고 오직 cleanId로만 매핑!
   const WidgetComponent = useMemo(() => {
     if (!cleanId) return null;
     return WIDGET_MAP[cleanId] || null;
   }, [cleanId]);
+
+  // 🌟 탭 변경 핸들러 (URL 업데이트 및 화면 깨짐 방지)
+  const handleTabChange = (newTab) => {
+    startTransition(() => {
+      setSearchParams({ tab: newTab }, { replace: true });
+    });
+  };
 
   if (loading)
     return (
@@ -123,10 +150,9 @@ export default function AiVideoWatch() {
           {!isVision && (
             <section className="scroll-mt-24">
               <div className="flex border-b border-gray-200 mt-8 mb-2">
-                {/* 🌟 2. startTransition 적용! */}
                 <button
                   className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "quiz" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
-                  onClick={() => startTransition(() => setActiveTab("quiz"))}
+                  onClick={() => handleTabChange("quiz")}
                 >
                   실전 퀴즈
                 </button>
@@ -134,9 +160,7 @@ export default function AiVideoWatch() {
                 {WidgetComponent && (
                   <button
                     className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400 hover:text-gray-600"}`}
-                    onClick={() =>
-                      startTransition(() => setActiveTab("widget"))
-                    }
+                    onClick={() => handleTabChange("widget")}
                   >
                     <Sparkles
                       size={20}
@@ -150,7 +174,7 @@ export default function AiVideoWatch() {
 
                 <button
                   className={`flex-1 py-4 text-center font-bold text-lg transition-colors ${activeTab === "qna" ? "border-b-4 border-[#0047a5] text-[#0047a5]" : "text-gray-400 hover:text-gray-600"}`}
-                  onClick={() => startTransition(() => setActiveTab("qna"))}
+                  onClick={() => handleTabChange("qna")}
                 >
                   질문 및 A/S
                 </button>
