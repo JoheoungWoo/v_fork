@@ -1,56 +1,68 @@
 import apiClient from "@/api/core/apiClient";
 import useCustomMove from "@/hooks/useCustomMove";
 import { Loader2, Lock, PlayCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useMemo, useState, useRef } from "react";
 
-export default function VideoPlayList() {
-  const { id } = useParams(); // 현재 URL의 cleanId
+export default function VideoPlayList({ currentLectureId }) {
   const { moveToRead } = useCustomMove("/user/videos");
 
-  const [allLectures, setAllLectures] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [videoList, setVideoList] = useState([]);
 
-  // 1. 전체 강의 데이터를 백엔드에서 가져옴
+  // 1. 타겟을 잡기 위한 ref
+  const activeItemRef = useRef(null);
+
   useEffect(() => {
-    const fetchLectures = async () => {
+    const fetchList = async () => {
       try {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
-        setAllLectures(res.data || []);
+        const fetchedList = res.data?.data || [];
+        setVideoList(fetchedList);
       } catch (error) {
-        console.error("재생목록 로딩 실패:", error);
+        console.error("목록 가져오기 실패", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchLectures();
+    fetchList();
   }, []);
 
-  // 2. 현재 보고 있는 영상과 같은 과목(subject)의 영상들만 추출
   const { currentSubjectLectures, currentTitle } = useMemo(() => {
-    // 현재 영상 찾기 (lecture_id 또는 id 매칭)
-    const currentVideo = allLectures.find(
-      (v) => v.lecture_id === id || v.id === id,
+    if (videoList.length === 0 || !currentLectureId)
+      return { currentSubjectLectures: [], currentTitle: "" };
+    const currentVideo = videoList.find(
+      (v) => v.lecture_id === currentLectureId,
     );
-
     if (!currentVideo) return { currentSubjectLectures: [], currentTitle: "" };
 
-    // 같은 과목 필터링
-    const filtered = allLectures.filter(
-      (v) => v.subject === currentVideo.subject,
-    );
+    const filtered = videoList
+      .filter((v) => v.subject === currentVideo.subject)
+      .sort(
+        (a, b) =>
+          (parseInt(a.lecture_id) || 9999) - (parseInt(b.lecture_id) || 9999),
+      );
 
     return {
       currentSubjectLectures: filtered,
       currentTitle: currentVideo.subject,
     };
-  }, [allLectures, id]);
+  }, [videoList, currentLectureId]);
+
+  // 🔥 스크롤 이동 로직: 로딩이 끝나는 시점에 딱 한 번만 중앙으로 부드럽게 이동!
+  useEffect(() => {
+    if (!loading && activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({
+        behavior: "auto",
+        block: "center",
+      });
+    }
+  }, [loading]);
 
   if (loading) {
     return (
       <div className="flex justify-center p-8 bg-white rounded-xl border">
-        <Loader2 className="animate-spin text-blue-500" size={24} />
+        <Loader2 className="animate-spin text-[#0047a5]" size={24} />
       </div>
     );
   }
@@ -59,7 +71,7 @@ export default function VideoPlayList() {
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden flex flex-col">
-      {/* 헤더 영역 */}
+      {/* 헤더 영역 (기존 복구 완료) */}
       <div className="p-4 bg-gray-50 border-b border-gray-100">
         <h3 className="font-bold text-gray-900 flex items-center gap-2">
           <span className="w-1.5 h-1.5 bg-[#0047a5] rounded-full"></span>
@@ -73,21 +85,21 @@ export default function VideoPlayList() {
       {/* 리스트 영역 */}
       <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
         {currentSubjectLectures.map((video, index) => {
-          // 🌟 정화된 ID 체계 대응
           const targetId = video.lecture_id || video.id;
-          const isActive = targetId === id;
+          const isActive = targetId === currentLectureId;
           const isLocked =
             !video.video_url && (!video.videoUrls || video.videoUrls[0] === "");
 
           return (
             <div
               key={video.id}
+              ref={isActive ? activeItemRef : null} // 🔥 명찰 달아주기
               onClick={() => !isLocked && moveToRead(targetId)}
               className={`group flex items-start gap-3 p-4 transition-all border-b border-gray-50 last:border-0
                 ${isActive ? "bg-blue-50/50" : isLocked ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50 cursor-pointer"}
               `}
             >
-              {/* 상태 아이콘 */}
+              {/* 상태 아이콘 (기존 복구 완료: 자물쇠 등) */}
               <div className="mt-0.5 shrink-0">
                 {isActive ? (
                   <PlayCircle
@@ -103,7 +115,7 @@ export default function VideoPlayList() {
                 )}
               </div>
 
-              {/* 강의 정보 */}
+              {/* 강의 정보 (기존 복구 완료: duration, PLAYING 뱃지) */}
               <div className="flex-1 min-w-0">
                 <h4
                   className={`text-sm font-semibold truncate ${isActive ? "text-[#0047a5]" : "text-gray-700"}`}
@@ -122,6 +134,7 @@ export default function VideoPlayList() {
                 </div>
               </div>
 
+              {/* hover 시 나타나는 플레이 아이콘 (기존 복구 완료) */}
               {!isLocked && !isActive && (
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                   <PlayCircle size={16} className="text-gray-300" />

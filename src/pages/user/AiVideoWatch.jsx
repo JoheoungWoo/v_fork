@@ -15,43 +15,6 @@ import VideoPlayList from "@/components/video/VideoPlayList";
 
 import WIDGET_MAP from "@/utils/widgetData";
 
-// 🌟 URL의 옛날 해시 ID를 직관적인 새 ID로 변환
-const ID_MAPPING = {
-  "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
-  "1234qwer": "21_control_test",
-  "1da7f54684d76e361736580a26e6917c": "207_cho_hw_cheer",
-  "201092af306ff8cb381808e4c3f45e0c": "13_vector_dot_product",
-  "30d2bd6d1675fb17fe237d8c9d930413": "14_vector_cross_product",
-  "5f16ede4e7730bdbf86da518cfd232e9": "25_circuit_test_video",
-  "605e4d59a8fdcfe8f914734370c726f4": "18_angular_velocity",
-  "61b1ec56bcd7e87535d18c40bb9afb21": "8_parabola_line_intersection",
-  "62069c25429c16e898888d5611eb67b4": "7_line_intersection",
-  "8fc05f0f6c31f19deeb976cb2b1562cf": "11_trig_function_2",
-  a778e615bf667e6db830b498baa5ec66: "16_partial_derivative",
-  acf4500a94d8492cde7139e71760ff71: "25_control_test_video",
-  c3d27bab5e1cf6ae9f07f70ae08c1e26: "10_trig_function_1",
-  c44dc0cd81fbb02320299a7bff062e4d: "15_derivative",
-  e935dc2d2e592a79688c5f40da5fbe23: "9_perfect_square",
-  circuit_ohm_law_equivalent: "6_ohms_law",
-  circuit_power: "2_circuit_power",
-  circuit_reactance_3d: "7_reactance_3d",
-  circuit_resistance: "1_circuit_resistance",
-  circuit_y_voltage: "4_circuit_y_voltage",
-  circuit_ydelta: "3_circuit_ydelta",
-  control_laplace_stability: "1_laplace_stability",
-  em_ampere_law: "3_ampere_law",
-  em_coulomb: "1_coulombs_law",
-  lec_poten_3d: "2_equipotential_3d",
-  math_exponent: "2_math_exponent",
-  math_factorization: "4_math_factorization",
-  math_fraction: "1_math_fraction",
-  math_function: "5_math_function",
-  math_integral_3d: "17_math_integral_3d",
-  math_logarithm: "3_math_logarithm",
-  math_polynomial: "6_math_polynomial",
-  math_radian: "12_math_radian",
-};
-
 export default function AiVideoWatch() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -64,7 +27,7 @@ export default function AiVideoWatch() {
   // 🌟 URL의 ?tab= 값이 없으면 기본으로 "quiz"를 씁니다.
   const activeTab = searchParams.get("tab") || "quiz";
 
-  const cleanId = useMemo(() => ID_MAPPING[id] || id, [id]);
+  const cleanId = useMemo(() => id, [id]);
   const isVision = cleanId.startsWith("vision_");
 
   useEffect(() => {
@@ -73,9 +36,13 @@ export default function AiVideoWatch() {
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${cleanId}`);
-        const backendData = res.data?.data || res.data;
+        console.log(res, res?.data);
+        const { data } = res;
+        const { data: data3 } = data;
+        // const backendData = res.data?.data;
+        const backendData = data3;
 
-        if (!backendData || backendData.id === undefined) {
+        if (!backendData || backendData.lecture_id === undefined) {
           setVideoInfo(null);
         } else {
           setVideoInfo(backendData);
@@ -84,22 +51,27 @@ export default function AiVideoWatch() {
         console.error("❌ 데이터 페칭 실패:", error);
         setVideoInfo(null);
       } finally {
+        console.log("useEffect", cleanId);
         setLoading(false);
       }
     };
     fetchVideoData();
   }, [cleanId]);
 
-  // DB의 widget_type 무시하고 오직 cleanId로만 매핑!
+  // DB의 widget_type 무시하고 오직 lecture_id로만 매핑!
   const WidgetComponent = useMemo(() => {
-    if (!cleanId) return null;
-    return WIDGET_MAP[cleanId] || null;
-  }, [cleanId]);
+    // 🌟 cleanId 대신 videoInfo.lecture_id를 사용합니다.
+    const targetId = videoInfo?.lecture_id;
+    console.log("widget targetId:", targetId);
+    if (!targetId) return null;
+    return WIDGET_MAP[targetId] || null;
+  }, [videoInfo]); // 의존성 배열도 videoInfo로 변경
 
   // 🌟 탭 변경 핸들러 (URL 업데이트 및 화면 깨짐 방지)
   const handleTabChange = (newTab) => {
     startTransition(() => {
       setSearchParams({ tab: newTab }, { replace: true });
+      console.log("handleTabChang 이벤트 발생");
     });
   };
 
@@ -181,7 +153,10 @@ export default function AiVideoWatch() {
               </div>
 
               <div className="min-h-[400px]">
-                {activeTab === "quiz" && <LocalQuizCard id={cleanId} />}
+                {/* 🌟 LocalQuizCard에도 해시값 대신 lecture_id를 넘겨줍니다. */}
+                {activeTab === "quiz" && (
+                  <LocalQuizCard id={videoInfo.lecture_id} />
+                )}
 
                 {activeTab === "widget" && WidgetComponent && (
                   <div className="mt-8 p-6 bg-white rounded-3xl border border-gray-200 shadow-inner min-h-[600px] flex flex-col">
@@ -207,8 +182,9 @@ export default function AiVideoWatch() {
         </div>
 
         <aside className="lg:col-span-4 space-y-8">
-          <VideoPlayList />
-          <RecommendedVideo count={4} />
+          {/* 🌟 이제 주석을 해제하고, 현재 재생 중인 영상의 lecture_id를 프롭스로 넘겨주세요! */}
+          <VideoPlayList currentLectureId={videoInfo.lecture_id} />
+          <RecommendedVideo count={4} currentLectureId={videoInfo.lecture_id} />
         </aside>
       </div>
     </main>

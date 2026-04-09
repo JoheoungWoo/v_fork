@@ -1,40 +1,18 @@
 import { Lock, Play } from "lucide-react";
 
-// 🌟 이전 ID 하위 호환성을 위한 매핑
-const ID_MAPPING = {
-  "0439b5168355bedd244f2c4cbd79c82f": "8_time_constant",
-  "1da7f54684d76e361736580a26e6917c": "207_cho_hw_cheer",
-  "201092af306ff8cb381808e4c3f45e0c": "13_vector_dot_product",
-  "30d2bd6d1675fb17fe237d8c9d930413": "14_vector_cross_product",
-  a778e615bf667e6db830b498baa5ec66: "16_partial_derivative",
-  c44dc0cd81fbb02320299a7bff062e4d: "15_derivative",
-  e935dc2d2e592a79688c5f40da5fbe23: "9_perfect_square",
-};
-
 export default function VideoCard({ video, onRead, onOpenModal }) {
   // 1. 영상 유무 체크
   const hasVideo =
     !!video.video_url && video.video_url !== "" && video.video_url !== "null";
   const isLocked = !hasVideo;
 
-  // 🌟 2. 썸네일 스마트 추출 로직 (에러의 원인 해결)
-  let thumbnailSrc = "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
+  // 2. 썸네일 로직 초간단화 (있으면 쓰고, 없으면 기본 이미지)
+  const defaultImage =
+    "https://placehold.co/400x300/e2e8f0/94a3b8?text=No+Image";
+  const thumbnailSrc = video.thumbnail ? video.thumbnail : defaultImage;
 
-  if (hasVideo && video.video_url.includes("cloudflarestream.com")) {
-    // [최고 우선순위] Cloudflare Stream 영상이면 자동으로 생성된 고화질 썸네일 주소 사용
-    // 예: .../1da7f.../manifest/video.m3u8 -> .../1da7f.../thumbnails/thumbnail.jpg
-    const streamBaseUrl = video.video_url.split("/manifest")[0];
-    thumbnailSrc = `${streamBaseUrl}/thumbnails/thumbnail.jpg`;
-  } else if (video.thumbnail && !video.thumbnail.includes("undefined")) {
-    // Cloudflare Stream이 아닌 다른 영상일 경우 백엔드가 준 데이터 사용
-    thumbnailSrc = video.thumbnail;
-  } else if (video.thumb_url) {
-    thumbnailSrc = video.thumb_url;
-  }
-
-  // 3. 정화된 ID 체계 적용 (lecture_id 우선)
+  // 🌟 3. 호환성 매핑 완벽 제거! 백엔드에서 주는 lecture_id 바로 사용 (없으면 id 사용)
   const targetId = video.lecture_id || video.id;
-  const normalizedId = ID_MAPPING[targetId] || targetId;
 
   return (
     <article
@@ -43,7 +21,7 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
           ? "opacity-60 grayscale-[0.3]"
           : "shadow-sm hover:shadow-xl group cursor-pointer"
       }`}
-      onClick={() => !isLocked && onRead(normalizedId)}
+      onClick={() => !isLocked && onRead(targetId)}
     >
       {/* 썸네일 영역 */}
       <div
@@ -62,7 +40,6 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
           </div>
         ) : (
           <>
-            {/* 🌟 썸네일 이미지 에러 발생 시 처리하는 onError 추가 */}
             <img
               src={thumbnailSrc}
               alt={video.title}
@@ -109,7 +86,7 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onRead(normalizedId);
+                onRead(targetId);
               }}
               className="bg-[#e5edff] text-[#0047a5] text-lg px-8 py-3 rounded-xl font-bold hover:bg-[#0047a5] hover:text-white transition-all shadow-sm active:scale-95"
             >

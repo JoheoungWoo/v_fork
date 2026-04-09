@@ -221,12 +221,30 @@ const LocalQuizCard = (props) => {
     const src = String(imgSrc || "").trim();
     if (!src || src === "null" || src === "None" || src.length < 20)
       return null;
-    if (!src.startsWith("http") && !src.startsWith("data:")) {
+
+    // 이미 올바른 포맷(http 또는 data:)으로 오면 그대로 사용
+    if (src.startsWith("http") || src.startsWith("data:")) {
+      return src;
+    }
+
+    // Base64 문자열인지 확인 후, 디코딩하여 앞부분이 <svg 인지 확인
+    try {
+      // 🌟 atob()를 사용해 Base64 문자열의 앞 10글자 정도만 디코딩해봅니다.
+      const decodedStart = atob(src.substring(0, 50)).trim();
+
+      if (decodedStart.startsWith("<svg") || decodedStart.startsWith("<?xml")) {
+        // 내용물이 SVG라면 SVG 명찰을 붙여줍니다.
+        return `data:image/svg+xml;base64,${src}`;
+      } else {
+        // SVG가 아니면 기본적으로 PNG로 간주합니다.
+        return `data:image/png;base64,${src}`;
+      }
+    } catch (e) {
+      // 디코딩에 실패하면(완벽한 Base64가 아니면) 기본 PNG로 처리 시도
       return src.startsWith("PHN2") || src.startsWith("PD94")
         ? `data:image/svg+xml;base64,${src}`
         : `data:image/png;base64,${src}`;
     }
-    return src;
   };
 
   const renderImage = (imgSrc, altText) => {
@@ -279,7 +297,8 @@ const LocalQuizCard = (props) => {
   const questionImage =
     problemData?.question_image ||
     problemData?.graph_image ||
-    problemData?.circuit_image;
+    problemData?.circuit_image ||
+    problemData?.math_image;
 
   return (
     <div className="mt-8 text-center animate-fade-in">

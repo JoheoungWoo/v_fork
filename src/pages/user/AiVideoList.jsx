@@ -105,17 +105,21 @@ export default function AiVideoList() {
   const filteredVideos = useMemo(() => {
     if (!allLectures || allLectures.length === 0) return [];
 
-    // 카테고리 필터링
-    let list =
-      activeTab === "전체"
-        ? [...allLectures]
-        : allLectures.filter((v) => v.category === activeTab);
+    if (activeTab === "전체") {
+      // 🌟 전체 탭: 백엔드에서 넘겨준 순서(최신순) 그대로 반환
+      return [...allLectures];
+    }
 
-    // 시청 가능한(video_url이 있는) 강의를 무조건 상단으로 정렬
-    return list.sort((a, b) => {
-      const aPlayable = a.video_url ? 1 : 0;
-      const bPlayable = b.video_url ? 1 : 0;
-      return bPlayable - aPlayable;
+    // 🌟 특정 카테고리 탭: 필터링 후 lecture_id의 숫자 기준으로 오름차순 정렬
+    const filtered = allLectures.filter((v) => v.category === activeTab);
+
+    return filtered.sort((a, b) => {
+      // lecture_id에서 앞의 숫자만 추출 (예: "13_vector" -> 13)
+      // 만약 숫자로 시작하지 않거나 lecture_id가 없으면 9999를 줘서 맨 뒤로 보냄
+      const numA = parseInt(a.lecture_id) || 9999;
+      const numB = parseInt(b.lecture_id) || 9999;
+
+      return numA - numB; // 숫자 기준 오름차순 (1, 2, 3...) 정렬
     });
   }, [allLectures, activeTab]);
 
@@ -149,14 +153,17 @@ export default function AiVideoList() {
       {/* 비디오 카드 그리드 영역 */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16 mt-8">
         {currentList.length > 0 ? (
-          currentList.map((video) => (
-            <VideoCard
-              key={video.id}
-              video={video}
-              onRead={moveToRead}
-              onOpenModal={setSelectedVideo}
-            />
-          ))
+          currentList.map((video) => {
+            console.log("video설명", video);
+            return (
+              <VideoCard
+                key={video.lecture_id}
+                video={video}
+                onRead={moveToRead}
+                onOpenModal={setSelectedVideo}
+              />
+            );
+          })
         ) : (
           <div className="col-span-full text-center py-20 text-gray-400 text-lg bg-gray-50 rounded-2xl border border-gray-100">
             선택한 카테고리에 해당하는 강의가 아직 없습니다. 😢

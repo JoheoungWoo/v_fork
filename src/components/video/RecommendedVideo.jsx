@@ -2,10 +2,9 @@ import apiClient from "@/api/core/apiClient";
 import useCustomMove from "@/hooks/useCustomMove";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+// 🌟 useParams는 더 이상 필요 없으므로 제거했습니다.
 
-export default function RecommendedVideo({ count = 4 }) {
-  const { id } = useParams(); // 현재 URL의 id (cleanId 형태)
+export default function RecommendedVideo({ count = 4, currentLectureId }) {
   const { moveToRead } = useCustomMove("/user/videos");
 
   const [allLectures, setAllLectures] = useState([]);
@@ -16,9 +15,9 @@ export default function RecommendedVideo({ count = 4 }) {
     const fetchAllLectures = async () => {
       try {
         setLoading(true);
-        // 전체 강의 목록을 가져오는 API 엔드포인트 (기존에 구현된 것을 활용)
         const res = await apiClient.get("/api/video/list/all");
-        setAllLectures(res.data || []);
+        // 🌟 핵심 수정: res.data 안의 진짜 배열인 'data'를 꺼내야 .filter 에러가 안 납니다!
+        setAllLectures(res.data?.data || []);
       } catch (error) {
         console.error("추천 영상을 위한 리스트 로딩 실패:", error);
       } finally {
@@ -30,19 +29,21 @@ export default function RecommendedVideo({ count = 4 }) {
 
   // 2. 가져온 데이터 중 현재 영상을 제외하고 랜덤하게 추출합니다.
   const recommendedVideos = useMemo(() => {
-    if (allLectures.length === 0) return [];
+    // 만약 allLectures가 배열이 아니면 에러 방지를 위해 빈 배열 반환
+    if (!Array.isArray(allLectures) || allLectures.length === 0) return [];
 
     // 영상 URL이 있고 현재 보고 있는 영상이 아닌 것 필터링
     const playableVideos = allLectures.filter(
       (video) =>
         (video.video_url || (video.videoUrls && video.videoUrls[0])) &&
-        video.lecture_id !== id && // 정화된 lecture_id 기준으로 비교
-        video.id !== id,
+        // 🌟 수정: useParams의 id 대신 부모가 넘겨준 currentLectureId를 사용!
+        video.lecture_id !== currentLectureId &&
+        video.id !== currentLectureId,
     );
 
     // 무작위 셔플 후 count만큼 추출
     return [...playableVideos].sort(() => 0.5 - Math.random()).slice(0, count);
-  }, [allLectures, id, count]);
+  }, [allLectures, currentLectureId, count]); // 🌟 의존성 배열도 변경
 
   if (loading) {
     return (
