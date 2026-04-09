@@ -9,8 +9,13 @@ import HeroBanner from "./HeroBanner";
 import VideoCard from "./VideoCard";
 import VideoCategoryTabs from "./VideoCategoryTabs";
 
-// 🌟 백엔드(Python)의 ID 명명 규칙을 기반으로 카테고리를 유추하는 강력한 분류기
+// 🌟 DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
 const getCategory = (video) => {
+  console.log("video:", video);
+  // 🌟 [핵심 방어막] video 객체 자체가 없으면 에러 내지 말고 "기타" 반환!
+  if (!video) return "기타";
+
+  // 이제 안전하게 subject와 lecture_id를 추출할 수 있습니다.
   const subject = video.subject || "";
   const idStr = String(video.lecture_id || video.id || "").toLowerCase();
 
@@ -62,7 +67,6 @@ const getCategory = (video) => {
 
   return "기타"; // 매칭되지 않는 영상
 };
-
 export default function AiVideoList() {
   const { page, size, moveToList, moveToRead } = useCustomMove("/user/videos");
 
