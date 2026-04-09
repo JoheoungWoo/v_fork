@@ -36,10 +36,10 @@ export default function AiVideoWatch() {
       try {
         setLoading(true);
         const res = await apiClient.get(`/api/video/url/${cleanId}`);
-        console.log(res, res?.data);
+        console.log("video fetch data:", res, res?.data);
+
         const { data } = res;
         const { data: data3 } = data;
-        // const backendData = res.data?.data;
         const backendData = data3;
 
         if (!backendData || backendData.lecture_id === undefined) {
@@ -51,27 +51,28 @@ export default function AiVideoWatch() {
         console.error("❌ 데이터 페칭 실패:", error);
         setVideoInfo(null);
       } finally {
-        console.log("useEffect", cleanId);
         setLoading(false);
       }
     };
     fetchVideoData();
   }, [cleanId]);
 
-  // DB의 widget_type 무시하고 오직 lecture_id로만 매핑!
-  const WidgetComponent = useMemo(() => {
-    // 🌟 cleanId 대신 videoInfo.lecture_id를 사용합니다.
+  // 🌟 [핵심 수정] DB의 widget_type 무시하고 오직 lecture_id로만 배열(Array) 형태로 매핑!
+  const WidgetComponents = useMemo(() => {
     const targetId = videoInfo?.lecture_id;
-    console.log("widget targetId:", targetId);
-    if (!targetId) return null;
-    return WIDGET_MAP[targetId] || null;
-  }, [videoInfo]); // 의존성 배열도 videoInfo로 변경
+    if (!targetId) return [];
+
+    const widgets = WIDGET_MAP[targetId];
+    if (!widgets) return [];
+
+    // 배열이 아닐 경우(레거시 코드)를 대비해 무조건 배열 형태로 반환하도록 안전장치 추가
+    return Array.isArray(widgets) ? widgets : [widgets];
+  }, [videoInfo]);
 
   // 🌟 탭 변경 핸들러 (URL 업데이트 및 화면 깨짐 방지)
   const handleTabChange = (newTab) => {
     startTransition(() => {
       setSearchParams({ tab: newTab }, { replace: true });
-      console.log("handleTabChang 이벤트 발생");
     });
   };
 
@@ -129,7 +130,8 @@ export default function AiVideoWatch() {
                   실전 퀴즈
                 </button>
 
-                {WidgetComponent && (
+                {/* 🌟 배열에 위젯이 1개라도 있으면 탭을 표시하고, 2개 이상이면 개수도 표시해줍니다. */}
+                {WidgetComponents.length > 0 && (
                   <button
                     className={`flex-1 py-4 text-center font-bold text-lg transition-colors flex items-center justify-center gap-2 ${activeTab === "widget" ? "border-b-4 border-yellow-500 text-yellow-600" : "text-gray-400 hover:text-gray-600"}`}
                     onClick={() => handleTabChange("widget")}
@@ -140,7 +142,9 @@ export default function AiVideoWatch() {
                         activeTab === "widget" ? "fill-yellow-500" : ""
                       }
                     />
-                    인터랙티브 실습
+                    인터랙티브 실습{" "}
+                    {WidgetComponents.length > 1 &&
+                      `(${WidgetComponents.length})`}
                   </button>
                 )}
 
@@ -153,28 +157,37 @@ export default function AiVideoWatch() {
               </div>
 
               <div className="min-h-[400px]">
-                {/* 🌟 LocalQuizCard에도 해시값 대신 lecture_id를 넘겨줍니다. */}
+                {/* 실전 퀴즈 */}
                 {activeTab === "quiz" && (
                   <LocalQuizCard id={videoInfo.lecture_id} />
                 )}
 
-                {activeTab === "widget" && WidgetComponent && (
-                  <div className="mt-8 p-6 bg-white rounded-3xl border border-gray-200 shadow-inner min-h-[600px] flex flex-col">
-                    <Suspense
-                      fallback={
-                        <div className="flex flex-1 items-center justify-center">
-                          <Loader2
-                            className="animate-spin text-[#0047a5]"
-                            size={48}
-                          />
-                        </div>
-                      }
-                    >
-                      <WidgetComponent />
-                    </Suspense>
+                {/* 🌟 다중 인터랙티브 위젯 렌더링 영역 */}
+                {activeTab === "widget" && WidgetComponents.length > 0 && (
+                  <div className="mt-8 flex flex-col gap-8">
+                    {WidgetComponents.map((Widget, index) => (
+                      <div
+                        key={index}
+                        className="p-6 bg-white rounded-3xl border border-gray-200 shadow-inner min-h-[600px] flex flex-col"
+                      >
+                        <Suspense
+                          fallback={
+                            <div className="flex flex-1 items-center justify-center h-full">
+                              <Loader2
+                                className="animate-spin text-[#0047a5]"
+                                size={48}
+                              />
+                            </div>
+                          }
+                        >
+                          <Widget />
+                        </Suspense>
+                      </div>
+                    ))}
                   </div>
                 )}
 
+                {/* QnA */}
                 {activeTab === "qna" && <QnaCard />}
               </div>
             </section>
@@ -182,7 +195,6 @@ export default function AiVideoWatch() {
         </div>
 
         <aside className="lg:col-span-4 space-y-8">
-          {/* 🌟 이제 주석을 해제하고, 현재 재생 중인 영상의 lecture_id를 프롭스로 넘겨주세요! */}
           <VideoPlayList currentLectureId={videoInfo.lecture_id} />
           <RecommendedVideo count={4} currentLectureId={videoInfo.lecture_id} />
         </aside>
