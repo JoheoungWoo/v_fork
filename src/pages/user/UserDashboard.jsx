@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
 import useMove from "@/hooks/useMove";
 import { ForwardIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 // 마크다운 텍스트에서 시험 일정 테이블만 파싱하는 함수
 function extractExamSchedule(mdText) {
@@ -12,25 +12,21 @@ function extractExamSchedule(mdText) {
   for (let line of lines) {
     const trimmedLine = line.trim();
 
-    // 테이블 헤더를 찾으면 파싱 시작
     if (trimmedLine.includes("| 구분 | 필기원서접수")) {
       isTableMode = true;
       continue;
     }
 
-    // 구분선(| --- |)은 건너뛰기
     if (isTableMode && trimmedLine.startsWith("| ---")) {
       continue;
     }
 
-    // 테이블 데이터 추출
     if (isTableMode && trimmedLine.startsWith("|")) {
       const columns = trimmedLine
         .split("|")
         .map((col) => col.trim())
         .filter((col) => col !== "");
 
-      // 열이 7개인 경우만 유효한 데이터로 판단
       if (columns.length >= 7) {
         scheduleData.push({
           구분: columns[0],
@@ -43,7 +39,6 @@ function extractExamSchedule(mdText) {
         });
       }
     } else if (isTableMode && trimmedLine === "") {
-      // 테이블 영역이 끝났다고 판단되면 반복문 종료
       break;
     }
   }
@@ -51,15 +46,125 @@ function extractExamSchedule(mdText) {
   return scheduleData;
 }
 
+// --- 새롭게 추가된 플래시카드 위젯 컴포넌트 ---
+function FlashCardWidget() {
+  // 실제 환경에서는 DB/API에서 데이터를 가져옵니다.
+  const flashcards = [
+    {
+      id: 1,
+      subject: "전력공학",
+      keyword: "송전선로에서 코로나 현상을 방지하기 위한 가장 효과적인 대책은?",
+      answer: "복도체(다도체)를 사용한다.",
+    },
+    {
+      id: 2,
+      subject: "전력공학",
+      keyword:
+        "수전단 전압이 송전단 전압보다 높아지는 페란티 현상의 방지 대책은?",
+      answer: "분로 리액터(블로 리액터)를 설치한다.",
+    },
+    {
+      id: 3,
+      subject: "전기기기",
+      keyword:
+        "변압기 철심에 규소강판을 사용하고 '성층'하여 만드는 주된 이유는?",
+      answer: "철손(히스테리시스손 및 와류손)을 감소시키기 위해",
+    },
+  ];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  const handleFlip = () => {
+    setIsFlipped(!isFlipped);
+  };
+
+  const handleNext = (e) => {
+    e.stopPropagation(); // 카드 뒤집기 이벤트 방지
+    setIsFlipped(false);
+    // 카드가 다시 뒤집히는 애니메이션 시간을 벌어준 뒤 내용 변경
+    setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % flashcards.length);
+    }, 150);
+  };
+
+  return (
+    <div className="mb-10">
+      <div className="flex justify-between items-end mb-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            ⚡ 1초 컷 스피드 암기
+          </h2>
+          <p className="text-sm text-on-surface-variant mt-1">
+            자주 출제되는 핵심 기출 키워드를 빠르게 확인하세요.
+          </p>
+        </div>
+        <span className="text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
+          {currentIndex + 1} / {flashcards.length}
+        </span>
+      </div>
+
+      <div className="relative w-full h-48 perspective-1000">
+        <div
+          className="w-full h-full cursor-pointer transition-transform duration-500 transform-style-preserve-3d"
+          onClick={handleFlip}
+          style={{ transform: isFlipped ? "rotateX(180deg)" : "rotateX(0deg)" }}
+        >
+          {/* 카드 앞면 (문제) */}
+          <div
+            className="absolute inset-0 w-full h-full bg-white rounded-2xl shadow-md border border-gray-100 flex flex-col items-center justify-center p-6 text-center backface-hidden"
+            style={{ backfaceVisibility: "hidden" }}
+          >
+            <span className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">
+              {flashcards[currentIndex].subject} - 문제
+            </span>
+            <h3 className="text-lg md:text-xl font-bold text-gray-800 break-keep">
+              {flashcards[currentIndex].keyword}
+            </h3>
+            <p className="absolute bottom-4 text-xs text-gray-400 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">
+                touch_app
+              </span>
+              카드를 터치하여 정답 확인
+            </p>
+          </div>
+
+          {/* 카드 뒷면 (정답) */}
+          <div
+            className="absolute inset-0 w-full h-full bg-primary text-white rounded-2xl shadow-lg flex flex-col items-center justify-center p-6 text-center backface-hidden"
+            style={{
+              backfaceVisibility: "hidden",
+              transform: "rotateX(180deg)",
+            }}
+          >
+            <span className="text-xs font-bold text-primary-200 mb-3 uppercase tracking-wider">
+              정답 키워드
+            </span>
+            <h3 className="text-xl md:text-2xl font-extrabold break-keep">
+              {flashcards[currentIndex].answer}
+            </h3>
+
+            <button
+              onClick={handleNext}
+              className="absolute bottom-4 bg-white/20 hover:bg-white/30 text-white text-sm font-bold py-2 px-6 rounded-full transition-colors backdrop-blur-sm flex items-center gap-2"
+            >
+              다음 문제
+              <ForwardIcon size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function UserDashboard() {
   const move = useMove();
 
-  // 시험 일정 상태 관리
   const [schedules, setSchedules] = useState([]);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(true);
   const [scheduleError, setScheduleError] = useState(null);
 
-  // 컴포넌트 마운트 시 동적으로 데이터 Fetch
   useEffect(() => {
     const fetchSchedules = async () => {
       try {
@@ -73,9 +178,7 @@ export default function UserDashboard() {
         }
 
         const markdownText = await response.text();
-        console.log(markdownText);
         const parsedData = extractExamSchedule(markdownText);
-        console.log(parsedData);
         setSchedules(parsedData);
       } catch (error) {
         console.error("시험 일정 파싱 에러:", error);
@@ -233,8 +336,12 @@ export default function UserDashboard() {
         </div>
       </section>
 
+      {/* 하단 컨텐츠 영역 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8">
+          {/* ⚡ 추가된 플래시카드 위젯 ⚡ */}
+          <FlashCardWidget />
+
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold tracking-tight">추천 강좌</h2>
             <a
@@ -301,6 +408,7 @@ export default function UserDashboard() {
                 chevron_right
               </span>
             </button>
+
             <div className="bg-surface-container-high rounded-xl p-6 mt-8">
               <h3 className="font-bold mb-4">최근 학습한 내용</h3>
               <div className="space-y-4">
