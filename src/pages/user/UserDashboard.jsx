@@ -121,14 +121,17 @@ function InteractiveFlashcard({ subjectId, onMarkIncorrect }) {
     <div className="flex flex-col items-center w-full">
       <div className="w-full relative h-56 perspective-1000">
         <div
-          className="w-full h-full cursor-pointer transition-transform duration-500 transform-style-preserve-3d"
+          className="w-full h-full cursor-pointer transition-transform duration-500"
           onClick={handleFlip}
-          style={{ transform: isFlipped ? "rotateX(180deg)" : "rotateX(0deg)" }}
+          style={{
+            transform: isFlipped ? "rotateX(180deg)" : "rotateX(0deg)",
+            transformStyle: "preserve-3d", // 👈 확실한 3D 효과를 위해 인라인으로 추가
+          }}
         >
           {/* 앞면: 문제 */}
           <div
-            className="absolute inset-0 w-full h-full bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center justify-center p-6 text-center backface-hidden"
-            style={{ backfaceVisibility: "hidden" }}
+            className="absolute inset-0 w-full h-full bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center justify-center p-6 text-center"
+            style={{ backfaceVisibility: "hidden" }} // 👈 여기도 인라인으로 추가
           >
             <span className="text-xs font-bold text-gray-400 mb-2 uppercase">
               문제 키워드
@@ -140,7 +143,7 @@ function InteractiveFlashcard({ subjectId, onMarkIncorrect }) {
 
           {/* 뒷면: 정답 */}
           <div
-            className="absolute inset-0 w-full h-full bg-primary text-white rounded-2xl shadow-md flex flex-col items-center justify-center p-6 text-center backface-hidden"
+            className="absolute inset-0 w-full h-full bg-primary text-white rounded-2xl shadow-md flex flex-col items-center justify-center p-6 text-center"
             style={{
               backfaceVisibility: "hidden",
               transform: "rotateX(180deg)",
