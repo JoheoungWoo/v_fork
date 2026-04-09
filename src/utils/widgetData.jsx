@@ -20,7 +20,7 @@ const WIDGET_MAP = {
     lazy(() => import("@/components/animations/Reactance3DWidget")),
     lazy(
       () =>
-        import("@/components/animations/circuit/MobileCoilAndCapacitorWidget"),
+        import("@/components/animations/circuits/MobileCoilAndCapacitorWidget"),
     ),
   ],
   "8_time_constant": [
