@@ -90,7 +90,10 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
 
   const currentCard = cards[currentIndex];
   const progressPercentage = ((currentIndex + 1) / cards.length) * 100;
-
+  const formatMathText = (text) => {
+    if (!text) return "";
+    return text.replace(/\$\$([\s\S]*?)\$\$/g, "\n\n$$\n$1\n$$\n\n");
+  };
   return (
     <div className="w-full max-w-md flex flex-col items-center">
       {/* 상단 진행률 바 */}
@@ -158,7 +161,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
                 remarkPlugins={[remarkMath]}
                 rehypePlugins={[rehypeKatex]}
               >
-                {currentCard.content}
+                {formatMathText(currentCard.content)}
               </ReactMarkdown>
             </div>
 
