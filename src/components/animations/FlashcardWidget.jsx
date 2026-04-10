@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 
 const renderMathContent = (text) => {
   if (!text) return "";
-
+  console.log(JSON.stringify(currentCard.content));
   // ✅ DB에서 오는 리터럴 \n을 실제 줄바꿈으로 변환
   let processed = text.replace(/\\n/g, "\n");
 
@@ -120,6 +120,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   }
 
   const currentCard = cards[currentIndex];
+  console.log(JSON.stringify(currentCard.content));
   const progressPercentage = ((currentIndex + 1) / cards.length) * 100;
 
   return (
