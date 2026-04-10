@@ -1,4 +1,5 @@
 import apiClient from "@/api/core/apiClient";
+import { Check, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
@@ -7,12 +8,10 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 과목이 변경될 때마다 백엔드 API에서 데이터 Fetch
   useEffect(() => {
     const fetchCards = async () => {
       setLoading(true);
       try {
-        // FastAPI의 GET /flashcards/{subject} 호출
         const response = await apiClient.get(`/flashcards/${subject.name}`);
         setCards(response.data.data);
         setCurrentIndex(0);
@@ -31,28 +30,29 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
 
   const handleNext = () => {
     setIsFlipped(false);
-    setCurrentIndex((prev) => (prev + 1) % cards.length);
+    setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % cards.length);
+    }, 150); // 카드가 뒤집히기 전에 넘어가는 것을 방지
   };
 
   const handlePrev = () => {
     setIsFlipped(false);
-    setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
+    setTimeout(() => {
+      setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
+    }, 150);
   };
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
   };
 
-  // '모르겠어요(X)' 버튼 클릭 시 상위(Page)로 올리고, 백엔드에도 저장
   const handleIncorrectClick = async (card) => {
-    // 1. UI 상태 업데이트 (FlashcardPage의 오답노트에 추가)
     onMarkIncorrect({
       id: card.id,
       keyword: card.title,
       answer: card.content,
     });
 
-    // 2. 백엔드 DB 오답노트에 연동 저장
     try {
       await apiClient.post("/flashcards/wrongbook", {
         card_id: card.id,
@@ -62,73 +62,138 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
       console.error("오답노트 DB 저장 실패:", error);
     }
 
-    // 다음 카드로 넘어가기
     handleNext();
   };
 
   if (loading) {
     return (
-      <div className="w-full h-80 flex items-center justify-center bg-white rounded-xl shadow">
-        데이터를 불러오는 중...
+      <div className="w-full max-w-md h-96 flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+        <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-400 font-medium">데이터를 불러오는 중...</p>
       </div>
     );
   }
 
   if (cards.length === 0) {
     return (
-      <div className="w-full h-80 flex items-center justify-center bg-white rounded-xl shadow">
+      <div className="w-full max-w-md h-96 flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 text-slate-400">
         해당 과목의 데이터가 없습니다.
       </div>
     );
   }
 
   const currentCard = cards[currentIndex];
+  const progressPercentage = ((currentIndex + 1) / cards.length) * 100;
 
   return (
-    <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-lg border border-gray-100 flex flex-col items-center">
-      <div className="text-gray-500 text-sm mb-4">
-        {currentIndex + 1} / {cards.length}
+    <div className="w-full max-w-md flex flex-col items-center">
+      {/* 상단 진행률 바 */}
+      <div className="w-full mb-6 px-4">
+        <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
+          <span>진행도</span>
+          <span>
+            {currentIndex + 1} / {cards.length}
+          </span>
+        </div>
+        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div
+            className="bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${progressPercentage}%` }}
+          ></div>
+        </div>
       </div>
 
-      {/* 카드 영역 */}
+      {/* 3D 플립 카드 영역 */}
       <div
-        onClick={handleFlip}
-        className="w-full h-64 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="w-full relative h-80 w-full"
+        style={{ perspective: "1000px" }}
       >
-        {!isFlipped ? (
-          <h2 className="text-2xl font-bold text-gray-800 text-center">
-            {currentCard.title}
-          </h2>
-        ) : (
-          <p className="text-lg text-gray-700 text-center whitespace-pre-wrap">
-            {currentCard.content}
-          </p>
-        )}
+        <div
+          className="w-full h-full cursor-pointer transition-transform duration-500 ease-in-out"
+          onClick={handleFlip}
+          style={{
+            transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            transformStyle: "preserve-3d",
+          }}
+        >
+          {/* 앞면: 문제 (Question) */}
+          <div
+            className="absolute inset-0 w-full h-full bg-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] border border-slate-100 flex flex-col items-center justify-center p-8 text-center"
+            style={{ backfaceVisibility: "hidden" }}
+          >
+            <span className="text-xs font-extrabold text-blue-500 mb-4 tracking-widest bg-blue-50 px-3 py-1 rounded-full uppercase">
+              Question
+            </span>
+            <h2 className="text-2xl font-extrabold text-slate-800 break-keep leading-snug">
+              {currentCard.title}
+            </h2>
+            <div className="absolute bottom-6 flex items-center gap-2 text-slate-300 text-sm font-medium">
+              <RotateCcw size={16} /> 터치하여 정답 확인
+            </div>
+          </div>
+
+          {/* 뒷면: 정답 (Answer) */}
+          <div
+            className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(59,130,246,0.4)] flex flex-col items-center justify-center p-8 text-center"
+            style={{
+              backfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+            }}
+          >
+            <span className="text-xs font-extrabold text-blue-100 mb-4 tracking-widest bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full uppercase shadow-sm">
+              Answer
+            </span>
+            <p className="text-xl font-bold break-keep leading-relaxed">
+              {currentCard.content}
+            </p>
+            <div className="absolute bottom-6 flex items-center gap-2 text-blue-200 text-sm font-medium">
+              <RotateCcw size={16} /> 다시 터치하여 뒤집기
+            </div>
+          </div>
+        </div>
       </div>
 
-      <p className="text-sm text-gray-400 mt-2">카드를 터치하여 뒤집기</p>
-
-      {/* 하단 컨트롤러 */}
-      <div className="flex w-full justify-between items-center mt-6">
+      {/* 하단 컨트롤러 (버튼) */}
+      <div className="flex items-center justify-between w-full mt-8 px-2 gap-3">
+        {/* 이전 버튼 */}
         <button
           onClick={handlePrev}
-          className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+          className="p-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-2xl transition-colors shrink-0"
         >
-          이전
+          <ChevronLeft size={24} />
         </button>
 
-        <button
-          onClick={() => handleIncorrectClick(currentCard)}
-          className="px-6 py-2 bg-red-100 text-red-600 font-bold rounded-lg hover:bg-red-200"
-        >
-          모르겠어요
-        </button>
+        {/* 메인 액션 버튼 */}
+        <div className="flex gap-3 flex-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleIncorrectClick(currentCard);
+            }}
+            className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-red-50 text-red-500 font-bold rounded-2xl hover:bg-red-100 hover:shadow-md transition-all border border-red-100 active:scale-95"
+          >
+            <X size={20} strokeWidth={3} />
+            <span className="text-sm">몰라요</span>
+          </button>
 
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNext();
+            }}
+            className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-blue-50 text-blue-600 font-bold rounded-2xl hover:bg-blue-100 hover:shadow-md transition-all border border-blue-100 active:scale-95"
+          >
+            <Check size={20} strokeWidth={3} />
+            <span className="text-sm">알아요</span>
+          </button>
+        </div>
+
+        {/* 다음 버튼 */}
         <button
           onClick={handleNext}
-          className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+          className="p-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-2xl transition-colors shrink-0"
         >
-          다음
+          <ChevronRight size={24} />
         </button>
       </div>
     </div>
