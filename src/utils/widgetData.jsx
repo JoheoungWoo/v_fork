@@ -26,9 +26,11 @@ const WIDGET_MAP = {
     lazy(() => import("@/components/animations/circuits/DualityWidget")),
   ],
   "8_time_constant": [
-    lazy(() => import("@/components/animations/controls/TimeConstantWidget")),
+    lazy(() => import("@/components/animations/circuits/TimeConstantWidget")),
   ],
-
+  "1_frequency_meaning": [
+    lazy(() => import("@/components/animations/circuits/SineWaveWidget")),
+  ],
   // ==========================================
   // 🧲 전자기학 (Electromagnetics)
   // ==========================================
