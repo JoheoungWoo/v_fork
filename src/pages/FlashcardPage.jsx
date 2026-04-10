@@ -1,5 +1,5 @@
+import FlashcardWidget from "@/components/animations/FlashcardWidget";
 import { useState } from "react";
-import FlashcardWidget from "./FlashcardWidget";
 
 const FlashcardPage = () => {
   const subjects = [
@@ -65,7 +65,7 @@ const FlashcardPage = () => {
         {/* 왼쪽/상단: 플립 카드 위젯 */}
         <div className="flex-1 flex justify-center items-start">
           <FlashcardWidget
-            subjectId={activeSubject.id}
+            subject={activeSubject}
             onMarkIncorrect={handleMarkIncorrect}
           />
         </div>
