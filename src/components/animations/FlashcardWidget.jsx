@@ -1,4 +1,4 @@
-import apiClient from "@/apiClient";
+import apiClient from "@/api/core/apiClient";
 import { Check, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
