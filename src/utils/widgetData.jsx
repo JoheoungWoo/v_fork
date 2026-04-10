@@ -71,6 +71,9 @@ const WIDGET_MAP = {
   "18_angular_velocity": [
     lazy(() => import("@/components/animations/AngularVelocityWidget")),
   ],
+  "12_trig_function_3": [
+    lazy(() => import("@/components/animations/math/TrigGraphWidget")),
+  ],
 
   // ==========================================
   // ⚙️ 제어공학 (Control Engineering)
