@@ -133,13 +133,18 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
           onClick={handleFlip}
           style={{
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            WebkitTransform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)", // ✅ 추가
             transformStyle: "preserve-3d",
+            WebkitTransformStyle: "preserve-3d", // ✅ 추가
           }}
         >
-          {/* 앞면: 문제 (Question) */}
+          {/* 앞면: Question */}
           <div
             className="absolute inset-0 w-full h-full bg-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] border border-slate-100 flex flex-col items-center justify-center p-8 text-center"
-            style={{ backfaceVisibility: "hidden" }}
+            style={{
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden", // ✅ Safari/Chrome 대응
+            }}
           >
             <span className="text-xs font-extrabold text-blue-500 mb-4 tracking-widest bg-blue-50 px-3 py-1 rounded-full uppercase">
               Question
@@ -152,12 +157,14 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
             </div>
           </div>
 
-          {/* 뒷면: 정답 (Answer) */}
+          {/* 뒷면: Answer */}
           <div
-            className="absolute inset-0 w-full h-full bg-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(59,130,246,0.15)] border-2 border-blue-50 flex flex-col items-center justify-start p-8 text-left overflow-y-auto custom-scrollbar"
+            className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] ..."
             style={{
               backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden", // ✅ Safari/Chrome 대응
               transform: "rotateY(180deg)",
+              WebkitTransform: "rotateY(180deg)", // ✅ 추가
             }}
           >
             <div className="w-full flex justify-center mb-6 shrink-0">
