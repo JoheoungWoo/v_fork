@@ -1,3 +1,4 @@
+import FlashcardWidget from "@/components/animations/FlashcardWidget";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
 import useMove from "@/hooks/useMove";
 import { ForwardIcon } from "lucide-react";
@@ -42,147 +43,7 @@ function extractExamSchedule(mdText) {
 }
 
 // ---------------------------------------------------------
-// 2. 내부 플래시카드 위젯 (O/X 버튼 포함)
-// ---------------------------------------------------------
-function InteractiveFlashcard({ subjectId, onMarkIncorrect }) {
-  // 실제 환경에서는 백엔드 API에서 subjectId에 맞는 데이터를 가져옵니다.
-  const allCards = {
-    1: [
-      { id: 101, keyword: "정전계에서 도체 내부 전계의 세기는?", answer: "0" },
-    ],
-    2: [
-      {
-        id: 201,
-        keyword: "코로나 현상 방지를 위한 가장 효과적인 대책은?",
-        answer: "복도체(다도체) 사용",
-      },
-      {
-        id: 202,
-        keyword: "페란티 현상 방지 대책은?",
-        answer: "분로 리액터 설치",
-      },
-    ],
-    3: [
-      {
-        id: 301,
-        keyword: "변압기 철심에 규소강판을 성층하여 사용하는 이유는?",
-        answer: "철손(히스테리시스손, 와류손) 감소",
-      },
-      {
-        id: 302,
-        keyword:
-          "위험 속도 도달 우려로 무부하 및 벨트 운전을 금지하는 전동기는?",
-        answer: "직류 직권 전동기",
-      },
-    ],
-    4: [
-      {
-        id: 401,
-        keyword: "폐회로에서 전압 강하의 합은 기전력의 합과 같다는 법칙은?",
-        answer: "키르히호프의 전압 법칙 (KVL)",
-      },
-    ],
-    5: [
-      {
-        id: 501,
-        keyword: "SELV 시스템에서 기본 절연에 대한 절연 저항값 기준은?",
-        answer: "0.5 MΩ 이상",
-      },
-    ],
-  };
-
-  const cards = allCards[subjectId] || [
-    { id: 999, keyword: "등록된 문제가 없습니다.", answer: "업데이트 예정" },
-  ];
-
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  // 과목이 바뀌면 첫 문제로 리셋
-  useEffect(() => {
-    setCurrentIndex(0);
-    setIsFlipped(false);
-  }, [subjectId]);
-
-  const handleFlip = () => setIsFlipped(!isFlipped);
-
-  const handleAnswer = (isKnown, e) => {
-    e.stopPropagation();
-    if (!isKnown && onMarkIncorrect) {
-      onMarkIncorrect(cards[currentIndex]);
-    }
-    setIsFlipped(false);
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % cards.length);
-    }, 150);
-  };
-
-  return (
-    <div className="flex flex-col items-center w-full">
-      <div className="w-full relative h-56 perspective-1000">
-        <div
-          className="w-full h-full cursor-pointer transition-transform duration-500"
-          onClick={handleFlip}
-          style={{
-            transform: isFlipped ? "rotateX(180deg)" : "rotateX(0deg)",
-            transformStyle: "preserve-3d", // 👈 확실한 3D 효과를 위해 인라인으로 추가
-          }}
-        >
-          {/* 앞면: 문제 */}
-          <div
-            className="absolute inset-0 w-full h-full bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center justify-center p-6 text-center"
-            style={{ backfaceVisibility: "hidden" }} // 👈 여기도 인라인으로 추가
-          >
-            <span className="text-xs font-bold text-gray-400 mb-2 uppercase">
-              문제 키워드
-            </span>
-            <h3 className="text-lg font-bold text-gray-800 break-keep leading-snug">
-              {cards[currentIndex].keyword}
-            </h3>
-          </div>
-
-          {/* 뒷면: 정답 */}
-          <div
-            className="absolute inset-0 w-full h-full bg-primary text-white rounded-2xl shadow-md flex flex-col items-center justify-center p-6 text-center"
-            style={{
-              backfaceVisibility: "hidden",
-              transform: "rotateX(180deg)",
-            }}
-          >
-            <span className="text-xs font-bold text-primary-200 mb-2 uppercase">
-              정답 확인
-            </span>
-            <h3 className="text-xl font-extrabold break-keep leading-snug">
-              {cards[currentIndex].answer}
-            </h3>
-          </div>
-        </div>
-      </div>
-
-      {/* O/X 버튼 컨트롤 */}
-      <div className="mt-6 flex space-x-4 w-full justify-center">
-        <button
-          onClick={(e) => handleAnswer(false, e)}
-          className="flex-1 max-w-[120px] py-3 rounded-xl bg-red-50 text-red-600 font-bold text-lg shadow-sm hover:bg-red-100 border border-red-100 transition-colors"
-        >
-          몰라요 (X)
-        </button>
-        <button
-          onClick={(e) => handleAnswer(true, e)}
-          className="flex-1 max-w-[120px] py-3 rounded-xl bg-blue-50 text-blue-600 font-bold text-lg shadow-sm hover:bg-blue-100 border border-blue-100 transition-colors"
-        >
-          알아요 (O)
-        </button>
-      </div>
-      <p className="text-gray-400 text-xs mt-3">
-        카드를 터치하면 정답이 보입니다.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------
-// 3. 대시보드 삽입용 스피드 퀴즈 + 오답노트 섹션
+// 2. 대시보드 삽입용 스피드 퀴즈 + 오답노트 섹션
 // ---------------------------------------------------------
 function SpeedQuizDashboardSection() {
   const subjects = [
@@ -190,7 +51,7 @@ function SpeedQuizDashboardSection() {
     { id: 2, name: "전력공학" },
     { id: 3, name: "전기기기" },
     { id: 4, name: "회로이론" },
-    { id: 5, name: "설비기준" },
+    { id: 5, name: "전기설비기술기준" },
   ];
 
   const [activeSubject, setActiveSubject] = useState(subjects[1]); // 전력공학 기본 선택
@@ -198,6 +59,7 @@ function SpeedQuizDashboardSection() {
 
   const handleMarkIncorrect = (card) => {
     setIncorrectCards((prev) => {
+      // 이미 오답노트에 있는 문제인지 확인 (중복 방지)
       if (prev.some((c) => c.id === card.id)) return prev;
       return [...prev, card];
     });
@@ -232,16 +94,17 @@ function SpeedQuizDashboardSection() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* 왼쪽: 플래시카드 */}
+        {/* 왼쪽: 백엔드와 연동된 플래시카드 위젯 */}
         <div className="flex flex-col items-center justify-center">
-          <InteractiveFlashcard
-            subjectId={activeSubject.id}
+          {/* 👈 subjectId 대신 subject 객체 전체를 넘겨줍니다 */}
+          <FlashcardWidget
+            subject={activeSubject}
             onMarkIncorrect={handleMarkIncorrect}
           />
         </div>
 
         {/* 오른쪽: 오답 노트 */}
-        <div className="bg-red-50/50 rounded-xl p-5 border border-red-100 flex flex-col h-full max-h-[350px]">
+        <div className="bg-red-50/50 rounded-xl p-5 border border-red-100 flex flex-col h-full max-h-[400px]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-red-500 text-lg">
@@ -256,7 +119,7 @@ function SpeedQuizDashboardSection() {
 
           <div className="overflow-y-auto flex-grow pr-2 space-y-3 custom-scrollbar">
             {incorrectCards.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-gray-400">
+              <div className="h-full flex items-center justify-center text-sm text-gray-400 min-h-[200px]">
                 아직 틀린 문제가 없습니다.
               </div>
             ) : (
@@ -265,10 +128,10 @@ function SpeedQuizDashboardSection() {
                   key={idx}
                   className="bg-white p-3 rounded-lg border border-red-50 shadow-sm"
                 >
-                  <p className="text-xs text-red-400 font-bold mb-1">
+                  <p className="text-xs text-red-400 font-bold mb-1 break-keep">
                     Q. {card.keyword}
                   </p>
-                  <p className="text-sm text-gray-800 font-semibold">
+                  <p className="text-sm text-gray-800 font-semibold break-keep">
                     {card.answer}
                   </p>
                 </div>
@@ -282,7 +145,7 @@ function SpeedQuizDashboardSection() {
 }
 
 // ---------------------------------------------------------
-// 4. 메인 UserDashboard 컴포넌트
+// 3. 메인 UserDashboard 컴포넌트
 // ---------------------------------------------------------
 export default function UserDashboard() {
   const move = useMove();
@@ -454,7 +317,7 @@ export default function UserDashboard() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8">
-          {/* ⚡ 방금 만든 스피드 퀴즈 + 오답노트 섹션 삽입 ⚡ */}
+          {/* ⚡ 방금 연동한 스피드 퀴즈 + 오답노트 섹션 삽입 ⚡ */}
           <SpeedQuizDashboardSection />
 
           <div className="flex justify-between items-center mb-6">
