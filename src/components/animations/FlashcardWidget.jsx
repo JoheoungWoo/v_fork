@@ -1,6 +1,12 @@
-import apiClient from "@/api/core/apiClient";
+import apiClient from "@/apiClient";
 import { Check, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
+
+// 🚀 수식 렌더링을 위한 라이브러리 추가
+import "katex/dist/katex.min.css"; // 👈 수식이 예쁘게 나오려면 CSS 임포트 필수!
+import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
+import remarkMath from "remark-math";
 
 const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   const [cards, setCards] = useState([]);
@@ -32,7 +38,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
     setIsFlipped(false);
     setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % cards.length);
-    }, 150); // 카드가 뒤집히기 전에 넘어가는 것을 방지
+    }, 150);
   };
 
   const handlePrev = () => {
@@ -105,7 +111,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
 
       {/* 3D 플립 카드 영역 */}
       <div
-        className="w-full relative h-80 w-full"
+        className="w-full relative h-96 w-full"
         style={{ perspective: "1000px" }}
       >
         <div
@@ -132,22 +138,33 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
             </div>
           </div>
 
-          {/* 뒷면: 정답 (Answer) */}
+          {/* 뒷면: 정답 (Answer) - 수식 렌더링 적용 */}
           <div
-            className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(59,130,246,0.4)] flex flex-col items-center justify-center p-8 text-center"
+            className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(59,130,246,0.4)] flex flex-col items-center justify-start p-8 text-left overflow-y-auto custom-scrollbar"
             style={{
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
             }}
           >
-            <span className="text-xs font-extrabold text-blue-100 mb-4 tracking-widest bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full uppercase shadow-sm">
-              Answer
-            </span>
-            <p className="text-xl font-bold break-keep leading-relaxed">
-              {currentCard.content}
-            </p>
-            <div className="absolute bottom-6 flex items-center gap-2 text-blue-200 text-sm font-medium">
-              <RotateCcw size={16} /> 다시 터치하여 뒤집기
+            <div className="w-full flex justify-center mb-4 shrink-0">
+              <span className="text-xs font-extrabold text-blue-100 tracking-widest bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full uppercase shadow-sm">
+                Answer
+              </span>
+            </div>
+
+            {/* 🚀 ReactMarkdown을 통해 일반 텍스트와 LaTeX 수식을 혼합하여 렌더링 */}
+            <div className="text-lg font-medium leading-relaxed w-full">
+              <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+              >
+                {currentCard.content}
+              </ReactMarkdown>
+            </div>
+
+            <div className="w-full flex justify-center mt-auto pt-6 shrink-0 text-blue-200 text-sm font-medium">
+              <RotateCcw size={16} className="mr-1 inline-block" /> 다시
+              터치하여 뒤집기
             </div>
           </div>
         </div>
@@ -155,7 +172,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
 
       {/* 하단 컨트롤러 (버튼) */}
       <div className="flex items-center justify-between w-full mt-8 px-2 gap-3">
-        {/* 이전 버튼 */}
         <button
           onClick={handlePrev}
           className="p-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-2xl transition-colors shrink-0"
@@ -163,7 +179,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
           <ChevronLeft size={24} />
         </button>
 
-        {/* 메인 액션 버튼 */}
         <div className="flex gap-3 flex-1">
           <button
             onClick={(e) => {
@@ -188,7 +203,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
           </button>
         </div>
 
-        {/* 다음 버튼 */}
         <button
           onClick={handleNext}
           className="p-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-2xl transition-colors shrink-0"
