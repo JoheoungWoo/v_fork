@@ -157,60 +157,15 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
             </div>
           </div>
 
-          {/* 뒷면: Answer */}
-          <div
-            className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] ..."
-            style={{
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden", // ✅ Safari/Chrome 대응
-              transform: "rotateY(180deg)",
-              WebkitTransform: "rotateY(180deg)", // ✅ 추가
-            }}
-          >
-            <div className="w-full flex justify-center mb-6 shrink-0">
-              <span className="text-xs font-extrabold text-blue-600 tracking-widest bg-blue-50 px-4 py-1.5 rounded-full uppercase shadow-sm">
-                Answer
-              </span>
-            </div>
-
-            <div className="text-[15px] font-medium w-full text-slate-700">
-              <ReactMarkdown
-                remarkPlugins={[remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  p: ({ node, ...props }) => (
-                    <p className="mb-5 leading-relaxed break-keep" {...props} />
-                  ),
-                  ul: ({ node, ...props }) => (
-                    <ul
-                      className="list-disc pl-5 mb-5 space-y-2 marker:text-blue-500"
-                      {...props}
-                    />
-                  ),
-                  li: ({ node, ...props }) => <li className="" {...props} />,
-                  div: ({ node, className, ...props }) => {
-                    if (className === "math math-display") {
-                      return (
-                        <div
-                          className="my-6 overflow-x-auto text-center w-full"
-                          {...props}
-                        />
-                      );
-                    }
-                    return <div className={className} {...props} />;
-                  },
-                }}
-              >
-                {formatMathText(currentCard?.content)}{" "}
-                {/* 옵셔널 체이닝 추가 */}
-              </ReactMarkdown>
-            </div>
-
-            <div className="w-full flex justify-center mt-auto pt-6 shrink-0 text-slate-300 text-sm font-medium">
-              <RotateCcw size={16} className="mr-1 inline-block" /> 다시
-              터치하여 뒤집기
-            </div>
-          </div>
+<div
+  className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] flex flex-col items-center justify-start p-8 overflow-y-auto"
+  style={{
+    backfaceVisibility: "hidden",
+    WebkitBackfaceVisibility: "hidden",
+    transform: "rotateY(180deg)",
+    WebkitTransform: "rotateY(180deg)",
+  }}
+>
         </div>
       </div>
 
