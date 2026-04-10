@@ -3,7 +3,7 @@ import { Check, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 // 🚀 수식 렌더링을 위한 라이브러리 추가
-import "katex/dist/katex.min.css"; // 👈 수식이 예쁘게 나오려면 CSS 임포트 필수!
+//import "katex/dist/katex.min.css"; // 👈 수식이 예쁘게 나오려면 CSS 임포트 필수!
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
