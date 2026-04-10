@@ -1,5 +1,5 @@
+import apiClient from "@/api/core/apiClient";
 import { useEffect, useState } from "react";
-import apiClient from "./apiClient"; // 기존에 만든 apiClient 경로에 맞게 수정
 
 const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   const [cards, setCards] = useState([]);
