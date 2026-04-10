@@ -1,11 +1,49 @@
 import apiClient from "@/api/core/apiClient";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import { Check, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import "katex/dist/katex.min.css";
-import ReactMarkdown from "react-markdown";
-import rehypeKatex from "rehype-katex";
-import remarkMath from "remark-math";
+const renderMathContent = (text) => {
+  if (!text) return "";
+
+  // 리터럴 \n → 실제 줄바꿈
+  let processed = text.replace(/\\n/g, "\n");
+
+  // $$ 블록 수식
+  let html = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+    try {
+      return `<div style="margin:0.75rem 0;text-align:center;overflow-x:auto;">${katex.renderToString(
+        math.trim(),
+        {
+          displayMode: true,
+          throwOnError: false,
+          strict: false,
+        },
+      )}</div>`;
+    } catch {
+      return `<div>${math}</div>`;
+    }
+  });
+
+  // $ 인라인 수식
+  html = html.replace(/\$((?!\$)[^$\n]+?)\$/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), {
+        displayMode: false,
+        throwOnError: false,
+        strict: false,
+      });
+    } catch {
+      return math;
+    }
+  });
+
+  // 줄바꿈 → <br>
+  html = html.replace(/\n/g, "<br/>");
+
+  return html;
+};
 
 const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   const [cards, setCards] = useState([]);
@@ -18,7 +56,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
       setLoading(true);
       try {
         const response = await apiClient.get(`/flashcards/${subject.name}`);
-        // 데이터가 배열이 아닐 경우를 대비한 안전장치
         const fetchedData = response.data?.data || [];
         setCards(fetchedData);
         setCurrentIndex(0);
@@ -49,19 +86,15 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
     }, 150);
   };
 
-  const handleFlip = () => {
-    setIsFlipped(!isFlipped);
-  };
+  const handleFlip = () => setIsFlipped(!isFlipped);
 
   const handleIncorrectClick = async (card) => {
-    if (!card) return; // 카드가 없을 경우 방어
-
+    if (!card) return;
     onMarkIncorrect({
       id: card.id,
       keyword: card.title,
       answer: card.content,
     });
-
     try {
       await apiClient.post("/flashcards/wrongbook", {
         card_id: card.id,
@@ -73,7 +106,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
     handleNext();
   };
 
-  // 1. 로딩 중일 때 화면
   if (loading) {
     return (
       <div className="w-full max-w-md h-[26rem] flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-sm border border-slate-100">
@@ -83,7 +115,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
     );
   }
 
-  // 2. 데이터가 없을 때 화면
   if (!cards || cards.length === 0) {
     return (
       <div className="w-full max-w-md h-[26rem] flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-sm border border-slate-100 text-slate-400">
@@ -92,22 +123,12 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
     );
   }
 
-  // ⭐ 여기서 currentCard를 명확하게 선언합니다 (에러 발생 원인 해결)
   const currentCard = cards[currentIndex];
   const progressPercentage = ((currentIndex + 1) / cards.length) * 100;
 
-  // DB에서 넘어온 텍스트의 줄바꿈과 수식 블록을 깔끔하게 정리하는 함수
-  const formatMathText = (text) => {
-    if (!text) return "";
-    let formatted = text.replace(/\\n/g, "\n");
-    formatted = formatted.replace(/\$\$([\s\S]*?)\$\$/g, "\n$$\n$1\n$$\n");
-    return formatted;
-  };
-
-  // 3. 정상 렌더링 화면
   return (
     <div className="w-full max-w-md flex flex-col items-center">
-      {/* 상단 진행률 바 */}
+      {/* 진행률 바 */}
       <div className="w-full mb-6 px-4">
         <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
           <span>진행도</span>
@@ -119,13 +140,13 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
           <div
             className="bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progressPercentage}%` }}
-          ></div>
+          />
         </div>
       </div>
 
-      {/* 3D 플립 카드 영역 */}
+      {/* 3D 플립 카드 */}
       <div
-        className="w-full relative h-[26rem] w-full"
+        className="w-full relative h-[26rem]"
         style={{ perspective: "1000px" }}
       >
         <div
@@ -133,9 +154,9 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
           onClick={handleFlip}
           style={{
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            WebkitTransform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)", // ✅ 추가
+            WebkitTransform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
             transformStyle: "preserve-3d",
-            WebkitTransformStyle: "preserve-3d", // ✅ 추가
+            WebkitTransformStyle: "preserve-3d",
           }}
         >
           {/* 앞면: Question */}
@@ -143,33 +164,56 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
             className="absolute inset-0 w-full h-full bg-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] border border-slate-100 flex flex-col items-center justify-center p-8 text-center"
             style={{
               backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden", // ✅ Safari/Chrome 대응
+              WebkitBackfaceVisibility: "hidden",
             }}
           >
             <span className="text-xs font-extrabold text-blue-500 mb-4 tracking-widest bg-blue-50 px-3 py-1 rounded-full uppercase">
               Question
             </span>
             <h2 className="text-2xl font-extrabold text-slate-800 break-keep leading-snug">
-              {currentCard?.title} {/* 옵셔널 체이닝 추가 */}
+              {currentCard?.title}
             </h2>
             <div className="absolute bottom-6 flex items-center gap-2 text-slate-300 text-sm font-medium">
               <RotateCcw size={16} /> 터치하여 정답 확인
             </div>
           </div>
 
-<div
-  className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] flex flex-col items-center justify-start p-8 overflow-y-auto"
-  style={{
-    backfaceVisibility: "hidden",
-    WebkitBackfaceVisibility: "hidden",
-    transform: "rotateY(180deg)",
-    WebkitTransform: "rotateY(180deg)",
-  }}
->
+          {/* 뒷면: Answer */}
+          <div
+            className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] flex flex-col p-8 overflow-y-auto"
+            style={{
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+              WebkitTransform: "rotateY(180deg)",
+            }}
+          >
+            {/* Answer 뱃지 */}
+            <div className="w-full flex justify-center mb-5 shrink-0">
+              <span className="text-xs font-extrabold text-blue-100 tracking-widest bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full uppercase">
+                Answer
+              </span>
+            </div>
+
+            {/* KaTeX 렌더링 */}
+            <div
+              className="text-[15px] font-medium leading-relaxed w-full flex-1"
+              style={{ color: "white" }}
+              dangerouslySetInnerHTML={{
+                __html: renderMathContent(currentCard?.content),
+              }}
+            />
+
+            {/* 하단 안내 */}
+            <div className="w-full flex justify-center pt-4 shrink-0 text-blue-200 text-sm font-medium">
+              <RotateCcw size={16} className="mr-1 inline-block" /> 다시
+              터치하여 뒤집기
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* 하단 컨트롤러 (버튼) */}
+      {/* 하단 버튼 */}
       <div className="flex items-center justify-between w-full mt-8 px-2 gap-3">
         <button
           onClick={handlePrev}
