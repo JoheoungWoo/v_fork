@@ -9,8 +9,11 @@ import { useEffect, useState } from "react";
 const renderMathContent = (text) => {
   if (!text) return "";
 
-  // 1단계: $$...$$ 블록 수식 처리 (먼저!)
-  let html = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+  // ✅ DB에서 오는 리터럴 \n을 실제 줄바꿈으로 변환
+  let processed = text.replace(/\\n/g, "\n");
+
+  // ✅ $$ 블록 수식
+  let html = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
     try {
       return `<div class="katex-block">${katex.renderToString(math.trim(), {
         displayMode: true,
@@ -22,7 +25,7 @@ const renderMathContent = (text) => {
     }
   });
 
-  // 2단계: $...$ 인라인 수식 처리
+  // ✅ $ 인라인 수식
   html = html.replace(/\$((?!\$)[^$\n]+?)\$/g, (_, math) => {
     try {
       return katex.renderToString(math.trim(), {
@@ -35,15 +38,11 @@ const renderMathContent = (text) => {
     }
   });
 
-  // 3단계: 줄바꿈 → <br>
+  // ✅ 줄바꿈 → <br>
   html = html.replace(/\n/g, "<br/>");
-
-  // 4단계: * 불릿 포인트 처리
-  html = html.replace(/^• /gm, "• ").replace(/\* /g, "• ");
 
   return html;
 };
-
 const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   const [cards, setCards] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
