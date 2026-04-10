@@ -1,11 +1,48 @@
 import apiClient from "@/api/core/apiClient";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import { Check, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import "katex/dist/katex.min.css";
-import ReactMarkdown from "react-markdown";
-import rehypeKatex from "rehype-katex";
-import remarkMath from "remark-math";
+// react-markdown, rehype-katex, remark-math import 전부 제거
+
+const renderMathContent = (text) => {
+  if (!text) return "";
+
+  // 1단계: $$...$$ 블록 수식 처리 (먼저!)
+  let html = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+    try {
+      return `<div class="katex-block">${katex.renderToString(math.trim(), {
+        displayMode: true,
+        throwOnError: false,
+        strict: false,
+      })}</div>`;
+    } catch {
+      return `<div class="katex-block text-red-300">${math}</div>`;
+    }
+  });
+
+  // 2단계: $...$ 인라인 수식 처리
+  html = html.replace(/\$((?!\$)[^$\n]+?)\$/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), {
+        displayMode: false,
+        throwOnError: false,
+        strict: false,
+      });
+    } catch {
+      return math;
+    }
+  });
+
+  // 3단계: 줄바꿈 → <br>
+  html = html.replace(/\n/g, "<br/>");
+
+  // 4단계: * 불릿 포인트 처리
+  html = html.replace(/^• /gm, "• ").replace(/\* /g, "• ");
+
+  return html;
+};
 
 const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   const [cards, setCards] = useState([]);
@@ -47,9 +84,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
     }, 150);
   };
 
-  const handleFlip = () => {
-    setIsFlipped(!isFlipped);
-  };
+  const handleFlip = () => setIsFlipped(!isFlipped);
 
   const handleIncorrectClick = async (card) => {
     onMarkIncorrect({
@@ -57,7 +92,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
       keyword: card.title,
       answer: card.content,
     });
-
     try {
       await apiClient.post("/flashcards/wrongbook", {
         card_id: card.id,
@@ -71,7 +105,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
 
   if (loading) {
     return (
-      <div className="w-full max-w-md h-[26rem] flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-sm border border-slate-100">
+      <div className="w-full max-w-md h-96 flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
         <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-4"></div>
         <p className="text-slate-400 font-medium">데이터를 불러오는 중...</p>
       </div>
@@ -80,7 +114,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
 
   if (cards.length === 0) {
     return (
-      <div className="w-full max-w-md h-[26rem] flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-sm border border-slate-100 text-slate-400">
+      <div className="w-full max-w-md h-96 flex flex-col items-center justify-center bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 text-slate-400">
         해당 과목의 데이터가 없습니다.
       </div>
     );
@@ -88,16 +122,6 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
 
   const currentCard = cards[currentIndex];
   const progressPercentage = ((currentIndex + 1) / cards.length) * 100;
-
-  // DB에서 넘어온 텍스트의 줄바꿈과 수식 블록을 깔끔하게 정리하는 함수
-  const formatMathText = (text) => {
-    if (!text) return "";
-    // 1. DB의 문자열 "\n"을 실제 줄바꿈 문자로 변환
-    let formatted = text.replace(/\\n/g, "\n");
-    // 2. 블록 수식($$) 앞뒤로 적절한 여백만 부여
-    formatted = formatted.replace(/\$\$([\s\S]*?)\$\$/g, "\n$$\n$1\n$$\n");
-    return formatted;
-  };
 
   return (
     <div className="w-full max-w-md flex flex-col items-center">
@@ -113,15 +137,12 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
           <div
             className="bg-blue-500 h-full rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progressPercentage}%` }}
-          ></div>
+          />
         </div>
       </div>
 
       {/* 3D 플립 카드 영역 */}
-      <div
-        className="w-full relative h-[26rem] w-full"
-        style={{ perspective: "1000px" }}
-      >
+      <div className="w-full relative h-96" style={{ perspective: "1000px" }}>
         <div
           className="w-full h-full cursor-pointer transition-transform duration-500 ease-in-out"
           onClick={handleFlip}
@@ -130,7 +151,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
             transformStyle: "preserve-3d",
           }}
         >
-          {/* 앞면: 문제 (Question) - 깔끔한 화이트 디자인 */}
+          {/* 앞면: Question */}
           <div
             className="absolute inset-0 w-full h-full bg-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] border border-slate-100 flex flex-col items-center justify-center p-8 text-center"
             style={{ backfaceVisibility: "hidden" }}
@@ -146,55 +167,29 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
             </div>
           </div>
 
-          {/* 뒷면: 정답 (Answer) - 수식이 잘 보이도록 배경을 밝게 변경하고 Markdown 스타일링 적용 */}
+          {/* 뒷면: Answer - KaTeX 직접 렌더링 */}
           <div
-            className="absolute inset-0 w-full h-full bg-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(59,130,246,0.15)] border-2 border-blue-50 flex flex-col items-center justify-start p-8 text-left overflow-y-auto custom-scrollbar"
+            className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 text-white rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(59,130,246,0.4)] flex flex-col items-start justify-start p-8 overflow-y-auto custom-scrollbar"
             style={{
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
             }}
           >
-            <div className="w-full flex justify-center mb-6 shrink-0">
-              <span className="text-xs font-extrabold text-blue-600 tracking-widest bg-blue-50 px-4 py-1.5 rounded-full uppercase shadow-sm">
+            <div className="w-full flex justify-center mb-4 shrink-0">
+              <span className="text-xs font-extrabold text-blue-100 tracking-widest bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full uppercase shadow-sm">
                 Answer
               </span>
             </div>
 
-            {/* 🚀 커스텀 컴포넌트를 넘겨주어 여백과 글머리 기호를 예쁘게 디자인합니다 */}
-            <div className="text-[15px] font-medium w-full text-slate-700">
-              <ReactMarkdown
-                remarkPlugins={[remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  p: ({ node, ...props }) => (
-                    <p className="mb-5 leading-relaxed break-keep" {...props} />
-                  ),
-                  ul: ({ node, ...props }) => (
-                    <ul
-                      className="list-disc pl-5 mb-5 space-y-2 marker:text-blue-500"
-                      {...props}
-                    />
-                  ),
-                  li: ({ node, ...props }) => <li className="" {...props} />,
-                  // 수식이 가운데 정렬되도록 감싸줍니다
-                  div: ({ node, className, ...props }) => {
-                    if (className === "math math-display") {
-                      return (
-                        <div
-                          className="my-6 overflow-x-auto text-center w-full"
-                          {...props}
-                        />
-                      );
-                    }
-                    return <div className={className} {...props} />;
-                  },
-                }}
-              >
-                {formatMathText(currentCard.content)}
-              </ReactMarkdown>
-            </div>
+            {/* KaTeX 직접 렌더링 */}
+            <div
+              className="text-base font-medium leading-relaxed w-full katex-white"
+              dangerouslySetInnerHTML={{
+                __html: renderMathContent(currentCard.content),
+              }}
+            />
 
-            <div className="w-full flex justify-center mt-auto pt-6 shrink-0 text-slate-300 text-sm font-medium">
+            <div className="w-full flex justify-center mt-auto pt-6 shrink-0 text-blue-200 text-sm font-medium">
               <RotateCcw size={16} className="mr-1 inline-block" /> 다시
               터치하여 뒤집기
             </div>
@@ -202,7 +197,7 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
         </div>
       </div>
 
-      {/* 하단 컨트롤러 (버튼) */}
+      {/* 하단 컨트롤러 */}
       <div className="flex items-center justify-between w-full mt-8 px-2 gap-3">
         <button
           onClick={handlePrev}
@@ -217,10 +212,10 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
               e.stopPropagation();
               handleIncorrectClick(currentCard);
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-4 bg-white text-red-500 font-bold rounded-2xl hover:bg-red-50 transition-all border border-slate-200 hover:border-red-200 active:scale-95 shadow-sm"
+            className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-red-50 text-red-500 font-bold rounded-2xl hover:bg-red-100 hover:shadow-md transition-all border border-red-100 active:scale-95"
           >
             <X size={20} strokeWidth={3} />
-            <span className="text-[15px]">몰라요</span>
+            <span className="text-sm">몰라요</span>
           </button>
 
           <button
@@ -228,10 +223,10 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
               e.stopPropagation();
               handleNext();
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-4 bg-blue-500 text-white font-bold rounded-2xl hover:bg-blue-600 transition-all shadow-md active:scale-95"
+            className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-blue-50 text-blue-600 font-bold rounded-2xl hover:bg-blue-100 hover:shadow-md transition-all border border-blue-100 active:scale-95"
           >
             <Check size={20} strokeWidth={3} />
-            <span className="text-[15px]">알아요</span>
+            <span className="text-sm">알아요</span>
           </button>
         </div>
 
