@@ -46,7 +46,7 @@ const WIDGET_MAP = {
   "3_ampere_law": [
     lazy(() => import("@/components/animations/AmpereLawWidget")),
   ],
-  "4_vector_calculus_basics": [
+  "4_vector_calculus": [
     lazy(
       () => import("@/components/animations/magnetics/VectorCalculusWidget"),
     ),
