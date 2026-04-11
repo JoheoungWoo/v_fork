@@ -4,47 +4,94 @@ import "katex/dist/katex.min.css";
 import { Check, ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const renderMathContent = (text) => {
+// ==========================================
+// 💡 수식 렌더링 헬퍼 컴포넌트 (LocalQuizCard에서 차용)
+// ==========================================
+const normalizeLatexText = (text) => {
   if (!text) return "";
-
-  // 리터럴 \n → 실제 줄바꿈
-  let processed = text.replace(/\\n/g, "\n");
-
-  // $$ 블록 수식
-  let html = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
-    try {
-      return `<div style="margin:0.75rem 0;text-align:center;overflow-x:auto;">${katex.renderToString(
-        math.trim(),
-        {
-          displayMode: true,
-          throwOnError: false,
-          strict: false,
-        },
-      )}</div>`;
-    } catch {
-      return `<div>${math}</div>`;
+  const strText = String(text);
+  if (!/\$\$|\\\[|\\\(|\$/.test(strText) && strText.includes("\\text{")) {
+    const parts = strText.split(/\\text{([^}]+)}/g);
+    let result = "";
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 0) {
+        const mathPart = parts[i].trim();
+        if (mathPart) result += ` $${mathPart}$ `;
+      } else {
+        result += parts[i];
+      }
     }
-  });
-
-  // $ 인라인 수식
-  html = html.replace(/\$((?!\$)[^$\n]+?)\$/g, (_, math) => {
-    try {
-      return katex.renderToString(math.trim(), {
-        displayMode: false,
-        throwOnError: false,
-        strict: false,
-      });
-    } catch {
-      return math;
-    }
-  });
-
-  // 줄바꿈 → <br>
-  html = html.replace(/\n/g, "<br/>");
-
-  return html;
+    return result.replace(/\s+/g, " ").trim();
+  }
+  return strText;
 };
 
+const InlineMath = ({ math }) => {
+  if (!math) return null;
+  const html = katex.renderToString(String(math).replace(/\\\\/g, "\\"), {
+    throwOnError: false,
+    displayMode: false,
+    strict: "ignore",
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const BlockMath = ({ math }) => {
+  if (!math) return null;
+  const html = katex.renderToString(String(math).replace(/\\\\/g, "\\"), {
+    throwOnError: false,
+    displayMode: true,
+    strict: "ignore",
+  });
+  return (
+    <div
+      dangerouslySetInnerHTML={{ __html: html }}
+      className="overflow-x-auto flex justify-center w-full my-2"
+    />
+  );
+};
+
+const AutoMathRenderer = ({ text, isBlock = true }) => {
+  if (!text) return null;
+
+  // 리터럴 \n을 실제 줄바꿈으로 변환 (Flashcard 데이터 특성 반영)
+  const textWithNewlines = String(text).replace(/\\n/g, "\n");
+  const cleanText = textWithNewlines.replace(/\\\$/g, "$");
+
+  if (!/\$\$|\\\[|\\\(|\$/.test(cleanText)) {
+    if (!cleanText.includes("\\")) return <span>{cleanText}</span>;
+    return isBlock ? (
+      <BlockMath math={cleanText} />
+    ) : (
+      <InlineMath math={cleanText} />
+    );
+  }
+
+  const parts = cleanText.split(
+    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[\s\S]*?\$|\\\([\s\S]*?\\\))/g,
+  );
+
+  return (
+    <span className="whitespace-pre-wrap leading-relaxed">
+      {parts.map((part, i) => {
+        if (!part) return null;
+        if (part.startsWith("$$") && part.endsWith("$$"))
+          return <BlockMath key={i} math={part.slice(2, -2)} />;
+        if (part.startsWith("\\[") && part.endsWith("\\]"))
+          return <BlockMath key={i} math={part.slice(2, -2)} />;
+        if (part.startsWith("\\(") && part.endsWith("\\)"))
+          return <InlineMath key={i} math={part.slice(2, -2)} />;
+        if (part.startsWith("$") && part.endsWith("$"))
+          return <InlineMath key={i} math={part.slice(1, -1)} />;
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+};
+
+// ==========================================
+// 💡 FlashcardWidget 메인 컴포넌트
+// ==========================================
 const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
   const [cards, setCards] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -195,14 +242,13 @@ const FlashcardWidget = ({ subject, onMarkIncorrect }) => {
               </span>
             </div>
 
-            {/* KaTeX 렌더링 */}
+            {/* 교체된 KaTeX 렌더링 방식 */}
             <div
               className="text-[15px] font-medium leading-relaxed w-full flex-1"
               style={{ color: "white" }}
-              dangerouslySetInnerHTML={{
-                __html: renderMathContent(currentCard?.content),
-              }}
-            />
+            >
+              <AutoMathRenderer text={currentCard?.content} isBlock={false} />
+            </div>
 
             {/* 하단 안내 */}
             <div className="w-full flex justify-center pt-4 shrink-0 text-blue-200 text-sm font-medium">

@@ -40,18 +40,3 @@
 .read-the-docs {
   color: #888;
 }
-
-/* KaTeX 수식 색상 - 카드 뒷면 흰색 배경 대응 */
-.katex-white .katex {
-  color: white;
-}
-.katex-white .katex-block {
-  margin: 0.75rem 0;
-  text-align: center;
-  overflow-x: auto;
-}
-/* 수식이 카드 너비를 넘칠 때 가로 스크롤 */
-.katex-white .katex-display {
-  overflow-x: auto;
-  overflow-y: hidden;
-}

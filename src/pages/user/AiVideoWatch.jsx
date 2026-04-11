@@ -157,9 +157,11 @@ export default function AiVideoWatch() {
               </div>
 
               <div className="min-h-[400px]">
-                {/* 실전 퀴즈 */}
                 {activeTab === "quiz" && (
-                  <LocalQuizCard id={videoInfo.lecture_id} />
+                  <LocalQuizCard
+                    id={videoInfo.lecture_id}
+                    subject={videoInfo.subject} /* 🌟 요기를 추가! */
+                  />
                 )}
 
                 {/* 🌟 다중 인터랙티브 위젯 렌더링 영역 */}

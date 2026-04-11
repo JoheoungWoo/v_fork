@@ -3,6 +3,8 @@ import RecommendedVideo from "@/components/video/RecommendedVideo";
 import useMove from "@/hooks/useMove";
 import { ForwardIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+// 🌟 방금 만든 오답노트 컴포넌트 임포트 (경로는 실제 위치에 맞게 수정)
+import WrongAnswerNote from "@/components/animations/WrongAnswerNote";
 
 // ---------------------------------------------------------
 // 1. 큐넷 시험 일정 파싱 함수
@@ -59,7 +61,6 @@ function SpeedQuizDashboardSection() {
 
   const handleMarkIncorrect = (card) => {
     setIncorrectCards((prev) => {
-      // 이미 오답노트에 있는 문제인지 확인 (중복 방지)
       if (prev.some((c) => c.id === card.id)) return prev;
       return [...prev, card];
     });
@@ -76,7 +77,6 @@ function SpeedQuizDashboardSection() {
         </p>
       </div>
 
-      {/* 과목 탭 */}
       <div className="mb-6 flex flex-wrap gap-2">
         {subjects.map((subject) => (
           <button
@@ -94,51 +94,15 @@ function SpeedQuizDashboardSection() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* 왼쪽: 백엔드와 연동된 플래시카드 위젯 */}
         <div className="flex flex-col items-center justify-center">
-          {/* 👈 subjectId 대신 subject 객체 전체를 넘겨줍니다 */}
           <FlashcardWidget
             subject={activeSubject}
             onMarkIncorrect={handleMarkIncorrect}
           />
         </div>
 
-        {/* 오른쪽: 오답 노트 */}
-        <div className="bg-red-50/50 rounded-xl p-5 border border-red-100 flex flex-col h-full max-h-[400px]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-              <span className="material-symbols-outlined text-red-500 text-lg">
-                edit_note
-              </span>
-              나만의 오답 노트
-            </h3>
-            <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-bold">
-              {incorrectCards.length}개
-            </span>
-          </div>
-
-          <div className="overflow-y-auto flex-grow pr-2 space-y-3 custom-scrollbar">
-            {incorrectCards.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-gray-400 min-h-[200px]">
-                아직 틀린 문제가 없습니다.
-              </div>
-            ) : (
-              incorrectCards.map((card, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white p-3 rounded-lg border border-red-50 shadow-sm"
-                >
-                  <p className="text-xs text-red-400 font-bold mb-1 break-keep">
-                    Q. {card.keyword}
-                  </p>
-                  <p className="text-sm text-gray-800 font-semibold break-keep">
-                    {card.answer}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        {/* 🌟 외부 컴포넌트로 깔끔하게 처리 */}
+        <WrongAnswerNote incorrectCards={incorrectCards} />
       </div>
     </div>
   );
@@ -317,7 +281,6 @@ export default function UserDashboard() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8">
-          {/* ⚡ 방금 연동한 스피드 퀴즈 + 오답노트 섹션 삽입 ⚡ */}
           <SpeedQuizDashboardSection />
 
           <div className="flex justify-between items-center mb-6">

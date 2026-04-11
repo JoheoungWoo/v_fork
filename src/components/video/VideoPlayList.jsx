@@ -31,20 +31,30 @@ export default function VideoPlayList({ currentLectureId }) {
   const { currentSubjectLectures, currentTitle } = useMemo(() => {
     if (videoList.length === 0 || !currentLectureId)
       return { currentSubjectLectures: [], currentTitle: "" };
+
     const currentVideo = videoList.find(
       (v) => v.lecture_id === currentLectureId,
     );
+
     if (!currentVideo) return { currentSubjectLectures: [], currentTitle: "" };
 
-    const filtered = videoList
-      .filter((v) => v.subject === currentVideo.subject)
-      .sort(
-        (a, b) =>
-          (parseInt(a.lecture_id) || 9999) - (parseInt(b.lecture_id) || 9999),
-      );
+    // ✅ 1. 같은 subject 필터
+    const filtered = videoList.filter(
+      (v) => v.subject === currentVideo.subject,
+    );
+
+    // ✅ 2. title 기준 정렬 (숫자 + "강")
+    const sorted = filtered.sort((a, b) => {
+      const getOrder = (title = "") => {
+        const match = title.trim().match(/^(\d+)\s*강/);
+        return match ? parseInt(match[1], 10) : 9999;
+      };
+
+      return getOrder(a.title) - getOrder(b.title);
+    });
 
     return {
-      currentSubjectLectures: filtered,
+      currentSubjectLectures: sorted,
       currentTitle: currentVideo.subject,
     };
   }, [videoList, currentLectureId]);

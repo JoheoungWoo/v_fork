@@ -113,13 +113,24 @@ export default function AiVideoList() {
     // 🌟 특정 카테고리 탭: 필터링 후 lecture_id의 숫자 기준으로 오름차순 정렬
     const filtered = allLectures.filter((v) => v.category === activeTab);
 
-    return filtered.sort((a, b) => {
-      // lecture_id에서 앞의 숫자만 추출 (예: "13_vector" -> 13)
-      // 만약 숫자로 시작하지 않거나 lecture_id가 없으면 9999를 줘서 맨 뒤로 보냄
-      const numA = parseInt(a.lecture_id) || 9999;
-      const numB = parseInt(b.lecture_id) || 9999;
+    // => lecture_id가 아니라 title을 기준으로 정렬
 
-      return numA - numB; // 숫자 기준 오름차순 (1, 2, 3...) 정렬
+    // return filtered.sort((a, b) => {
+    //   // lecture_id에서 앞의 숫자만 추출 (예: "13_vector" -> 13)
+    //   // 만약 숫자로 시작하지 않거나 lecture_id가 없으면 9999를 줘서 맨 뒤로 보냄
+    //   const numA = parseInt(a.lecture_id) || 9999;
+    //   const numB = parseInt(b.lecture_id) || 9999;
+
+    //   return numA - numB; // 숫자 기준 오름차순 (1, 2, 3...) 정렬
+    // });
+
+    return filtered.sort((a, b) => {
+      const getOrder = (title) => {
+        const match = title.match(/^(\d+)\s*강/);
+        return match ? parseInt(match[1], 10) : 9999;
+      };
+
+      return getOrder(a.title) - getOrder(b.title);
     });
   }, [allLectures, activeTab]);
 
