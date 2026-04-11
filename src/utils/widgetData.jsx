@@ -29,7 +29,7 @@ const WIDGET_MAP = {
     lazy(() => import("@/components/animations/circuits/TimeConstantWidget")),
   ],
   "9_circuit_analysis_rlc": [
-    lazy(() => import("@/components/animations/circuits/ConfigurationPanel")),
+    lazy(() => import("@/components/animations/circuits/RLCCombinedWidget")),
   ],
   "1_frequency_meaning": [
     lazy(() => import("@/components/animations/circuits/SineWaveWidget")),
