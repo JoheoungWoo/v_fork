@@ -28,6 +28,9 @@ const WIDGET_MAP = {
   "8_time_constant": [
     lazy(() => import("@/components/animations/circuits/TimeConstantWidget")),
   ],
+  "9_circuit_analysis_rlc": [
+    lazy(() => import("@/components/animations/circuits/ConfigurationPanel")),
+  ],
   "1_frequency_meaning": [
     lazy(() => import("@/components/animations/circuits/SineWaveWidget")),
   ],
