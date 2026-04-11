@@ -48,7 +48,7 @@ const WIDGET_MAP = {
   ],
   "4_vector_calculus": [
     lazy(
-      () => import("@/components/animations/magnetics/VectorCalculusWidget"),
+      () => import("@/components/animations/magnetics/VectorCalculus3DWidget"),
     ),
   ],
 
