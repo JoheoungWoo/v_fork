@@ -58,6 +58,9 @@ const WIDGET_MAP = {
   "10_trig_function_1": [
     lazy(() => import("@/components/animations/InteractiveUnitCircle")),
   ],
+  "10_integral": [
+    lazy(() => import("@/components/animations/math/IntegralWidget")),
+  ],
   "8_parabola_line_intersection": [
     lazy(() => import("@/components/animations/ParabolaIntersection")),
   ],
