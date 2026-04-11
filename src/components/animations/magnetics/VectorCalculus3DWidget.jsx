@@ -1,458 +1,434 @@
-import { Grid, OrbitControls } from "@react-three/drei";
+// src/components/animations/magnetics/VectorCalculus3DWidget.jsx
+// widgetData.jsx → "4_vector_calculus" 키에 이미 등록되어 있습니다.
+// React Three Fiber + 기존 apiClient 기반 FastAPI 연동
+
+import { Suspense, useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef, useState } from "react";
+import { OrbitControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
+import { Loader2 } from "lucide-react";
+import { useVectorCalc } from "@/hooks/useVectorCalc";
 
-// ==========================================
-// 1. 수학적 모델 정의 (평면 국한 회전장 추가)
-// ==========================================
-const MODELS = {
-  gradient: {
-    name: "기울기 (Gradient)",
-    functions: [
-      {
-        id: "saddle",
-        name: "말안장 (Saddle)",
-        funcStr: "f(x,y) = x² - y²",
-        calcF: (x, y) => (x * x - y * y) * 0.2,
-        calcGrad: (x, y) => [2 * x * 0.2, -2 * y * 0.2, 0],
-      },
-      {
-        id: "hills",
-        name: "언덕 (Hills)",
-        funcStr: "f(x,y) = sin(x) + cos(y)",
-        calcF: (x, y) => Math.sin(x) + Math.cos(y),
-        calcGrad: (x, y) => [Math.cos(x), -Math.sin(y), 0],
-      },
-      {
-        id: "bowl",
-        name: "그릇 (Bowl)",
-        funcStr: "f(x,y) = x² + y²",
-        calcF: (x, y) => (x * x + y * y) * 0.1,
-        calcGrad: (x, y) => [2 * x * 0.1, 2 * y * 0.1, 0],
-      },
-    ],
-  },
-  divergence: {
-    name: "발산 (Divergence)",
-    functions: [
-      {
-        id: "source",
-        name: "원천 (Source/Sink)",
-        funcStr: "A = [x, y, z]",
-        calcV: (x, y, z) => [x * 0.5, y * 0.5, z * 0.5],
-        calcDiv: (x, y, z) => 1.5, // 상수 발산
-      },
-      {
-        id: "uniform",
-        name: "균일 흐름 (Uniform)",
-        funcStr: "A = [1, 0, 0]",
-        calcV: (x, y, z) => [1, 0, 0],
-        calcDiv: (x, y, z) => 0, // 발산 없음
-      },
-    ],
-  },
-  curl: {
-    name: "회전 (Curl)",
-    functions: [
-      {
-        id: "localized_rotation", // 🌟 새로 추가된 평면 국한 모델
-        name: "평면 국한 회전 (2D Plane)",
-        funcStr: "A = [-y·exp(-z²), x·exp(-z²), 0]",
-        calcV: (x, y, z) => {
-          const attenuation = Math.exp(-(z * z)); // z가 0에서 멀어질수록 0에 가까워짐
-          return [-y * 0.5 * attenuation, x * 0.5 * attenuation, 0];
-        },
-        calcCurl: (x, y, z) => {
-          const att = Math.exp(-(z * z));
-          // z가 평면을 벗어나면 회전력(z성분)이 급격히 감소함
-          return [0, 0, 1 * att];
-        },
-      },
-      {
-        id: "cylinder_rotation",
-        name: "원통형 회전 (3D Cylinder)",
-        funcStr: "A = [-y, x, 0]",
-        calcV: (x, y, z) => [-y * 0.5, x * 0.5, 0],
-        calcCurl: (x, y, z) => [0, 0, 1], // z높이에 상관없이 일정한 회전력
-      },
-      {
-        id: "vortex",
-        name: "소용돌이 (Vortex)",
-        funcStr: "A = [-y/(x²+y²), x/(x²+y²), 0]",
-        calcV: (x, y, z) => {
-          const r2 = x * x + y * y;
-          if (r2 < 0.1) return [0, 0, 0]; // 특이점 방지
-          const att = Math.exp(-(z * z));
-          return [(-y / r2) * 2 * att, (x / r2) * 2 * att, 0];
-        },
-        calcCurl: (x, y, z) => [0, 0, 0], // 원점 제외 회전 없음
-      },
-    ],
-  },
-};
+// ──────────────────────────────────────────────────────────────────────────────
+// [1] 3D 프리미티브: 화살표
+// ──────────────────────────────────────────────────────────────────────────────
+function Arrow({ start, dir, color = "#e55a2b", scale = 1 }) {
+  const v = new THREE.Vector3(...dir);
+  const len = v.length();
+  if (len < 0.001) return null;
+  v.normalize();
 
-// ==========================================
-// 2. 3D 헬퍼 컴포넌트 (화살표)
-// ==========================================
-const Arrow3D = ({
-  start,
-  dir,
-  length = 1,
-  color = "#ff0000",
-  thickness = 0.05,
-}) => {
-  const vecDir = new THREE.Vector3(...dir);
-  const len = vecDir.length();
-  if (len < 0.01) return null;
-
-  vecDir.normalize();
-  const quaternion = new THREE.Quaternion().setFromUnitVectors(
+  const shaftLen = Math.min(len, 2.0) * scale;
+  const r = 0.04 * scale;
+  const q = new THREE.Quaternion().setFromUnitVectors(
     new THREE.Vector3(0, 1, 0),
-    vecDir,
+    v
   );
-  const actualLength = length * Math.min(len, 2);
 
   return (
-    <group position={start} quaternion={quaternion}>
-      <mesh position={[0, actualLength / 2, 0]}>
-        <cylinderGeometry args={[thickness, thickness, actualLength, 8]} />
-        <meshStandardMaterial color={color} />
+    <group position={start} quaternion={q}>
+      <mesh position={[0, shaftLen / 2, 0]}>
+        <cylinderGeometry args={[r, r, shaftLen, 8]} />
+        <meshPhongMaterial color={color} />
       </mesh>
-      <mesh position={[0, actualLength + thickness * 2, 0]}>
-        <coneGeometry args={[thickness * 3, thickness * 6, 8]} />
-        <meshStandardMaterial color={color} />
+      <mesh position={[0, shaftLen + r * 3, 0]}>
+        <coneGeometry args={[r * 2.5, r * 6, 8]} />
+        <meshPhongMaterial color={color} />
       </mesh>
     </group>
   );
-};
+}
 
-// ==========================================
-// 3. 동적 표면(Surface) 생성 컴포넌트 (Gradient 용)
-// ==========================================
-const ParametricSurface = ({ func }) => {
-  const geometry = useMemo(() => {
-    const size = 10;
-    const segments = 50;
-    const geo = new THREE.PlaneGeometry(size, size, segments, segments);
-    const pos = geo.attributes.position;
-
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      const z = func(x, y);
-      pos.setZ(i, z);
-    }
-    geo.computeVertexNormals();
-    return geo;
-  }, [func]);
-
+// ──────────────────────────────────────────────────────────────────────────────
+// [2] 배경 벡터장 화살표 전체
+// ──────────────────────────────────────────────────────────────────────────────
+function FieldArrows({ samples }) {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]}>
-      <primitive object={geometry} />
-      <meshStandardMaterial
+    <>
+      {samples.map((s, i) => (
+        <Arrow key={i} start={s.pos} dir={s.vec} color="#94a3b8" scale={0.6} />
+      ))}
+    </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// [3] 스칼라 곡면 (Gradient 모드)
+// ──────────────────────────────────────────────────────────────────────────────
+function ScalarSurface({ meshData }) {
+  const geo = useMemo(() => {
+    if (!meshData) return null;
+    const { positions, segments } = meshData;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(positions.flat()), 3)
+    );
+    const idx = [];
+    const N = segments;
+    for (let row = 0; row < N - 1; row++) {
+      for (let col = 0; col < N - 1; col++) {
+        const a = row * N + col;
+        idx.push(a, a + N, a + 1, a + 1, a + N, a + N + 1);
+      }
+    }
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  }, [meshData]);
+
+  if (!geo) return null;
+  return (
+    <mesh geometry={geo}>
+      <meshPhongMaterial
         color="#94a3b8"
-        wireframe={false}
-        opacity={0.6}
         transparent
+        opacity={0.5}
         side={THREE.DoubleSide}
       />
     </mesh>
   );
-};
+}
 
-// ==========================================
-// 4. 탐색기 (프로브) 시각화 컴포넌트
-// ==========================================
-const Probe = ({ mode, position, activeFunc }) => {
+// ──────────────────────────────────────────────────────────────────────────────
+// [4] 바람개비 (Curl 모드) — curl 벡터 방향을 회전축으로 사용
+// ──────────────────────────────────────────────────────────────────────────────
+function Windmill({ position, curlVec, curlMag }) {
   const ref = useRef();
-  const [x, y, z] = position;
+  const axis = useMemo(() => {
+    const v = new THREE.Vector3(...curlVec);
+    return v.lengthSq() > 0.0001 ? v.normalize() : new THREE.Vector3(0, 0, 1);
+  }, [curlVec]);
 
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (mode === "divergence" && ref.current) {
-      const divVal = activeFunc.calcDiv(x, y, z);
-      const scale = 1 + Math.sin(t * 5) * (divVal * 0.2);
-      ref.current.scale.set(scale, scale, scale);
-    } else if (mode === "curl" && ref.current) {
-      const curlVal = activeFunc.calcCurl(x, y, z);
-      ref.current.rotation.z += curlVal[2] * 0.05;
-    }
+  useFrame(() => {
+    if (ref.current) ref.current.rotateOnAxis(axis, curlMag * 0.025);
   });
 
-  if (mode === "gradient") {
-    const grad = activeFunc.calcGrad(x, y);
-    const zPos = activeFunc.calcF(x, y);
-    return (
-      <group position={[x, zPos, -y]}>
-        <mesh>
-          <sphereGeometry args={[0.2, 16, 16]} />
-          <meshStandardMaterial color="#fbbf24" />
+  return (
+    <group position={position} ref={ref}>
+      {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle, i) => (
+        <mesh key={i} rotation={[0, 0, angle]}>
+          <boxGeometry args={[1.2, 0.08, 0.08]} />
+          <meshPhongMaterial color="#10b981" side={THREE.DoubleSide} />
         </mesh>
-        <Arrow3D
-          start={[0, 0, 0]}
-          dir={[grad[0], grad[2], -grad[1]]}
-          length={1.5}
+      ))}
+      <mesh>
+        <sphereGeometry args={[0.15, 16, 16]} />
+        <meshPhongMaterial color="#ffffff" />
+      </mesh>
+    </group>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// [5] 탐색 프로브 (모드별 렌더링)
+// ──────────────────────────────────────────────────────────────────────────────
+function Probe({ mode, probe, result }) {
+  const { x, y, z } = probe;
+
+  if (mode === "gradient" && result) {
+    const fval = result.f_value ?? 0;
+    const grad = result.gradient ?? [0, 0];
+    return (
+      <group>
+        <mesh position={[x, fval, -y]}>
+          <sphereGeometry args={[0.22, 16, 16]} />
+          <meshPhongMaterial color="#fbbf24" />
+        </mesh>
+        <Arrow
+          start={[x, fval, -y]}
+          dir={[grad[0] * 0.7, 0, -grad[1] * 0.7]}
           color="#ef4444"
-          thickness={0.08}
+          scale={1.3}
         />
       </group>
     );
   }
 
-  if (mode === "divergence") {
-    const divVal = activeFunc.calcDiv(x, y, z);
-    const color = divVal > 0 ? "#ef4444" : divVal < 0 ? "#3b82f6" : "#cbd5e1";
+  if (mode === "divergence" && result) {
+    const div = result.divergence ?? 0;
+    const color =
+      div > 0.01 ? "#ef4444" : div < -0.01 ? "#3b82f6" : "#94a3b8";
+    const dirs = [
+      [1, 0, 0], [-1, 0, 0], [0, 1, 0],
+      [0, -1, 0], [0, 0, 1], [0, 0, -1],
+    ];
     return (
-      <group position={position}>
-        <mesh ref={ref}>
+      <group>
+        <mesh position={[x, y, z]}>
           <sphereGeometry args={[0.5, 32, 32]} />
-          <meshStandardMaterial color={color} transparent opacity={0.5} />
+          <meshPhongMaterial color={color} transparent opacity={0.35} />
         </mesh>
-        <mesh>
+        <mesh position={[x, y, z]}>
           <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color="white" />
+          <meshPhongMaterial color="#ffffff" />
         </mesh>
+        {dirs.map((d, i) => {
+          const s = Math.abs(div) * 0.18;
+          const start = [x + d[0] * 0.55, y + d[1] * 0.55, z + d[2] * 0.55];
+          const dir   = div >= 0 ? d.map((v) => v * s * 3) : d.map((v) => -v * s * 3);
+          return <Arrow key={i} start={start} dir={dir} color={color} scale={0.8} />;
+        })}
       </group>
     );
   }
 
-  if (mode === "curl") {
+  if (mode === "curl" && result) {
+    const curl    = result.curl    ?? [0, 0, 0];
+    const curlMag = result.curl_mag ?? 0;
+    const vec     = result.vector  ?? [0, 0, 0];
     return (
-      <group position={position} ref={ref}>
-        <mesh position={[0.6, 0, 0]}>
-          <boxGeometry args={[1.2, 0.1, 0.1]} />
-          <meshStandardMaterial color="#10b981" />
-        </mesh>
-        <mesh position={[-0.6, 0, 0]}>
-          <boxGeometry args={[1.2, 0.1, 0.1]} />
-          <meshStandardMaterial color="#10b981" />
-        </mesh>
-        <mesh position={[0, 0.6, 0]}>
-          <boxGeometry args={[0.1, 1.2, 0.1]} />
-          <meshStandardMaterial color="#10b981" />
-        </mesh>
-        <mesh position={[0, -0.6, 0]}>
-          <boxGeometry args={[0.1, 1.2, 0.1]} />
-          <meshStandardMaterial color="#10b981" />
-        </mesh>
-        <mesh>
-          <sphereGeometry args={[0.15, 16, 16]} />
-          <meshStandardMaterial color="white" />
-        </mesh>
+      <group>
+        <Windmill position={[x, y, z]} curlVec={curl} curlMag={curlMag} />
+        {/* 초록: ∇×A 벡터, 보라: A 벡터 */}
+        <Arrow start={[x, y, z]} dir={curl.map((v) => v * 0.5)} color="#10b981" scale={1.2} />
+        <Arrow start={[x, y, z]} dir={vec.map((v) => v * 0.7)}  color="#6366f1" scale={0.9} />
       </group>
     );
   }
 
-  return null;
-};
+  // 결과 대기 중
+  return (
+    <mesh position={mode === "gradient" ? [x, 0, -y] : [x, y, z]}>
+      <sphereGeometry args={[0.18, 16, 16]} />
+      <meshPhongMaterial color="#fbbf24" transparent opacity={0.5} />
+    </mesh>
+  );
+}
 
-// ==========================================
-// 5. 배경 장(Field) 시각화 컴포넌트
-// ==========================================
-const FieldVisualizer = ({ mode, activeFunc }) => {
-  const arrows = useMemo(() => {
-    const arr = [];
-    const step = 2;
-    if (mode === "divergence" || mode === "curl") {
-      for (let x = -4; x <= 4; x += step) {
-        for (let y = -4; y <= 4; y += step) {
-          for (let z = -4; z <= 4; z += step) {
-            if (x === 0 && y === 0 && z === 0) continue;
-            const v = activeFunc.calcV(x, y, z);
-            arr.push(
-              <Arrow3D
-                key={`${x}${y}${z}`}
-                start={[x, y, z]}
-                dir={v}
-                length={1}
-                color="#cbd5e1"
-                thickness={0.02}
-              />,
-            );
-          }
-        }
-      }
-    }
-    return arr;
-  }, [mode, activeFunc]);
+// ──────────────────────────────────────────────────────────────────────────────
+// [6] Three.js 씬
+// ──────────────────────────────────────────────────────────────────────────────
+function Scene({ mode, probe, result, fieldSamples, surfaceMesh }) {
+  return (
+    <Canvas camera={{ position: [10, 8, 10], fov: 45 }}>
+      <color attach="background" args={["#f8fafc"]} />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[10, 20, 10]} intensity={1.2} />
+      <directionalLight position={[-10, -10, -10]} intensity={0.3} />
+      <Grid args={[10, 10]} cellColor="#cbd5e1" sectionColor="#94a3b8" fadeDistance={30} />
+      <axesHelper args={[6]} />
 
-  if (mode === "gradient") {
-    return <ParametricSurface func={activeFunc.calcF} />;
-  }
+      {fieldSamples.length > 0 && <FieldArrows samples={fieldSamples} />}
+      {mode === "gradient" && surfaceMesh && <ScalarSurface meshData={surfaceMesh} />}
+      <Probe mode={mode} probe={probe} result={result} />
 
-  return <>{arrows}</>;
-};
+      <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+    </Canvas>
+  );
+}
 
-// ==========================================
-// 6. 메인 UI 컴포넌트
-// ==========================================
-export default function VectorCalculus3DWidget() {
-  const [mode, setMode] = useState("gradient");
-  const [funcIndexes, setFuncIndexes] = useState({
-    gradient: 0,
-    divergence: 0,
-    curl: 0,
-  });
+// ──────────────────────────────────────────────────────────────────────────────
+// [7] 수치 결과 패널
+// ──────────────────────────────────────────────────────────────────────────────
+const MODE_COLOR = { gradient: "#e55a2b", divergence: "#3b82f6", curl: "#10b981" };
 
-  const [posX, setPosX] = useState(1);
-  const [posY, setPosX_Y] = useState(1);
-  const [posZ, setPosZ] = useState(0);
+function ResultPanel({ mode, result, loading, error }) {
+  const color = MODE_COLOR[mode];
 
-  const activeCategory = MODELS[mode];
-  const activeFunc = activeCategory.functions[funcIndexes[mode]];
+  const Badge = ({ label, value }) => (
+    <div className="flex justify-between items-center px-3 py-2 bg-gray-50 rounded-lg text-sm">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-mono font-bold">
+        {typeof value === "number" ? value.toFixed(4) : value}
+      </span>
+    </div>
+  );
 
-  const handleFuncChange = (e) => {
-    setFuncIndexes({ ...funcIndexes, [mode]: Number(e.target.value) });
-  };
+  const VecBadge = ({ label, vec, c }) => (
+    <div className="px-3 py-2 bg-gray-50 rounded-lg text-sm">
+      <div className="text-gray-500 mb-1">{label}</div>
+      <div className="font-mono font-bold" style={{ color: c }}>
+        ({vec.map((v) => v.toFixed(4)).join(", ")})
+      </div>
+    </div>
+  );
 
   return (
-    <div className="w-full flex flex-col bg-white rounded-[2rem] border border-gray-200 shadow-xl overflow-hidden min-h-[750px] font-sans">
-      {/* 상단 탭 */}
-      <div className="flex bg-slate-50 p-4 gap-2 border-b border-gray-200">
-        {Object.keys(MODELS).map((m) => (
+    <div className="flex flex-col gap-3">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4">
+        <p className="text-xs text-gray-400 mb-3">
+          수치 결과 <span className="text-gray-300">/ Python 중심차분법 h=1e-5</span>
+        </p>
+
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+            <Loader2 size={14} className="animate-spin" /> 계산 중...
+          </div>
+        )}
+        {error && (
+          <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+        )}
+
+        {!loading && !error && result && (
+          <div className="flex flex-col gap-2">
+            {mode === "gradient" && (
+              <>
+                <Badge label="f(x,y)" value={result.f_value} />
+                <VecBadge label="∇f (기울기)" vec={result.gradient} c={color} />
+                <Badge label="|∇f|" value={result.gradient_mag} />
+              </>
+            )}
+            {mode === "divergence" && (
+              <>
+                <VecBadge label="A" vec={result.vector} c={color} />
+                <Badge label="∂Ax/∂x" value={result.partials?.dFx_dx} />
+                <Badge label="∂Ay/∂y" value={result.partials?.dFy_dy} />
+                <Badge label="∂Az/∂z" value={result.partials?.dFz_dz} />
+                <Badge
+                  label="div A"
+                  value={`${result.divergence?.toFixed(4)}  ${
+                    result.divergence > 0.01 ? "▲ 원천" :
+                    result.divergence < -0.01 ? "▼ 싱크" : "● 비압축"
+                  }`}
+                />
+              </>
+            )}
+            {mode === "curl" && (
+              <>
+                <VecBadge label="A" vec={result.vector} c="#6366f1" />
+                <VecBadge label="∇×A (curl)" vec={result.curl} c={color} />
+                <Badge label="|∇×A|" value={result.curl_mag} />
+              </>
+            )}
+            <pre className="text-xs font-mono text-gray-400 bg-gray-50 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed mt-1">
+              {result.formula_detail}
+            </pre>
+          </div>
+        )}
+
+        {!loading && !error && !result && (
+          <p className="text-sm text-gray-400 py-2">슬라이더를 움직이면 계산됩니다.</p>
+        )}
+      </div>
+
+      {/* 개념 힌트 */}
+      <div className="px-4 py-3 bg-blue-50 rounded-xl text-xs text-blue-700 leading-relaxed">
+        {mode === "gradient" && "∇f : 스칼라 f(x,y)가 가장 빠르게 증가하는 방향. 빨간 화살표 방향으로 이동하면 f값 최대 증가."}
+        {mode === "divergence" && "∇·A = ∂Ax/∂x + ∂Ay/∂y + ∂Az/∂z\ndiv>0: 원천  /  div<0: 싱크  /  div=0: 비압축성"}
+        {mode === "curl" && "바람개비 회전축 = ∇×A 벡터 방향, 속도 ∝ 크기\n초록 화살표: ∇×A  /  보라 화살표: A 벡터"}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// [8] 메인 위젯 (widgetData.jsx "4_vector_calculus" 에서 lazy import)
+// ──────────────────────────────────────────────────────────────────────────────
+const MODES = [
+  { id: "gradient",   label: "기울기 ∇f" },
+  { id: "divergence", label: "발산 ∇·A" },
+  { id: "curl",       label: "회전 ∇×A" },
+];
+
+export default function VectorCalculus3DWidget() {
+  const calc = useVectorCalc();
+
+  if (!calc.fieldLists) {
+    return (
+      <div className="flex flex-1 items-center justify-center h-96">
+        <Loader2 className="animate-spin text-[#0047a5]" size={40} />
+      </div>
+    );
+  }
+
+  const fields = calc.fieldLists[calc.mode] ?? [];
+
+  return (
+    <div className="w-full flex flex-col gap-0 font-body">
+      {/* 상단 모드 탭 */}
+      <div className="flex gap-2 mb-4">
+        {MODES.map((m) => (
           <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`flex-1 py-4 px-4 rounded-xl font-black text-lg transition-all ${
-              mode === m
-                ? "bg-[#0047a5] text-white shadow-md"
-                : "bg-white text-gray-500 hover:bg-blue-50 border border-gray-200"
+            key={m.id}
+            onClick={() => calc.changeMode(m.id)}
+            className={`flex-1 py-3 px-4 rounded-xl font-bold text-base transition-all ${
+              calc.mode === m.id
+                ? "bg-[#0047a5] text-white shadow"
+                : "bg-gray-100 text-gray-500 hover:bg-blue-50 border border-gray-200"
             }`}
           >
-            {MODELS[m].name}
+            {m.label}
           </button>
         ))}
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-1 p-6 gap-6 bg-slate-50">
-        {/* 왼쪽: 제어 패널 */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-6">
-          {/* 함수 선택 드롭다운 */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-            <h3 className="text-[#0047a5] font-black text-xl mb-4">
-              수학적 모델 선택
-            </h3>
+      <div className="flex flex-col lg:flex-row gap-5">
+        {/* ── 왼쪽 패널 ─────────────────────────────────────────────────────── */}
+        <div className="w-full lg:w-72 flex flex-col gap-4 flex-shrink-0">
+          {/* 모델 선택 */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-4">
+            <p className="text-sm font-bold text-gray-500 mb-3">수학적 모델</p>
             <select
-              value={funcIndexes[mode]}
-              onChange={handleFuncChange}
-              className="w-full p-3 bg-slate-100 border border-slate-300 rounded-xl font-bold text-gray-700 outline-none focus:border-[#0047a5]"
+              value={calc.selectedId ?? ""}
+              onChange={(e) => calc.changeField(e.target.value)}
+              className="w-full p-2 border border-gray-200 rounded-xl text-sm bg-gray-50"
             >
-              {activeCategory.functions.map((f, idx) => (
-                <option key={f.id} value={idx}>
-                  {f.name}
-                </option>
+              {fields.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
               ))}
             </select>
-            <div className="mt-4 p-4 bg-blue-50 text-blue-900 font-mono text-center rounded-xl font-bold border border-blue-100 break-words">
-              {activeFunc.funcStr}
-            </div>
+            {calc.currentFieldMeta && (
+              <pre className="mt-3 text-xs font-mono text-gray-500 bg-gray-50 px-3 py-2 rounded-xl whitespace-pre-wrap leading-relaxed">
+                {calc.currentFieldMeta.formula}
+              </pre>
+            )}
+            {calc.samplesLoading && (
+              <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                <Loader2 size={10} className="animate-spin" /> 장 데이터 로드 중...
+              </p>
+            )}
           </div>
 
-          {/* 프로브 위치 제어 */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex-1">
-            <h3 className="text-gray-800 font-black text-lg mb-6">
-              탐색점(Probe) 좌표
-            </h3>
-
-            <div className="space-y-6">
-              <div>
-                <label className="flex justify-between font-bold text-gray-600 mb-2">
-                  <span>X 축</span>{" "}
-                  <span className="text-[#0047a5]">{posX.toFixed(1)}</span>
-                </label>
-                <input
-                  type="range"
-                  min="-4"
-                  max="4"
-                  step="0.1"
-                  value={posX}
-                  onChange={(e) => setPosX(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0047a5]"
-                />
-              </div>
-              <div>
-                <label className="flex justify-between font-bold text-gray-600 mb-2">
-                  <span>Y 축</span>{" "}
-                  <span className="text-[#0047a5]">{posY.toFixed(1)}</span>
-                </label>
-                <input
-                  type="range"
-                  min="-4"
-                  max="4"
-                  step="0.1"
-                  value={posY}
-                  onChange={(e) => setPosX_Y(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0047a5]"
-                />
-              </div>
-              {mode !== "gradient" && (
-                <div>
-                  <label className="flex justify-between font-bold text-gray-600 mb-2">
-                    <span>Z 축</span>{" "}
-                    <span className="text-[#0047a5]">{posZ.toFixed(1)}</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="-4"
-                    max="4"
-                    step="0.1"
-                    value={posZ}
-                    onChange={(e) => setPosZ(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0047a5]"
-                  />
+          {/* 슬라이더 */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-4">
+            <p className="text-sm font-bold text-gray-500 mb-4">탐색점 (Probe)</p>
+            {["x", "y", ...(calc.mode !== "gradient" ? ["z"] : [])].map((axis) => (
+              <div key={axis} className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-500">{axis.toUpperCase()} 축</span>
+                  <span className="font-mono font-bold text-[#0047a5]">
+                    {calc.probe[axis].toFixed(1)}
+                  </span>
                 </div>
-              )}
-            </div>
-
-            <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm text-gray-600 font-medium leading-relaxed">
-              {mode === "curl" &&
-                activeFunc.id === "localized_rotation" &&
-                "🟢 Z축 좌표를 0에서 멀어지게 조절해보세요. 평면을 벗어나면 벡터장의 세기가 급격히 줄어들며 바람개비가 멈추는 것을 볼 수 있습니다."}
-              {mode === "curl" &&
-                activeFunc.id !== "localized_rotation" &&
-                "🟢 초록색 바람개비는 벡터장의 회전(Curl)을 나타냅니다. 바람개비가 빨리 돌수록 소용돌이 치는 힘이 강함을 의미합니다."}
-              {mode === "gradient" &&
-                "🔴 그래디언트는 스칼라 함수(곡면)가 가장 가파르게 변하는 '방향'을 가리킵니다."}
-              {mode === "divergence" &&
-                "🔵 구체가 커졌다 작아지는 것은 발산(Divergence)을 의미합니다."}
-            </div>
+                <input
+                  type="range" min="-4" max="4" step="0.1"
+                  value={calc.probe[axis]}
+                  onChange={(e) => calc.updateProbe(axis, parseFloat(e.target.value))}
+                  className="w-full accent-[#0047a5]"
+                />
+              </div>
+            ))}
           </div>
+
+          {/* 수치 결과 */}
+          <ResultPanel
+            mode={calc.mode}
+            result={calc.result}
+            loading={calc.loading}
+            error={calc.error}
+          />
         </div>
 
-        {/* 오른쪽: 3D 캔버스 (밝은 배경) */}
-        <div className="w-full lg:w-2/3 bg-[#f8fafc] rounded-3xl overflow-hidden relative shadow-inner border border-gray-300 min-h-[400px]">
-          <Canvas camera={{ position: [6, 6, 6], fov: 45 }}>
-            <color attach="background" args={["#f8fafc"]} />
-            <ambientLight intensity={0.7} />
-            <directionalLight
-              position={[10, 20, 10]}
-              intensity={1.5}
-              castShadow
+        {/* ── 3D 뷰어 ──────────────────────────────────────────────────────── */}
+        <div className="flex-1 rounded-3xl overflow-hidden relative border border-gray-200 shadow-inner min-h-[480px]">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center h-full min-h-[480px]">
+                <Loader2 className="animate-spin text-[#0047a5]" size={36} />
+              </div>
+            }
+          >
+            <Scene
+              mode={calc.mode}
+              probe={calc.probe}
+              result={calc.result}
+              fieldSamples={calc.fieldSamples}
+              surfaceMesh={calc.surfaceMesh}
             />
-            <directionalLight position={[-10, -10, -10]} intensity={0.5} />
-
-            <Grid
-              args={[10, 10]}
-              position={[0, -0.01, 0]}
-              cellColor="#cbd5e1"
-              sectionColor="#94a3b8"
-              fadeDistance={25}
-            />
-            <axesHelper args={[5]} />
-
-            <FieldVisualizer mode={mode} activeFunc={activeFunc} />
-            <Probe
-              mode={mode}
-              position={[posX, posY, posZ]}
-              activeFunc={activeFunc}
-            />
-
-            <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
-          </Canvas>
-
-          <div className="absolute top-4 right-4 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full text-gray-600 font-bold text-xs border border-gray-200 shadow-sm pointer-events-none">
-            🖱️ 드래그하여 시점 회전 | 휠로 확대/축소
+          </Suspense>
+          <div className="absolute top-3 right-4 text-xs text-gray-400 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none">
+            드래그: 회전 &nbsp;|&nbsp; 휠: 확대
           </div>
         </div>
       </div>
