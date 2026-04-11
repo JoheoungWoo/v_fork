@@ -21,7 +21,7 @@ const VectorCalculusWidget = () => {
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
 
-      // 배경 격자 및 축
+      // 배경 격자 그리기
       ctx.strokeStyle = "#f1f5f9";
       ctx.beginPath();
       for (let x = 0; x <= width; x += GRID_SIZE * 2) {
@@ -48,17 +48,17 @@ const VectorCalculusWidget = () => {
             // f(x,y) = x^2 + y^2 의 기울기 => (2x, 2y)
             vx = dx * (strength / 10);
             vy = dy * (strength / 10);
-            color = "#ef4444"; // Gradient는 빨간색 (상승 방향)
+            color = "#ef4444"; // 빨간색
           } else if (mode === "divergence") {
-            // 발산: 원점에서 뿜어져 나가는 필드 (Source)
+            // 발산 (Source)
             vx = dx * (strength / 5);
             vy = dy * (strength / 5);
-            color = "#3b82f6"; // Divergence는 파란색 (유량)
+            color = "#3b82f6"; // 파란색
           } else if (mode === "curl") {
-            // 회전: 시계 방향으로 회전하는 필드 => (-y, x)
+            // 회전 (소용돌이) => (-y, x)
             vx = -dy * (strength / 5);
             vy = dx * (strength / 5);
-            color = "#10b981"; // Curl은 초록색 (소용돌이)
+            color = "#10b981"; // 초록색
           }
 
           drawArrow(ctx, x, y, vx * 10, vy * 10, color);
@@ -195,23 +195,22 @@ const VectorCalculusWidget = () => {
           >
             {mode === "gradient" && (
               <p>
-                🔴 <strong>Gradient:</strong> 전위($V$)가 가장 빠르게 증가하는
-                방향입니다. 전기장은 $-\nabla V$이므로 이 화살표의 반대 방향으로
-                형성됩니다.
+                🔴 <strong>Gradient:</strong> 스칼라 함수가 가장 가파르게
+                증가하는 방향과 크기를 나타냅니다. 전위(V)의 변화량을
+                보여줍니다.
               </p>
             )}
             {mode === "divergence" && (
               <p>
-                🔵 <strong>Divergence:</strong> 한 점(Source)에서 에너지가
-                뿜어져 나가는 양입니다. 가우스 법칙($\nabla \cdot \mathbf{E}$)의
-                핵심 원리입니다.
+                🔵 <strong>Divergence:</strong> 한 점(Source)에서 벡터가 뿜어져
+                나가는 정도를 나타냅니다. 가우스 법칙의 핵심입니다.
               </p>
             )}
             {mode === "curl" && (
               <p>
                 🟢 <strong>Curl/Stokes:</strong> 벡터장의 회전 성분입니다.
-                앙페르 법칙($\nabla \times \mathbf{H}$)처럼 전류가 흐를 때
-                자기장이 회전하는 현상을 설명합니다.
+                전류가 흐를 때 주변에 자기장이 회전하며 생기는 현상을
+                설명합니다.
               </p>
             )}
           </div>
