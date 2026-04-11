@@ -1,13 +1,13 @@
 import { useMemo } from "react";
 import {
-    CartesianGrid,
-    Line,
-    LineChart,
-    ReferenceDot,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceDot,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 
 const InductionMotorSimulation = ({ voltage, freq, poles, slip, params }) => {

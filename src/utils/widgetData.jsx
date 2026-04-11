@@ -111,6 +111,10 @@ const WIDGET_MAP = {
       () =>
         import("@/components/animations/machines/InductionMotorCombinedWidget"),
     ),
+    lazy(
+      () =>
+        import("@/components/animations/machines/InductionMotorCrossSection.jsx"),
+    ),
   ],
 };
 
