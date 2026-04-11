@@ -6,6 +6,7 @@ const CATEGORIES = [
   { id: "기초 수학", label: "기초 수학", icon: "📐" },
   { id: "회로이론", label: "회로이론", icon: "⚡" },
   { id: "전자기학", label: "전자기학", icon: "🧲" },
+  { id: "전기기기", label: "전기기기", icon: <Settings /> }, // 👈 이 줄을 추가!
   { id: "제어공학", label: "제어공학", icon: "⚙️" },
   { id: "Vision", label: "Vision", icon: "🚀" },
 ];

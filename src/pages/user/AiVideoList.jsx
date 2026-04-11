@@ -48,7 +48,16 @@ const getCategory = (video) => {
     idStr.includes("poten")
   )
     return "전자기학";
-
+  // 🌟 전기기기 분류 로직 추가
+  if (
+    subject.includes("기기") ||
+    idStr.includes("motor") ||
+    idStr.includes("machine") ||
+    idStr.includes("induction") ||
+    idStr.includes("generator") ||
+    idStr.includes("transformer")
+  )
+    return "전기기기";
   if (
     subject.includes("제어") ||
     idStr.includes("control") ||
