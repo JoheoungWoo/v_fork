@@ -97,6 +97,16 @@ const WIDGET_MAP = {
   dc_rectifier: [
     lazy(() => import("@/components/animations/DcRectificationWidget")),
   ],
+
+  // ==========================================
+  // ⚙️ 전기기기 (Electrical Machines)
+  // ==========================================
+  "1_induction_motor": [
+    lazy(
+      () =>
+        import("@/components/animations/machines/InductionMotorCombinedWidget"),
+    ),
+  ],
 };
 
 export default WIDGET_MAP;
