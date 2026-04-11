@@ -30,6 +30,7 @@ const WIDGET_MAP = {
   ],
   "9_circuit_analysis_rlc": [
     lazy(() => import("@/components/animations/circuits/ConfigurationPanel")),
+    lazy(() => import("@/components/animations/circuits/SimulationPanel")),
   ],
   "1_frequency_meaning": [
     lazy(() => import("@/components/animations/circuits/SineWaveWidget")),
