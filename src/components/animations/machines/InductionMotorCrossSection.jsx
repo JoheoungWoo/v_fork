@@ -1,54 +1,68 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * InductionMotorCrossSection
- * Props:
- *   slip   {number}  - 슬립 (0~1)
- *   poles  {number}  - 극수 (2, 4, 6, 8)
- *   freq   {number}  - 주파수 Hz
+ * Props (모두 선택적 — WIDGET_MAP에서 props 없이 단독 사용 가능):
+ *   slip   {number}  - 슬립 (0~1), 기본 0.05
+ *   poles  {number}  - 극수 (2,4,6,8), 기본 4
+ *   freq   {number}  - 주파수 Hz, 기본 60
+ *
+ * props가 undefined면 내부 state로 자체 제어 UI를 표시합니다.
  */
-const InductionMotorCrossSection = ({ slip, poles, freq }) => {
+const InductionMotorCrossSection = ({
+  slip: slipProp,
+  poles: polesProp,
+  freq: freqProp,
+}) => {
+  // props가 undefined면 내부 state로 관리
+  const isStandalone =
+    slipProp === undefined || polesProp === undefined || freqProp === undefined;
+
+  const [internalSlip, setInternalSlip] = useState(0.05);
+  const [internalPoles, setInternalPoles] = useState(4);
+  const [internalFreq, setInternalFreq] = useState(60);
+
+  const slip = isStandalone ? internalSlip : Number(slipProp) || 0.05;
+  const poles = isStandalone ? internalPoles : Number(polesProp) || 4;
+  const freq = isStandalone ? internalFreq : Number(freqProp) || 60;
+
   const rotorRef = useRef(null);
   const fieldRef = useRef(null);
 
   useEffect(() => {
     if (!rotorRef.current || !fieldRef.current) return;
-
-    // 동기속도 기준 주기 계산 (초)
     const syncRpm = (120 * freq) / poles;
-    const syncPeriodSec = 60 / syncRpm; // 1회전 주기(초)
+    const syncPeriodSec = 60 / syncRpm;
     const rotorPeriodSec = slip < 0.999 ? syncPeriodSec / (1 - slip) : 9999;
 
-    // CSS animation-duration 동적 적용
     fieldRef.current.style.animationDuration = syncPeriodSec.toFixed(3) + "s";
     rotorRef.current.style.animationDuration =
       Math.min(rotorPeriodSec, 120).toFixed(3) + "s";
   }, [slip, poles, freq]);
 
-  // 고정자 코일: 3상(U/V/W) × 극수쌍 개수만큼 배치
+  const syncRpm = (120 * freq) / poles;
+  const rotorRpm = Math.round(syncRpm * (1 - slip));
+
+  // 고정자 코일 슬롯
   const coilColors = ["#ef4444", "#22c55e", "#3b82f6"];
-  const poleCount = poles;
   const coilSlots = [];
-  for (let i = 0; i < poleCount * 3; i++) {
-    const angle = (360 / (poleCount * 3)) * i;
+  for (let i = 0; i < poles * 3; i++) {
+    const angle = (360 / (poles * 3)) * i;
     const rad = (angle * Math.PI) / 180;
-    const r = 148;
-    const cx = 230 + r * Math.sin(rad);
-    const cy = 230 - r * Math.cos(rad);
     coilSlots.push({
-      cx,
-      cy,
+      cx: 230 + 148 * Math.sin(rad),
+      cy: 230 - 148 * Math.cos(rad),
       color: coilColors[i % 3],
       opacity: i % 2 === 0 ? 0.85 : 0.4,
     });
   }
 
-  // 회전자 바: 8개 고정
+  // 회전자 바 8개
   const rotorBars = Array.from({ length: 8 }, (_, i) => ({
     angle: (360 / 8) * i,
   }));
 
-  // NS 자극: 극수만큼 배치
+  // N/S 자극
   const nsPoles = Array.from({ length: poles }, (_, i) => ({
     angle: (360 / poles) * i,
     isN: i % 2 === 0,
@@ -89,6 +103,119 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
         유도전동기 단면 구조 (Cross-section View)
       </h3>
 
+      {/* ── 단독 사용 시: 내부 제어 UI ── */}
+      {isStandalone && (
+        <div
+          style={{
+            display: "flex",
+            gap: "20px",
+            flexWrap: "wrap",
+            marginBottom: "16px",
+            padding: "12px 16px",
+            background: "#f8fafc",
+            borderRadius: "6px",
+            border: "1px solid #e2e8f0",
+            fontSize: "13px",
+          }}
+        >
+          <div style={{ flex: "1 1 200px" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "4px",
+              }}
+            >
+              슬립 (s): {internalSlip.toFixed(3)}
+            </label>
+            <input
+              type="range"
+              min="0.001"
+              max="1"
+              step="0.001"
+              value={internalSlip}
+              onChange={(e) => setInternalSlip(Number(e.target.value))}
+              style={{ width: "100%" }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "11px",
+                color: "#94a3b8",
+              }}
+            >
+              <span>동기속도 (s=0)</span>
+              <span>정지 (s=1)</span>
+            </div>
+          </div>
+
+          <div style={{ flex: "0 1 120px" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "4px",
+              }}
+            >
+              극수 (P)
+            </label>
+            <select
+              value={internalPoles}
+              onChange={(e) => setInternalPoles(Number(e.target.value))}
+              style={{ width: "100%", padding: "4px" }}
+            >
+              {[2, 4, 6, 8].map((p) => (
+                <option key={p} value={p}>
+                  {p}극
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ flex: "0 1 120px" }}>
+            <label
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "4px",
+              }}
+            >
+              주파수 (f)
+            </label>
+            <select
+              value={internalFreq}
+              onChange={(e) => setInternalFreq(Number(e.target.value))}
+              style={{ width: "100%", padding: "4px" }}
+            >
+              <option value={60}>60 Hz</option>
+              <option value={50}>50 Hz</option>
+            </select>
+          </div>
+
+          <div
+            style={{
+              flex: "0 1 160px",
+              padding: "8px 12px",
+              background: "#f0f9ff",
+              borderRadius: "6px",
+              color: "#0369a1",
+              lineHeight: "1.8",
+            }}
+          >
+            <div>
+              동기속도: <strong>{syncRpm} RPM</strong>
+            </div>
+            <div>
+              회전수: <strong>{rotorRpm} RPM</strong>
+            </div>
+            <div>
+              슬립주파수: <strong>{(slip * freq).toFixed(2)} Hz</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -97,7 +224,7 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
           alignItems: "flex-start",
         }}
       >
-        {/* SVG 단면도 */}
+        {/* ── SVG 단면도 ── */}
         <svg
           width="460"
           height="460"
@@ -116,7 +243,7 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
             </radialGradient>
           </defs>
 
-          {/* ── 외부 프레임 ── */}
+          {/* 외부 프레임 */}
           <circle
             cx="230"
             cy="230"
@@ -136,7 +263,7 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
             opacity="0.5"
           />
 
-          {/* ── 고정자 코일 슬롯 ── */}
+          {/* 고정자 코일 슬롯 */}
           {coilSlots.map((c, i) => (
             <circle
               key={i}
@@ -148,20 +275,17 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
             />
           ))}
 
-          {/* ── 자기장 회전 그룹 ── */}
+          {/* 자기장 회전 그룹 */}
           <g className="imcs-field" ref={fieldRef}>
-            {/* 자속선: 극수 방향으로 */}
             {nsPoles.map((p, i) => {
               const rad = (p.angle * Math.PI) / 180;
-              const x2 = 230 + 155 * Math.sin(rad);
-              const y2 = 230 - 155 * Math.cos(rad);
               return (
                 <line
                   key={i}
                   x1="230"
                   y1="230"
-                  x2={x2.toFixed(1)}
-                  y2={y2.toFixed(1)}
+                  x2={(230 + 155 * Math.sin(rad)).toFixed(1)}
+                  y2={(230 - 155 * Math.cos(rad)).toFixed(1)}
                   stroke="#3b82f6"
                   strokeWidth="2"
                   strokeDasharray="6 4"
@@ -169,12 +293,10 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
                 />
               );
             })}
-            {/* N/S 자극 표시 */}
             {nsPoles.map((p, i) => {
               const rad = (p.angle * Math.PI) / 180;
-              const r = 170;
-              const px = 230 + r * Math.sin(rad);
-              const py = 230 - r * Math.cos(rad);
+              const px = 230 + 170 * Math.sin(rad);
+              const py = 230 - 170 * Math.cos(rad);
               return (
                 <g key={i}>
                   <circle
@@ -186,7 +308,7 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
                   />
                   <text
                     x={px.toFixed(1)}
-                    y={(+py + 5).toFixed(1)}
+                    y={(py + 5).toFixed(1)}
                     textAnchor="middle"
                     fontSize="13"
                     fontWeight="600"
@@ -199,7 +321,7 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
             })}
           </g>
 
-          {/* ── 에어갭 ── */}
+          {/* 에어갭 */}
           <circle
             cx="230"
             cy="230"
@@ -211,9 +333,8 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
             strokeDasharray="3 3"
           />
 
-          {/* ── 회전자 그룹 ── */}
+          {/* 회전자 그룹 */}
           <g className="imcs-rotor" ref={rotorRef}>
-            {/* 회전자 본체 */}
             <circle
               cx="230"
               cy="230"
@@ -223,8 +344,6 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
               strokeWidth="1.5"
               opacity="0.6"
             />
-
-            {/* 엔드링 */}
             <circle
               cx="230"
               cy="230"
@@ -243,8 +362,6 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
               strokeWidth="5"
               opacity="0.5"
             />
-
-            {/* 회전자 바 (농형) */}
             {rotorBars.map((bar, i) => {
               const rad = (bar.angle * Math.PI) / 180;
               const bx = 230 + 122 * Math.sin(rad) - 6;
@@ -263,8 +380,6 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
                 />
               );
             })}
-
-            {/* 회전축 */}
             <circle
               cx="230"
               cy="230"
@@ -275,15 +390,13 @@ const InductionMotorCrossSection = ({ slip, poles, freq }) => {
               opacity="0.85"
             />
             <circle cx="230" cy="230" r="9" fill="#94a3b8" />
-            {/* 키 홈 */}
             <rect x="226" y="207" width="8" height="14" rx="2" fill="#475569" />
           </g>
 
-          {/* ── 범례 레이블 ── */}
+          {/* 범례 */}
           <text x="230" y="22" textAnchor="middle" fontSize="12" fill="#64748b">
             고정자 (Stator)
           </text>
-
           <circle cx="360" cy="340" r="8" fill="#ef4444" opacity="0.85" />
           <text x="374" y="345" fontSize="11" fill="#64748b">
             U상
