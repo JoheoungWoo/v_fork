@@ -11,7 +11,7 @@ import VideoCategoryTabs from "./VideoCategoryTabs";
 
 // 🌟 DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
 const getCategory = (video) => {
-  console.log("video:", video);
+  // console.log("video:", video);
   // 🌟 [핵심 방어막] video 객체 자체가 없으면 에러 내지 말고 "기타" 반환!
   if (!video) return "기타";
 
@@ -19,36 +19,18 @@ const getCategory = (video) => {
   const subject = video.subject || "";
   const idStr = String(video.lecture_id || video.id || "").toLowerCase();
 
-  if (
-    subject.includes("수학") ||
-    idStr.includes("math") ||
-    idStr.includes("derivative") ||
-    idStr.includes("square") ||
-    idStr.includes("trig") ||
-    idStr.includes("vector") ||
-    idStr.includes("parabola") ||
-    idStr.includes("intersection")
-  )
-    return "기초 수학";
-
-  if (
-    subject.includes("회로") ||
-    idStr.includes("circuit") ||
-    idStr.includes("ohm") ||
-    idStr.includes("voltage") ||
-    idStr.includes("reactance")
-  )
-    return "회로이론";
-
+  // 🌟 1. 전자기학 (우선순위 최상단으로 이동: vector_calculus 방어)
   if (
     subject.includes("전자기") ||
     idStr.includes("em_") ||
     idStr.includes("coulomb") ||
     idStr.includes("ampere") ||
-    idStr.includes("poten")
+    idStr.includes("poten") ||
+    idStr.includes("vector_calculus") // 전자기학 벡터 미적분
   )
     return "전자기학";
-  // 🌟 전기기기 분류 로직 추가
+
+  // 🌟 2. 전기기기
   if (
     subject.includes("기기") ||
     idStr.includes("motor") ||
@@ -58,6 +40,18 @@ const getCategory = (video) => {
     idStr.includes("transformer")
   )
     return "전기기기";
+
+  // 🌟 3. 회로이론
+  if (
+    subject.includes("회로") ||
+    idStr.includes("circuit") ||
+    idStr.includes("ohm") ||
+    idStr.includes("voltage") ||
+    idStr.includes("reactance")
+  )
+    return "회로이론";
+
+  // 🌟 4. 제어공학
   if (
     subject.includes("제어") ||
     idStr.includes("control") ||
@@ -67,6 +61,21 @@ const getCategory = (video) => {
   )
     return "제어공학";
 
+  // 🌟 5. 기초 수학 (전자기학/회로 등에서 안 걸러진 나머지 일반 수학)
+  if (
+    subject.includes("수학") ||
+    idStr.includes("math") ||
+    idStr.includes("derivative") ||
+    idStr.includes("square") ||
+    idStr.includes("trig") ||
+    idStr.includes("vector") || // 일반 수학용 벡터
+    idStr.includes("parabola") ||
+    idStr.includes("intersection") ||
+    idStr.includes("calculus")
+  )
+    return "기초 수학";
+
+  // 🌟 6. Vision
   if (
     subject.includes("Vision") ||
     subject.includes("AI") ||
@@ -76,6 +85,7 @@ const getCategory = (video) => {
 
   return "기타"; // 매칭되지 않는 영상
 };
+
 export default function AiVideoList() {
   const { page, size, moveToList, moveToRead } = useCustomMove("/user/videos");
 
@@ -122,17 +132,6 @@ export default function AiVideoList() {
     // 🌟 특정 카테고리 탭: 필터링 후 lecture_id의 숫자 기준으로 오름차순 정렬
     const filtered = allLectures.filter((v) => v.category === activeTab);
 
-    // => lecture_id가 아니라 title을 기준으로 정렬
-
-    // return filtered.sort((a, b) => {
-    //   // lecture_id에서 앞의 숫자만 추출 (예: "13_vector" -> 13)
-    //   // 만약 숫자로 시작하지 않거나 lecture_id가 없으면 9999를 줘서 맨 뒤로 보냄
-    //   const numA = parseInt(a.lecture_id) || 9999;
-    //   const numB = parseInt(b.lecture_id) || 9999;
-
-    //   return numA - numB; // 숫자 기준 오름차순 (1, 2, 3...) 정렬
-    // });
-
     return filtered.sort((a, b) => {
       const getOrder = (title) => {
         const match = title.match(/^(\d+)\s*강/);
@@ -174,7 +173,7 @@ export default function AiVideoList() {
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-16 mt-8">
         {currentList.length > 0 ? (
           currentList.map((video) => {
-            console.log("video설명", video);
+            // console.log("video설명", video);
             return (
               <VideoCard
                 key={video.lecture_id}
