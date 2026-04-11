@@ -1,8 +1,8 @@
 import apiClient from "@/api/core/apiClient";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { CheckCircle2, Eye, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 // ==========================================
 // 💡 수식 렌더링 헬퍼 컴포넌트
@@ -46,7 +46,7 @@ const BlockMath = ({ math }) => {
   return (
     <div
       dangerouslySetInnerHTML={{ __html: html }}
-      className="overflow-x-auto flex justify-center w-full"
+      className="overflow-x-auto flex justify-center w-full my-2"
     />
   );
 };
@@ -94,59 +94,57 @@ const LocalQuizCard = (props) => {
   const [isCorrect, setIsCorrect] = useState(null);
   const [fetchError, setFetchError] = useState(false);
 
-  // 🌟 ID와 과목명 선언
   const targetId = String(
     props.id || props.conceptId || props.lecture_id || "",
   ).trim();
   const subjectName = String(props.subject || "").trim();
 
-  // 🌟 [핵심] 컴포넌트 최상단에서 한 번만 판별! (Fetch와 Record 모두에서 사용)
-  const isCircuitProblem = (() => {
-    if (subjectName) {
-      return (
-        subjectName.includes("회로") ||
-        subjectName.includes("전기") ||
-        subjectName.includes("기기") ||
-        subjectName.includes("전력") ||
-        subjectName.includes("설비")
-      );
-    }
+  // 🌟 과목 및 ID를 기반으로 전용 API 경로를 결정하는 로직
+  const getBaseEndpoint = useCallback(() => {
     const lowerId = targetId.toLowerCase();
-    const hasKeyword = ["circuit", "ohm", "elec", "ch", "lec", "part"].some(
-      (k) => lowerId.includes(k),
-    );
-    return hasKeyword || /^\d+$/.test(lowerId);
-  })();
+    const combinedStr = (subjectName + lowerId).toLowerCase();
 
-  // 🌟 데이터 정규화 로직 (렌더링 시 사용)
-  const correctIdx =
-    problemData?.correct_index !== undefined
-      ? problemData.correct_index
-      : problemData?.answer_index !== undefined
-        ? problemData.answer_index
-        : typeof problemData?.answer === "number"
-          ? problemData.answer
-          : null;
+    if (
+      combinedStr.includes("기기") ||
+      combinedStr.includes("motor") ||
+      combinedStr.includes("machine") ||
+      combinedStr.includes("induction")
+    ) {
+      return "/api/machine";
+    }
+    if (
+      combinedStr.includes("회로") ||
+      combinedStr.includes("전기") ||
+      combinedStr.includes("전력") ||
+      combinedStr.includes("설비") ||
+      combinedStr.includes("circuit") ||
+      combinedStr.includes("ohm")
+    ) {
+      return "/api/circuit";
+    }
+    return "/api/math";
+  }, [subjectName, targetId]);
 
+  // 데이터 정규화 변수들
   const choices = problemData?.choices || problemData?.options || [];
-
-  let normalizedSteps = [];
-  if (Array.isArray(problemData?.steps)) {
-    normalizedSteps = problemData.steps;
-  } else if (Array.isArray(problemData?.explanation)) {
-    normalizedSteps = problemData.explanation;
-  } else if (typeof problemData?.explanation === "string") {
-    normalizedSteps = [{ description: problemData.explanation }];
-  }
-
+  const correctIdx =
+    problemData?.correct_index ??
+    problemData?.answer_index ??
+    (typeof problemData?.answer === "number" ? problemData.answer : null);
   const problemText = normalizeLatexText(
     problemData?.problem_latex || problemData?.problem || problemData?.question,
   );
-
   const answerText =
     typeof problemData?.answer === "string"
       ? problemData.answer
       : problemData?.answer_latex || problemData?.correct_answer;
+
+  let normalizedSteps = [];
+  if (Array.isArray(problemData?.steps)) normalizedSteps = problemData.steps;
+  else if (Array.isArray(problemData?.explanation))
+    normalizedSteps = problemData.explanation;
+  else if (typeof problemData?.explanation === "string")
+    normalizedSteps = [{ description: problemData.explanation }];
 
   const handleFetchProblem = async () => {
     if (!targetId) return;
@@ -157,20 +155,16 @@ const LocalQuizCard = (props) => {
     setFetchError(false);
 
     try {
-      // 🌟 공통 판별 변수 사용
-      const endpoint = isCircuitProblem
-        ? "/api/circuit/random"
-        : "/api/math/random";
-      const res = await apiClient.get(`${endpoint}?type=${targetId}`);
+      const baseApi = getBaseEndpoint();
+      const res = await apiClient.get(`${baseApi}/random?type=${targetId}`);
 
-      if (!res.data || res.data.error || Object.keys(res.data).length === 0) {
+      if (!res.data || Object.keys(res.data).length === 0) {
         setFetchError(true);
-        setProblemData(null);
       } else {
         setProblemData(res.data);
       }
     } catch (e) {
-      console.error(e);
+      console.error("❌ 문제 로딩 실패:", e);
       setFetchError(true);
     } finally {
       setIsFetchingProblem(false);
@@ -190,152 +184,142 @@ const LocalQuizCard = (props) => {
     setShowSolution(true);
 
     try {
-      // 🌟 공통 판별 변수 사용 (기존에 있던 중복 로직 삭제)
-      const recordEndpoint = isCircuitProblem
-        ? "/api/circuit/record"
-        : "/api/math/record";
-
-      await apiClient.post(recordEndpoint, {
+      const baseApi = getBaseEndpoint();
+      await apiClient.post(`${baseApi}/record`, {
         concept_name: targetId,
         is_correct: correct,
-        chosen_answer: index !== null ? index : -1,
+        chosen_answer: index ?? -1,
         problem_latex: problemText,
       });
     } catch (error) {
-      console.error("결과 저장 실패", error);
+      console.error("❌ 결과 저장 실패:", error);
     }
   };
 
   const resolveImageSrc = (imgSrc) => {
     const src = String(imgSrc || "").trim();
-    if (!src || src === "null" || src === "None" || src.length < 20)
+    if (!src || src === "null" || src === "None" || src.length < 10)
       return null;
     if (src.startsWith("http") || src.startsWith("data:")) return src;
-    try {
-      const decodedStart = atob(src.substring(0, 50)).trim();
-      return decodedStart.startsWith("<svg") || decodedStart.startsWith("<?xml")
-        ? `data:image/svg+xml;base64,${src}`
-        : `data:image/png;base64,${src}`;
-    } catch (e) {
-      return src.startsWith("PHN2") || src.startsWith("PD94")
-        ? `data:image/svg+xml;base64,${src}`
-        : `data:image/png;base64,${src}`;
-    }
-  };
 
-  const renderImage = (imgSrc, altText) => {
-    const finalSrc = resolveImageSrc(imgSrc);
-    if (!finalSrc) return null;
-    return (
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-8 flex justify-center animate-fade-in">
-        <img
-          src={finalSrc}
-          alt={altText}
-          className="max-w-full h-auto rounded object-contain max-h-[400px]"
-        />
-      </div>
-    );
+    // Base64 데이터 처리
+    if (src.startsWith("PHN2") || src.includes("<svg"))
+      return `data:image/svg+xml;base64,${src}`;
+    return `data:image/png;base64,${src}`;
   };
 
   if (fetchError) {
     return (
-      <div className="p-8 text-center bg-red-50 rounded-xl border border-red-100 mt-8">
-        <p className="text-red-500 font-bold mb-4">
-          문제를 불러오지 못했습니다. (ID: {targetId})
+      <div className="p-10 text-center bg-red-50 rounded-2xl border border-red-100 mt-8">
+        <p className="text-red-500 font-bold text-lg mb-6">
+          문제를 생성할 수 없습니다. (ID: {targetId})
         </p>
         <button
           onClick={handleFetchProblem}
-          className="px-6 py-2 bg-white rounded shadow text-red-600 font-bold hover:bg-red-50 transition"
+          className="px-8 py-3 bg-white text-red-600 font-black rounded-xl shadow-sm hover:bg-red-50 transition-all border border-red-200"
         >
-          다시 시도
+          다시 시도하기
         </button>
       </div>
     );
   }
 
-  if (!problemData) {
+  if (!problemData && isFetchingProblem) {
     return (
-      <div className="p-8 text-center text-slate-500 mt-8 bg-slate-50 rounded-xl border border-slate-100">
-        문제를 불러오는 중입니다...
+      <div className="p-20 text-center flex flex-col items-center gap-4">
+        <Loader2 className="animate-spin text-[#0047a5]" size={48} />
+        <p className="text-slate-500 font-bold">
+          인공지능이 문제를 구성하고 있습니다...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="mt-8 text-center animate-fade-in">
-      <div className="mb-8">
+    <div className="mt-8 text-center max-w-4xl mx-auto">
+      <div className="mb-10">
         <button
           onClick={handleFetchProblem}
           disabled={isFetchingProblem}
-          className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md transition-all active:scale-[0.98] ${
+          className={`font-black text-xl py-5 px-12 rounded-2xl shadow-xl transition-all active:scale-95 ${
             isFetchingProblem
-              ? "bg-gray-400 text-white cursor-not-allowed animate-pulse"
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
               : "bg-[#0047a5] text-white hover:bg-blue-800"
           }`}
         >
-          {isFetchingProblem
-            ? "⏳ 문제를 만드는 중..."
-            : "🎯 랜덤 문제 가져오기"}
+          {isFetchingProblem ? "⏳ 생성 중..." : "🎯 새로운 문제 도전"}
         </button>
       </div>
 
-      <div className="mt-8 p-8 bg-blue-50/30 border border-gray-100 rounded-3xl shadow-xl text-left animate-fade-in">
-        <div className="flex items-center justify-between mb-8 border-b pb-4">
-          <h3 className="text-2xl font-black text-[#0047a5] flex items-center gap-2">
-            📝 실전 테스트
+      <div className="p-8 md:p-12 bg-white border border-gray-200 rounded-[2.5rem] shadow-2xl text-left">
+        <div className="flex items-center justify-between mb-10 border-b pb-6">
+          <h3 className="text-3xl font-black text-[#0047a5] tracking-tighter">
+            실전 TEST
           </h3>
-          {showSolution && choices.length > 0 && (
+          {showSolution && (
             <div
-              className={`flex items-center gap-2 font-black text-xl ${isCorrect ? "text-green-600" : "text-red-600"}`}
+              className={`flex items-center gap-2 font-black text-2xl ${isCorrect ? "text-green-600" : "text-red-600"}`}
             >
               {isCorrect ? (
                 <>
-                  <CheckCircle2 size={28} /> 정답입니다!
+                  <CheckCircle2 size={32} /> 정답!
                 </>
               ) : (
                 <>
-                  <XCircle size={28} /> 아쉬워요!
+                  <XCircle size={32} /> 오답
                 </>
               )}
             </div>
           )}
         </div>
 
-        {renderImage(
+        {/* 회로도 또는 그래프 이미지 출력 */}
+        {(problemData?.circuit_image ||
           problemData?.question_image ||
-            problemData?.graph_image ||
-            problemData?.circuit_image ||
-            problemData?.math_image,
-          "문제 이미지",
+          problemData?.graph_image) && (
+          <div className="bg-slate-50 p-8 rounded-3xl border border-dashed border-slate-200 mb-10 flex justify-center">
+            <img
+              src={resolveImageSrc(
+                problemData.circuit_image ||
+                  problemData.question_image ||
+                  problemData.graph_image,
+              )}
+              alt="문제 시각 자료"
+              className="max-w-full h-auto object-contain max-h-[450px] drop-shadow-md"
+            />
+          </div>
         )}
 
         {problemText && (
-          <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100 break-keep">
+          <div className="mb-12 text-2xl text-gray-800 font-bold leading-relaxed break-keep p-4 bg-blue-50/30 rounded-2xl">
             <AutoMathRenderer text={problemText} isBlock={false} />
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        <div className="grid grid-cols-1 gap-5 mb-12">
           {choices.map((choice, index) => {
             const isCorrectChoice = index === correctIdx;
-            let btnClass =
-              "p-6 text-left rounded-2xl border-2 transition-all flex items-center gap-4 group ";
-            let circleClass =
-              "w-10 h-10 flex items-center justify-center rounded-full font-black shrink-0 transition-colors ";
+            const isSelected = selectedIndex === index;
 
-            if (selectedIndex === index) {
-              btnClass += isCorrect
-                ? "border-green-500 bg-green-50"
-                : "border-red-500 bg-red-50";
-              circleClass += "bg-white text-gray-900";
+            let cardStyle =
+              "p-6 text-left rounded-3xl border-2 transition-all flex items-center gap-6 group relative ";
+            let numStyle =
+              "w-12 h-12 flex items-center justify-center rounded-2xl font-black text-xl shrink-0 transition-all ";
+
+            if (isSelected) {
+              cardStyle += isCorrect
+                ? "border-green-500 bg-green-50 shadow-green-100"
+                : "border-red-500 bg-red-50 shadow-red-100";
+              numStyle +=
+                "bg-white " + (isCorrect ? "text-green-600" : "text-red-600");
             } else if (showSolution && isCorrectChoice) {
-              btnClass += "border-green-500 bg-green-50";
-              circleClass += "bg-white text-gray-900";
+              cardStyle += "border-green-500 bg-green-50 animate-pulse";
+              numStyle += "bg-green-500 text-white";
             } else {
-              btnClass +=
-                "border-gray-200 bg-white hover:border-[#0047a5] hover:shadow-md";
-              circleClass +=
-                "bg-gray-100 text-gray-500 group-hover:bg-[#0047a5] group-hover:text-white";
+              cardStyle +=
+                "border-gray-100 bg-gray-50 hover:border-[#0047a5] hover:bg-white hover:shadow-xl";
+              numStyle +=
+                "bg-white text-gray-400 group-hover:text-[#0047a5] group-hover:shadow-inner";
             }
 
             return (
@@ -343,10 +327,10 @@ const LocalQuizCard = (props) => {
                 key={index}
                 onClick={() => handleChoiceClick(index)}
                 disabled={showSolution}
-                className={btnClass}
+                className={cardStyle}
               >
-                <span className={circleClass}>{index + 1}</span>
-                <span className="text-lg font-bold text-gray-800">
+                <span className={numStyle}>{index + 1}</span>
+                <span className="text-xl font-bold text-gray-700">
                   <AutoMathRenderer text={choice} isBlock={false} />
                 </span>
               </button>
@@ -355,43 +339,42 @@ const LocalQuizCard = (props) => {
         </div>
 
         {showSolution && (
-          <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-300 animate-slide-up">
-            <h4 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
-              💡 전문가의 상세 풀이
+          <div className="mt-16 pt-12 border-t-4 border-double border-gray-200 animate-slide-up">
+            <h4 className="text-3xl font-black text-gray-900 mb-8 tracking-tight">
+              💡 상세 풀이 과정
             </h4>
-            {normalizedSteps.length > 0 && (
-              <div className="space-y-4">
-                {normalizedSteps.map((step, idx) => (
-                  <div
-                    key={idx}
-                    className="flex gap-5 items-start bg-white p-6 rounded-2xl border border-gray-200 shadow-sm"
-                  >
-                    <span className="bg-[#e5edff] text-[#0047a5] font-black w-10 h-10 flex items-center justify-center rounded-xl shrink-0 mt-1">
-                      {idx + 1}
-                    </span>
-                    <div className="mt-1 w-full overflow-hidden">
-                      <div className="text-gray-700 font-bold mb-4 text-lg leading-relaxed break-keep">
-                        <AutoMathRenderer
-                          text={step.description || step.text || ""}
-                          isBlock={false}
-                        />
-                      </div>
-                      {(step.latex || step.math) && (
-                        <div className="bg-gray-50 py-4 px-6 rounded-xl border border-gray-100 overflow-x-auto">
-                          <BlockMath math={step.latex || step.math} />
-                        </div>
-                      )}
+            <div className="space-y-6">
+              {normalizedSteps.map((step, idx) => (
+                <div
+                  key={idx}
+                  className="flex gap-6 items-start bg-slate-50 p-8 rounded-[2rem] border border-gray-100 transition-hover hover:shadow-md"
+                >
+                  <span className="bg-[#0047a5] text-white font-black w-12 h-12 flex items-center justify-center rounded-2xl shrink-0">
+                    {idx + 1}
+                  </span>
+                  <div className="w-full">
+                    <div className="text-gray-700 font-bold text-xl leading-relaxed mb-4 break-keep">
+                      <AutoMathRenderer
+                        text={step.description || step.text || ""}
+                        isBlock={false}
+                      />
                     </div>
+                    {(step.latex || step.math) && (
+                      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-inner">
+                        <BlockMath math={step.latex || step.math} />
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
+
             {answerText && (
-              <div className="mt-12 p-10 bg-gradient-to-r from-[#0047a5] to-blue-700 text-white rounded-3xl text-center shadow-2xl tracking-tight">
-                <p className="text-blue-200 text-sm font-black mb-3 uppercase tracking-widest opacity-90">
-                  최종 정답
+              <div className="mt-14 p-12 bg-[#0047a5] text-white rounded-[3rem] text-center shadow-[0_20px_50px_rgba(0,71,165,0.3)]">
+                <p className="text-blue-300 text-lg font-black mb-4 tracking-widest uppercase">
+                  Final Answer
                 </p>
-                <div className="text-4xl font-black overflow-x-auto drop-shadow-md">
+                <div className="text-5xl font-black">
                   <AutoMathRenderer text={answerText} />
                 </div>
               </div>
