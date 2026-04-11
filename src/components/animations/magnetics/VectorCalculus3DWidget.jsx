@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 // ==========================================
-// 1. 수학적 모델 정의 (여러 함수 선택 가능)
+// 1. 수학적 모델 정의 (평면 국한 회전장 추가)
 // ==========================================
 const MODELS = {
   gradient: {
@@ -56,11 +56,25 @@ const MODELS = {
     name: "회전 (Curl)",
     functions: [
       {
-        id: "rotation",
-        name: "강체 회전 (Solid Body)",
+        id: "localized_rotation", // 🌟 새로 추가된 평면 국한 모델
+        name: "평면 국한 회전 (2D Plane)",
+        funcStr: "A = [-y·exp(-z²), x·exp(-z²), 0]",
+        calcV: (x, y, z) => {
+          const attenuation = Math.exp(-(z * z)); // z가 0에서 멀어질수록 0에 가까워짐
+          return [-y * 0.5 * attenuation, x * 0.5 * attenuation, 0];
+        },
+        calcCurl: (x, y, z) => {
+          const att = Math.exp(-(z * z));
+          // z가 평면을 벗어나면 회전력(z성분)이 급격히 감소함
+          return [0, 0, 1 * att];
+        },
+      },
+      {
+        id: "cylinder_rotation",
+        name: "원통형 회전 (3D Cylinder)",
         funcStr: "A = [-y, x, 0]",
         calcV: (x, y, z) => [-y * 0.5, x * 0.5, 0],
-        calcCurl: (x, y, z) => [0, 0, 1],
+        calcCurl: (x, y, z) => [0, 0, 1], // z높이에 상관없이 일정한 회전력
       },
       {
         id: "vortex",
@@ -69,9 +83,10 @@ const MODELS = {
         calcV: (x, y, z) => {
           const r2 = x * x + y * y;
           if (r2 < 0.1) return [0, 0, 0]; // 특이점 방지
-          return [(-y / r2) * 2, (x / r2) * 2, 0];
+          const att = Math.exp(-(z * z));
+          return [(-y / r2) * 2 * att, (x / r2) * 2 * att, 0];
         },
-        calcCurl: (x, y, z) => [0, 0, 0], // 원점 제외하고 회전 없음
+        calcCurl: (x, y, z) => [0, 0, 0], // 원점 제외 회전 없음
       },
     ],
   },
@@ -89,14 +104,14 @@ const Arrow3D = ({
 }) => {
   const vecDir = new THREE.Vector3(...dir);
   const len = vecDir.length();
-  if (len < 0.01) return null; // 벡터가 너무 작으면 안 그림
+  if (len < 0.01) return null;
 
   vecDir.normalize();
   const quaternion = new THREE.Quaternion().setFromUnitVectors(
     new THREE.Vector3(0, 1, 0),
     vecDir,
   );
-  const actualLength = length * Math.min(len, 2); // 길이에 비례하되 최대 길이 제한
+  const actualLength = length * Math.min(len, 2);
 
   return (
     <group position={start} quaternion={quaternion}>
@@ -125,7 +140,7 @@ const ParametricSurface = ({ func }) => {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const y = pos.getY(i);
-      const z = func(x, y); // f(x,y) 값으로 높이 설정
+      const z = func(x, y);
       pos.setZ(i, z);
     }
     geo.computeVertexNormals();
@@ -157,12 +172,10 @@ const Probe = ({ mode, position, activeFunc }) => {
     const t = clock.getElapsedTime();
     if (mode === "divergence" && ref.current) {
       const divVal = activeFunc.calcDiv(x, y, z);
-      // 발산값에 따라 맥동의 크기와 속도 조절
       const scale = 1 + Math.sin(t * 5) * (divVal * 0.2);
       ref.current.scale.set(scale, scale, scale);
     } else if (mode === "curl" && ref.current) {
       const curlVal = activeFunc.calcCurl(x, y, z);
-      // z축 회전값 기준으로 패들휠 회전
       ref.current.rotation.z += curlVal[2] * 0.05;
     }
   });
@@ -172,8 +185,6 @@ const Probe = ({ mode, position, activeFunc }) => {
     const zPos = activeFunc.calcF(x, y);
     return (
       <group position={[x, zPos, -y]}>
-        {" "}
-        {/* Threejs 좌표계 맞춤 */}
         <mesh>
           <sphereGeometry args={[0.2, 16, 16]} />
           <meshStandardMaterial color="#fbbf24" />
@@ -246,11 +257,7 @@ const FieldVisualizer = ({ mode, activeFunc }) => {
     if (mode === "divergence" || mode === "curl") {
       for (let x = -4; x <= 4; x += step) {
         for (let y = -4; y <= 4; y += step) {
-          for (
-            let z = mode === "curl" ? 0 : -4;
-            z <= (mode === "curl" ? 0 : 4);
-            z += step
-          ) {
+          for (let z = -4; z <= 4; z += step) {
             if (x === 0 && y === 0 && z === 0) continue;
             const v = activeFunc.calcV(x, y, z);
             arr.push(
@@ -282,7 +289,6 @@ const FieldVisualizer = ({ mode, activeFunc }) => {
 // ==========================================
 export default function VectorCalculus3DWidget() {
   const [mode, setMode] = useState("gradient");
-  // 각 모드별로 선택된 함수 인덱스 저장
   const [funcIndexes, setFuncIndexes] = useState({
     gradient: 0,
     divergence: 0,
@@ -290,7 +296,7 @@ export default function VectorCalculus3DWidget() {
   });
 
   const [posX, setPosX] = useState(1);
-  const [posY, setPosY] = useState(1);
+  const [posY, setPosX_Y] = useState(1);
   const [posZ, setPosZ] = useState(0);
 
   const activeCategory = MODELS[mode];
@@ -338,7 +344,7 @@ export default function VectorCalculus3DWidget() {
                 </option>
               ))}
             </select>
-            <div className="mt-4 p-4 bg-blue-50 text-blue-900 font-mono text-center rounded-xl font-bold border border-blue-100">
+            <div className="mt-4 p-4 bg-blue-50 text-blue-900 font-mono text-center rounded-xl font-bold border border-blue-100 break-words">
               {activeFunc.funcStr}
             </div>
           </div>
@@ -376,7 +382,7 @@ export default function VectorCalculus3DWidget() {
                   max="4"
                   step="0.1"
                   value={posY}
-                  onChange={(e) => setPosY(parseFloat(e.target.value))}
+                  onChange={(e) => setPosX_Y(parseFloat(e.target.value))}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0047a5]"
                 />
               </div>
@@ -400,12 +406,16 @@ export default function VectorCalculus3DWidget() {
             </div>
 
             <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm text-gray-600 font-medium leading-relaxed">
-              {mode === "gradient" &&
-                "🔴 그래디언트는 스칼라 함수(곡면)가 가장 가파르게 변하는 '방향'을 가리키는 벡터입니다. 산을 오를 때 가장 가파른 길을 찾는 것과 같습니다."}
-              {mode === "divergence" &&
-                "🔵 구체가 커졌다 작아지는 것은 발산(Divergence)을 의미합니다. 원천(Source, +)에서는 밖으로 뿜어내고, 싱크(Sink, -)에서는 빨아들입니다."}
               {mode === "curl" &&
-                "🟢 초록색 바람개비는 벡터장의 회전(Curl)을 나타냅니다. 바람개비가 빨리 돌수록 그 지점의 소용돌이 치는 힘이 강함을 의미합니다."}
+                activeFunc.id === "localized_rotation" &&
+                "🟢 Z축 좌표를 0에서 멀어지게 조절해보세요. 평면을 벗어나면 벡터장의 세기가 급격히 줄어들며 바람개비가 멈추는 것을 볼 수 있습니다."}
+              {mode === "curl" &&
+                activeFunc.id !== "localized_rotation" &&
+                "🟢 초록색 바람개비는 벡터장의 회전(Curl)을 나타냅니다. 바람개비가 빨리 돌수록 소용돌이 치는 힘이 강함을 의미합니다."}
+              {mode === "gradient" &&
+                "🔴 그래디언트는 스칼라 함수(곡면)가 가장 가파르게 변하는 '방향'을 가리킵니다."}
+              {mode === "divergence" &&
+                "🔵 구체가 커졌다 작아지는 것은 발산(Divergence)을 의미합니다."}
             </div>
           </div>
         </div>
@@ -422,7 +432,6 @@ export default function VectorCalculus3DWidget() {
             />
             <directionalLight position={[-10, -10, -10]} intensity={0.5} />
 
-            {/* 헬퍼 라인 */}
             <Grid
               args={[10, 10]}
               position={[0, -0.01, 0]}
@@ -432,7 +441,6 @@ export default function VectorCalculus3DWidget() {
             />
             <axesHelper args={[5]} />
 
-            {/* 필드와 프로브 */}
             <FieldVisualizer mode={mode} activeFunc={activeFunc} />
             <Probe
               mode={mode}
