@@ -1,12 +1,12 @@
 import apiClient from "@/api/core/apiClient";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { CheckCircle2, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
-// ==========================================
-// 💡 수식 렌더링 헬퍼 컴포넌트
-// ==========================================
+// ──────────────────────────────────────────────────────────────────────────────
+// KaTeX 렌더러
+// ──────────────────────────────────────────────────────────────────────────────
 const normalizeLatexText = (text) => {
   if (!text) return "";
   const strText = String(text);
@@ -46,7 +46,7 @@ const BlockMath = ({ math }) => {
   return (
     <div
       dangerouslySetInnerHTML={{ __html: html }}
-      className="overflow-x-auto flex justify-center w-full my-2"
+      className="overflow-x-auto flex justify-center w-full"
     />
   );
 };
@@ -83,9 +83,158 @@ const AutoMathRenderer = ({ text, isBlock = true }) => {
   );
 };
 
-// ==========================================
-// 💡 메인 컴포넌트
-// ==========================================
+// ──────────────────────────────────────────────────────────────────────────────
+// 🌟 라우팅 판별 (한 곳에서만 관리)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * lecture_id → { endpoint, method, buildParams }
+ *
+ * 우선순위:
+ *  1. EM 전용 ID (4_vector_calculus 등) → /api/em/vector-calc/quiz  (POST)
+ *  2. 회로/전기 관련              → /api/circuit/random          (GET)
+ *  3. 나머지                      → /api/math/random             (GET)
+ */
+const EM_VECTOR_CALC_IDS = new Set(["4_vector_calculus"]);
+
+// 전자기학 과목 중 벡터미적분 외 추가될 경우 여기에 추가
+const EM_TOPIC_MAP = {
+  "4_vector_calculus": "random", // → VectorCalcQuizService.generate("random")
+};
+
+function resolveEndpoint(targetId, subjectName) {
+  // 1) EM 벡터미적분 계열
+  if (EM_VECTOR_CALC_IDS.has(targetId)) {
+    return {
+      type: "em_vector_calc",
+      topic: EM_TOPIC_MAP[targetId] ?? "random",
+    };
+  }
+
+  // 2) 회로/전기 계열
+  const isCircuit = (() => {
+    if (subjectName) {
+      return ["회로", "전기", "기기", "전력", "설비"].some((k) =>
+        subjectName.includes(k),
+      );
+    }
+    const lower = targetId.toLowerCase();
+    return (
+      ["circuit", "ohm", "elec", "ch", "lec", "part"].some((k) =>
+        lower.includes(k),
+      ) || /^\d+$/.test(lower)
+    );
+  })();
+  if (isCircuit) return { type: "circuit" };
+
+  // 3) 수학 기본
+  return { type: "math" };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 🌟 API 호출 (엔드포인트 분기)
+// ──────────────────────────────────────────────────────────────────────────────
+async function fetchProblem(targetId, subjectName) {
+  const route = resolveEndpoint(targetId, subjectName);
+
+  if (route.type === "em_vector_calc") {
+    // POST /api/em/vector-calc/quiz  { topic: "random" }
+    const res = await apiClient.post("/api/em/vector-calc/quiz", {
+      topic: route.topic,
+    });
+    return normalizeVectorCalcResponse(res.data);
+  }
+
+  if (route.type === "circuit") {
+    const res = await apiClient.get(`/api/circuit/random?type=${targetId}`);
+    return res.data;
+  }
+
+  // math (기본)
+  const res = await apiClient.get(`/api/math/random?type=${targetId}`);
+  return res.data;
+}
+
+async function recordAnswer(
+  targetId,
+  subjectName,
+  isCorrect,
+  chosenIdx,
+  problemText,
+) {
+  const route = resolveEndpoint(targetId, subjectName);
+
+  if (route.type === "em_vector_calc") {
+    // EM 퀴즈는 별도 record 엔드포인트 없으므로 math/record 재사용
+    // (필요 시 /api/em/vector-calc/record 엔드포인트 추가)
+    await apiClient.post("/api/math/record", {
+      concept_name: targetId,
+      is_correct: isCorrect,
+      chosen_answer: chosenIdx ?? -1,
+      problem_latex: problemText,
+    });
+    return;
+  }
+
+  const endpoint =
+    route.type === "circuit" ? "/api/circuit/record" : "/api/math/record";
+  await apiClient.post(endpoint, {
+    concept_name: targetId,
+    is_correct: isCorrect,
+    chosen_answer: chosenIdx ?? -1,
+    problem_latex: problemText,
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 🌟 벡터미적분 응답 → LocalQuizCard 공통 형식으로 정규화
+//
+// VectorCalcQuizService 반환:
+//   { topic, topic_label, formula_preview, question, options[4],
+//     answer(int), explanation(str), probe, field_id }
+//
+// LocalQuizCard 기대:
+//   { question / problem_latex,
+//     choices / options,
+//     correct_index / answer_index / answer(int),
+//     steps / explanation }
+// ──────────────────────────────────────────────────────────────────────────────
+function normalizeVectorCalcResponse(data) {
+  if (!data) return null;
+
+  // LocalQuizCard 가 읽는 모든 키를 채워줌
+  return {
+    // 문제 텍스트 (AutoMathRenderer 가 $ $ 처리)
+    question: data.question,
+    problem_latex: data.question,
+
+    // 보기 (기존 options 그대로 → choices 별칭도 추가)
+    options: data.options,
+    choices: data.options,
+
+    // 정답 인덱스 (세 가지 키 모두 채워서 어떤 코드도 읽을 수 있게)
+    answer: data.answer,
+    answer_index: data.answer,
+    correct_index: data.answer,
+
+    // 해설 → steps 배열 형식으로 변환
+    // explanation 이 개행 포함 문자열이면 단락별로 분리
+    steps: String(data.explanation || "")
+      .split("\n\n")
+      .filter(Boolean)
+      .map((para) => ({ description: para })),
+
+    explanation: data.explanation,
+
+    // 추가 메타 (렌더링에 선택적으로 활용)
+    topic_label: data.topic_label,
+    formula_preview: data.formula_preview,
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 메인 컴포넌트
+// ──────────────────────────────────────────────────────────────────────────────
 const LocalQuizCard = (props) => {
   const [problemData, setProblemData] = useState(null);
   const [isFetchingProblem, setIsFetchingProblem] = useState(false);
@@ -99,45 +248,17 @@ const LocalQuizCard = (props) => {
   ).trim();
   const subjectName = String(props.subject || "").trim();
 
-  // 🌟 과목 및 ID를 기반으로 전용 API 경로를 결정하는 로직
-  const getBaseEndpoint = useCallback(() => {
-    const lowerId = targetId.toLowerCase();
-    const combinedStr = (subjectName + lowerId).toLowerCase();
-
-    if (
-      combinedStr.includes("기기") ||
-      combinedStr.includes("motor") ||
-      combinedStr.includes("machine") ||
-      combinedStr.includes("induction")
-    ) {
-      return "/api/machine";
-    }
-    if (
-      combinedStr.includes("회로") ||
-      combinedStr.includes("전기") ||
-      combinedStr.includes("전력") ||
-      combinedStr.includes("설비") ||
-      combinedStr.includes("circuit") ||
-      combinedStr.includes("ohm")
-    ) {
-      return "/api/circuit";
-    }
-    return "/api/math";
-  }, [subjectName, targetId]);
-
-  // 데이터 정규화 변수들
-  const choices = problemData?.choices || problemData?.options || [];
+  // 정규화된 필드 추출
   const correctIdx =
-    problemData?.correct_index ??
-    problemData?.answer_index ??
-    (typeof problemData?.answer === "number" ? problemData.answer : null);
-  const problemText = normalizeLatexText(
-    problemData?.problem_latex || problemData?.problem || problemData?.question,
-  );
-  const answerText =
-    typeof problemData?.answer === "string"
-      ? problemData.answer
-      : problemData?.answer_latex || problemData?.correct_answer;
+    problemData?.correct_index !== undefined
+      ? problemData.correct_index
+      : problemData?.answer_index !== undefined
+        ? problemData.answer_index
+        : typeof problemData?.answer === "number"
+          ? problemData.answer
+          : null;
+
+  const choices = problemData?.choices || problemData?.options || [];
 
   let normalizedSteps = [];
   if (Array.isArray(problemData?.steps)) normalizedSteps = problemData.steps;
@@ -146,6 +267,16 @@ const LocalQuizCard = (props) => {
   else if (typeof problemData?.explanation === "string")
     normalizedSteps = [{ description: problemData.explanation }];
 
+  const problemText = normalizeLatexText(
+    problemData?.problem_latex || problemData?.problem || problemData?.question,
+  );
+
+  const answerText =
+    typeof problemData?.answer === "string"
+      ? problemData.answer
+      : problemData?.answer_latex || problemData?.correct_answer;
+
+  // ── 문제 불러오기 ────────────────────────────────────────────────────────────
   const handleFetchProblem = async () => {
     if (!targetId) return;
     setIsFetchingProblem(true);
@@ -155,16 +286,15 @@ const LocalQuizCard = (props) => {
     setFetchError(false);
 
     try {
-      const baseApi = getBaseEndpoint();
-      const res = await apiClient.get(`${baseApi}/random?type=${targetId}`);
-
-      if (!res.data || Object.keys(res.data).length === 0) {
+      const data = await fetchProblem(targetId, subjectName);
+      if (!data || data.error || Object.keys(data).length === 0) {
         setFetchError(true);
+        setProblemData(null);
       } else {
-        setProblemData(res.data);
+        setProblemData(data);
       }
     } catch (e) {
-      console.error("❌ 문제 로딩 실패:", e);
+      console.error("문제 불러오기 실패:", e);
       setFetchError(true);
     } finally {
       setIsFetchingProblem(false);
@@ -175,151 +305,168 @@ const LocalQuizCard = (props) => {
     handleFetchProblem();
   }, [targetId]);
 
+  // ── 보기 선택 ────────────────────────────────────────────────────────────────
   const handleChoiceClick = async (index) => {
     if (showSolution || !problemData) return;
-
     const correct = index === correctIdx;
     setSelectedIndex(index);
     setIsCorrect(correct);
     setShowSolution(true);
-
     try {
-      const baseApi = getBaseEndpoint();
-      await apiClient.post(`${baseApi}/record`, {
-        concept_name: targetId,
-        is_correct: correct,
-        chosen_answer: index ?? -1,
-        problem_latex: problemText,
-      });
-    } catch (error) {
-      console.error("❌ 결과 저장 실패:", error);
+      await recordAnswer(targetId, subjectName, correct, index, problemText);
+    } catch (e) {
+      console.error("결과 저장 실패:", e);
     }
   };
 
+  // ── 이미지 헬퍼 ─────────────────────────────────────────────────────────────
   const resolveImageSrc = (imgSrc) => {
     const src = String(imgSrc || "").trim();
-    if (!src || src === "null" || src === "None" || src.length < 10)
+    if (!src || src === "null" || src === "None" || src.length < 20)
       return null;
     if (src.startsWith("http") || src.startsWith("data:")) return src;
-
-    // Base64 데이터 처리
-    if (src.startsWith("PHN2") || src.includes("<svg"))
-      return `data:image/svg+xml;base64,${src}`;
-    return `data:image/png;base64,${src}`;
+    try {
+      const decodedStart = atob(src.substring(0, 50)).trim();
+      return decodedStart.startsWith("<svg") || decodedStart.startsWith("<?xml")
+        ? `data:image/svg+xml;base64,${src}`
+        : `data:image/png;base64,${src}`;
+    } catch {
+      return src.startsWith("PHN2") || src.startsWith("PD94")
+        ? `data:image/svg+xml;base64,${src}`
+        : `data:image/png;base64,${src}`;
+    }
   };
 
+  const renderImage = (imgSrc, altText) => {
+    const finalSrc = resolveImageSrc(imgSrc);
+    if (!finalSrc) return null;
+    return (
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-8 flex justify-center animate-fade-in">
+        <img
+          src={finalSrc}
+          alt={altText}
+          className="max-w-full h-auto rounded object-contain max-h-[400px]"
+        />
+      </div>
+    );
+  };
+
+  // ── 렌더링 ──────────────────────────────────────────────────────────────────
   if (fetchError) {
     return (
-      <div className="p-10 text-center bg-red-50 rounded-2xl border border-red-100 mt-8">
-        <p className="text-red-500 font-bold text-lg mb-6">
-          문제를 생성할 수 없습니다. (ID: {targetId})
+      <div className="p-8 text-center bg-red-50 rounded-xl border border-red-100 mt-8">
+        <p className="text-red-500 font-bold mb-4">
+          문제를 불러오지 못했습니다. (ID: {targetId})
         </p>
         <button
           onClick={handleFetchProblem}
-          className="px-8 py-3 bg-white text-red-600 font-black rounded-xl shadow-sm hover:bg-red-50 transition-all border border-red-200"
+          className="px-6 py-2 bg-white rounded shadow text-red-600 font-bold hover:bg-red-50 transition"
         >
-          다시 시도하기
+          다시 시도
         </button>
       </div>
     );
   }
 
-  if (!problemData && isFetchingProblem) {
+  if (!problemData) {
     return (
-      <div className="p-20 text-center flex flex-col items-center gap-4">
-        <Loader2 className="animate-spin text-[#0047a5]" size={48} />
-        <p className="text-slate-500 font-bold">
-          인공지능이 문제를 구성하고 있습니다...
-        </p>
+      <div className="p-8 text-center text-slate-500 mt-8 bg-slate-50 rounded-xl border border-slate-100">
+        문제를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="mt-8 text-center max-w-4xl mx-auto">
-      <div className="mb-10">
+    <div className="mt-8 text-center animate-fade-in">
+      {/* ── 새 문제 버튼 ─────────────────────────────────────────────────────── */}
+      <div className="mb-8">
         <button
           onClick={handleFetchProblem}
           disabled={isFetchingProblem}
-          className={`font-black text-xl py-5 px-12 rounded-2xl shadow-xl transition-all active:scale-95 ${
+          className={`font-bold text-lg py-4 px-10 rounded-xl shadow-md transition-all active:scale-[0.98] ${
             isFetchingProblem
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-gray-400 text-white cursor-not-allowed animate-pulse"
               : "bg-[#0047a5] text-white hover:bg-blue-800"
           }`}
         >
-          {isFetchingProblem ? "⏳ 생성 중..." : "🎯 새로운 문제 도전"}
+          {isFetchingProblem ? "⏳ 문제를 만드는 중..." : "🎯 새로운 문제 도전"}
         </button>
       </div>
 
-      <div className="p-8 md:p-12 bg-white border border-gray-200 rounded-[2.5rem] shadow-2xl text-left">
-        <div className="flex items-center justify-between mb-10 border-b pb-6">
-          <h3 className="text-3xl font-black text-[#0047a5] tracking-tighter">
-            실전 TEST
-          </h3>
-          {showSolution && (
+      {/* ── 문제 카드 ────────────────────────────────────────────────────────── */}
+      <div className="mt-8 p-8 bg-blue-50/30 border border-gray-100 rounded-3xl shadow-xl text-left animate-fade-in">
+        <div className="flex items-center justify-between mb-8 border-b pb-4">
+          <div>
+            <h3 className="text-2xl font-black text-[#0047a5] flex items-center gap-2">
+              📝 실전 TEST
+            </h3>
+            {/* 🌟 벡터미적분 토픽 뱃지 */}
+            {problemData.topic_label && (
+              <span className="mt-1 inline-block text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">
+                {problemData.topic_label}
+              </span>
+            )}
+          </div>
+          {showSolution && choices.length > 0 && (
             <div
-              className={`flex items-center gap-2 font-black text-2xl ${isCorrect ? "text-green-600" : "text-red-600"}`}
+              className={`flex items-center gap-2 font-black text-xl ${isCorrect ? "text-green-600" : "text-red-600"}`}
             >
               {isCorrect ? (
                 <>
-                  <CheckCircle2 size={32} /> 정답!
+                  <CheckCircle2 size={28} /> 정답입니다!
                 </>
               ) : (
                 <>
-                  <XCircle size={32} /> 오답
+                  <XCircle size={28} /> 아쉬워요!
                 </>
               )}
             </div>
           )}
         </div>
 
-        {/* 회로도 또는 그래프 이미지 출력 */}
-        {(problemData?.circuit_image ||
+        {renderImage(
           problemData?.question_image ||
-          problemData?.graph_image) && (
-          <div className="bg-slate-50 p-8 rounded-3xl border border-dashed border-slate-200 mb-10 flex justify-center">
-            <img
-              src={resolveImageSrc(
-                problemData.circuit_image ||
-                  problemData.question_image ||
-                  problemData.graph_image,
-              )}
-              alt="문제 시각 자료"
-              className="max-w-full h-auto object-contain max-h-[450px] drop-shadow-md"
-            />
+            problemData?.graph_image ||
+            problemData?.circuit_image ||
+            problemData?.math_image,
+          "문제 이미지",
+        )}
+
+        {/* 수식 미리보기 (벡터미적분 전용) */}
+        {problemData.formula_preview && (
+          <div className="mb-4 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 text-sm font-mono text-gray-500 text-center">
+            {problemData.formula_preview}
           </div>
         )}
 
         {problemText && (
-          <div className="mb-12 text-2xl text-gray-800 font-bold leading-relaxed break-keep p-4 bg-blue-50/30 rounded-2xl">
+          <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100 break-keep">
             <AutoMathRenderer text={problemText} isBlock={false} />
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-5 mb-12">
+        {/* ── 보기 ──────────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
           {choices.map((choice, index) => {
             const isCorrectChoice = index === correctIdx;
-            const isSelected = selectedIndex === index;
+            let btnClass =
+              "p-6 text-left rounded-2xl border-2 transition-all flex items-center gap-4 group ";
+            let circleClass =
+              "w-10 h-10 flex items-center justify-center rounded-full font-black shrink-0 transition-colors ";
 
-            let cardStyle =
-              "p-6 text-left rounded-3xl border-2 transition-all flex items-center gap-6 group relative ";
-            let numStyle =
-              "w-12 h-12 flex items-center justify-center rounded-2xl font-black text-xl shrink-0 transition-all ";
-
-            if (isSelected) {
-              cardStyle += isCorrect
-                ? "border-green-500 bg-green-50 shadow-green-100"
-                : "border-red-500 bg-red-50 shadow-red-100";
-              numStyle +=
-                "bg-white " + (isCorrect ? "text-green-600" : "text-red-600");
+            if (selectedIndex === index) {
+              btnClass += isCorrect
+                ? "border-green-500 bg-green-50"
+                : "border-red-500 bg-red-50";
+              circleClass += "bg-white text-gray-900";
             } else if (showSolution && isCorrectChoice) {
-              cardStyle += "border-green-500 bg-green-50 animate-pulse";
-              numStyle += "bg-green-500 text-white";
+              btnClass += "border-green-500 bg-green-50";
+              circleClass += "bg-white text-gray-900";
             } else {
-              cardStyle +=
-                "border-gray-100 bg-gray-50 hover:border-[#0047a5] hover:bg-white hover:shadow-xl";
-              numStyle +=
-                "bg-white text-gray-400 group-hover:text-[#0047a5] group-hover:shadow-inner";
+              btnClass +=
+                "border-gray-200 bg-white hover:border-[#0047a5] hover:shadow-md";
+              circleClass +=
+                "bg-gray-100 text-gray-500 group-hover:bg-[#0047a5] group-hover:text-white";
             }
 
             return (
@@ -327,10 +474,10 @@ const LocalQuizCard = (props) => {
                 key={index}
                 onClick={() => handleChoiceClick(index)}
                 disabled={showSolution}
-                className={cardStyle}
+                className={btnClass}
               >
-                <span className={numStyle}>{index + 1}</span>
-                <span className="text-xl font-bold text-gray-700">
+                <span className={circleClass}>{index + 1}</span>
+                <span className="text-lg font-bold text-gray-800">
                   <AutoMathRenderer text={choice} isBlock={false} />
                 </span>
               </button>
@@ -338,43 +485,45 @@ const LocalQuizCard = (props) => {
           })}
         </div>
 
+        {/* ── 해설 ──────────────────────────────────────────────────────────── */}
         {showSolution && (
-          <div className="mt-16 pt-12 border-t-4 border-double border-gray-200 animate-slide-up">
-            <h4 className="text-3xl font-black text-gray-900 mb-8 tracking-tight">
-              💡 상세 풀이 과정
+          <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-300 animate-slide-up">
+            <h4 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
+              💡 전문가의 상세 풀이
             </h4>
-            <div className="space-y-6">
-              {normalizedSteps.map((step, idx) => (
-                <div
-                  key={idx}
-                  className="flex gap-6 items-start bg-slate-50 p-8 rounded-[2rem] border border-gray-100 transition-hover hover:shadow-md"
-                >
-                  <span className="bg-[#0047a5] text-white font-black w-12 h-12 flex items-center justify-center rounded-2xl shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div className="w-full">
-                    <div className="text-gray-700 font-bold text-xl leading-relaxed mb-4 break-keep">
-                      <AutoMathRenderer
-                        text={step.description || step.text || ""}
-                        isBlock={false}
-                      />
-                    </div>
-                    {(step.latex || step.math) && (
-                      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-inner">
-                        <BlockMath math={step.latex || step.math} />
+            {normalizedSteps.length > 0 && (
+              <div className="space-y-4">
+                {normalizedSteps.map((step, idx) => (
+                  <div
+                    key={idx}
+                    className="flex gap-5 items-start bg-white p-6 rounded-2xl border border-gray-200 shadow-sm"
+                  >
+                    <span className="bg-[#e5edff] text-[#0047a5] font-black w-10 h-10 flex items-center justify-center rounded-xl shrink-0 mt-1">
+                      {idx + 1}
+                    </span>
+                    <div className="mt-1 w-full overflow-hidden">
+                      <div className="text-gray-700 font-bold mb-4 text-lg leading-relaxed break-keep">
+                        <AutoMathRenderer
+                          text={step.description || step.text || ""}
+                          isBlock={false}
+                        />
                       </div>
-                    )}
+                      {(step.latex || step.math) && (
+                        <div className="bg-gray-50 py-4 px-6 rounded-xl border border-gray-100 overflow-x-auto">
+                          <BlockMath math={step.latex || step.math} />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
+                ))}
+              </div>
+            )}
             {answerText && (
-              <div className="mt-14 p-12 bg-[#0047a5] text-white rounded-[3rem] text-center shadow-[0_20px_50px_rgba(0,71,165,0.3)]">
-                <p className="text-blue-300 text-lg font-black mb-4 tracking-widest uppercase">
-                  Final Answer
+              <div className="mt-12 p-10 bg-gradient-to-r from-[#0047a5] to-blue-700 text-white rounded-3xl text-center shadow-2xl">
+                <p className="text-blue-200 text-sm font-black mb-3 uppercase tracking-widest opacity-90">
+                  최종 정답
                 </p>
-                <div className="text-5xl font-black">
+                <div className="text-4xl font-black overflow-x-auto drop-shadow-md">
                   <AutoMathRenderer text={answerText} />
                 </div>
               </div>

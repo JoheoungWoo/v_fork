@@ -1,29 +1,29 @@
 // src/hooks/useVectorCalc.js
-import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  fetchVCFields,
-  computeGradient,
-  computeDivergence,
   computeCurl,
+  computeDivergence,
+  computeGradient,
   fetchFieldSamples,
   fetchSurfaceMesh,
+  fetchVCFields,
 } from "@/api/vectorCalcApi";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEBOUNCE_MS = 150;
 
 export function useVectorCalc() {
-  const [mode, setMode]           = useState("gradient");
+  const [mode, setMode] = useState("gradient");
   const [fieldLists, setFieldLists] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
-  const [probe, setProbe]           = useState({ x: 1.0, y: 1.0, z: 0.0 });
+  const [probe, setProbe] = useState({ x: 1.0, y: 1.0, z: 0.0 });
 
-  const [result, setResult]             = useState(null);
+  const [result, setResult] = useState(null);
   const [fieldSamples, setFieldSamples] = useState([]);
-  const [surfaceMesh, setSurfaceMesh]   = useState(null);
+  const [surfaceMesh, setSurfaceMesh] = useState(null);
 
-  const [loading, setLoading]               = useState(false);
+  const [loading, setLoading] = useState(false);
   const [samplesLoading, setSamplesLoading] = useState(false);
-  const [error, setError]                   = useState(null);
+  const [error, setError] = useState(null);
 
   const debounceRef = useRef(null);
 
@@ -46,7 +46,7 @@ export function useVectorCalc() {
       setSurfaceMesh(null);
       if (fieldLists) setSelectedId(fieldLists[newMode][0].id);
     },
-    [fieldLists]
+    [fieldLists],
   );
 
   const changeField = useCallback((id) => {
@@ -67,9 +67,19 @@ export function useVectorCalc() {
           if (curMode === "gradient") {
             res = await computeGradient(fieldId, newProbe.x, newProbe.y);
           } else if (curMode === "divergence") {
-            res = await computeDivergence(fieldId, newProbe.x, newProbe.y, newProbe.z);
+            res = await computeDivergence(
+              fieldId,
+              newProbe.x,
+              newProbe.y,
+              newProbe.z,
+            );
           } else {
-            res = await computeCurl(fieldId, newProbe.x, newProbe.y, newProbe.z);
+            res = await computeCurl(
+              fieldId,
+              newProbe.x,
+              newProbe.y,
+              newProbe.z,
+            );
           }
           setResult(res);
         } catch (e) {
@@ -79,7 +89,7 @@ export function useVectorCalc() {
         }
       }, DEBOUNCE_MS);
     },
-    [probe, selectedId, mode]
+    [probe, selectedId, mode],
   );
 
   // ── 탐색점 변경 ───────────────────────────────────────────────────────────
@@ -89,7 +99,7 @@ export function useVectorCalc() {
       setProbe(newProbe);
       runCalc(newProbe, selectedId, mode);
     },
-    [probe, selectedId, mode, runCalc]
+    [probe, selectedId, mode, runCalc],
   );
 
   // ── 필드/모드 변경 시 샘플 재로드 ─────────────────────────────────────────
@@ -111,18 +121,28 @@ export function useVectorCalc() {
     }
 
     runCalc(probe, selectedId, mode);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, mode]);
 
   const currentFieldMeta =
     fieldLists && selectedId
-      ? fieldLists[mode].find((f) => f.id === selectedId) ?? null
+      ? (fieldLists[mode].find((f) => f.id === selectedId) ?? null)
       : null;
 
   return {
-    mode, probe, result, fieldSamples, surfaceMesh,
-    loading, samplesLoading, error,
-    fieldLists, selectedId, currentFieldMeta,
-    changeMode, changeField, updateProbe,
+    mode,
+    probe,
+    result,
+    fieldSamples,
+    surfaceMesh,
+    loading,
+    samplesLoading,
+    error,
+    fieldLists,
+    selectedId,
+    currentFieldMeta,
+    changeMode,
+    changeField,
+    updateProbe,
   };
 }
