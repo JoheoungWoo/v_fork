@@ -1,5 +1,6 @@
 // src/components/animations/magnetics/VectorCalcQuiz.jsx
 import { generateVCQuiz } from "@/api/vectorCalcApi";
+import katex from "katex";
 import "katex/dist/katex.min.css";
 import {
   CheckCircle2,
@@ -13,8 +14,21 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { InlineMath } from "react-katex";
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 // ──────────────────────────────────────────────────────────────────────────────
 // 토픽 설정
 // ──────────────────────────────────────────────────────────────────────────────
