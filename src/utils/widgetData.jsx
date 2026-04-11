@@ -46,6 +46,11 @@ const WIDGET_MAP = {
   "3_ampere_law": [
     lazy(() => import("@/components/animations/AmpereLawWidget")),
   ],
+  "4_vector_calculus_basics": [
+    lazy(
+      () => import("@/components/animations/magnetics/VectorCalculusWidget"),
+    ),
+  ],
 
   // ==========================================
   // 📐 기초수학 (Basic Math)
