@@ -1,3 +1,5 @@
+import { Settings } from "lucide-react";
+
 /**
  * 카테고리 설정 데이터
  */
