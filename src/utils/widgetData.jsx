@@ -41,8 +41,9 @@ const WIDGET_MAP = {
     lazy(() => import("@/components/animations/CoulombsLaw3DPage")),
   ],
   "5_flemming_law": [
-    lazy(() => import("@/components/animations/magnetics/FlemmingWidget")),
-    lazy(() => import("@/components/leftHand/LeftHandViewer")), // 새로 추가된 부분
+    lazy(() => import("@/components/animations/magnetics/FlemingWidget")),
+    // GLB: `public/models/left_hand.glb` (Blender: scripts/blender_left_hand.py)
+    lazy(() => import("@/components/leftHand/LeftHandViewer")),
   ],
   "2_equipotential_3d": [
     lazy(() => import("@/components/animations/Equipotential3DWidget")),
