@@ -113,7 +113,7 @@ const WIDGET_MAP = {
   // ⚙️ 전기기기 (Electrical Machines)
   // ==========================================
   "1_induction_motor": [
-    lazy(() => import("@/components/animations/machines/Inductionmotorwidget")),
+    lazy(() => import("@/components/animations/machines/InductionMotorWidget")),
   ],
 };
 
