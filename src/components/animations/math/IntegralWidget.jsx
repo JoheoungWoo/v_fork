@@ -4,18 +4,32 @@ import "katex/dist/katex.min.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 // ─── 수식 렌더링 헬퍼 ───────────────────────────────────────────────────────
+// choice/step 가 객체일 수도 있으므로 항상 String() 캐스팅
+const toLatex = (val) => {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  // { description: "..." } 형태 대응
+  if (typeof val === "object")
+    return String(val.description ?? val.text ?? val.latex ?? "");
+  return String(val);
+};
+
 const InlineMath = ({ math }) => {
-  const html = katex.renderToString(math, {
+  const safe = toLatex(math).replace(/\$/g, "");
+  const html = katex.renderToString(safe, {
     throwOnError: false,
     displayMode: false,
+    strict: "ignore",
   });
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
 const BlockMath = ({ math }) => {
-  const html = katex.renderToString(math, {
+  const safe = toLatex(math).replace(/\$/g, "");
+  const html = katex.renderToString(safe, {
     throwOnError: false,
     displayMode: true,
+    strict: "ignore",
   });
   return <div dangerouslySetInnerHTML={{ __html: html }} />;
 };
@@ -364,7 +378,7 @@ const IntegralWidget = ({ quizData: quizDataProp }) => {
           {loading ? (
             <div style={styles.skeletonLine} />
           ) : (
-            <BlockMath math={data.problem_latex.replace(/\$/g, "")} />
+            <BlockMath math={toLatex(data.problem_latex)} />
           )}
         </div>
 
@@ -395,7 +409,7 @@ const IntegralWidget = ({ quizData: quizDataProp }) => {
                   onClick={() => handleAnswerClick(idx)}
                   style={{ ...styles.choiceBtn, border, background: bg }}
                 >
-                  <InlineMath math={choice.replace(/\$/g, "")} />
+                  <InlineMath math={toLatex(choice)} />
                 </button>
               );
             })}
@@ -409,7 +423,7 @@ const IntegralWidget = ({ quizData: quizDataProp }) => {
             {data.steps.map((step, idx) => (
               <div key={idx} style={styles.stepBox}>
                 <div style={styles.stepLabel}>Step {idx + 1}</div>
-                <BlockMath math={step.replace(/\$/g, "")} />
+                <BlockMath math={toLatex(step)} />
               </div>
             ))}
           </div>
