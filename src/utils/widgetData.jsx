@@ -140,6 +140,13 @@ const WIDGET_MAP = {
   "1_induction_motor": [
     lazy(() => import("@/components/animations/machines/InductionMotorWidget")),
   ],
+  /** Supabase: homopolar_motor — 말굽자석·도체 원판 회전(호모폴라·플레밍 연계 설명용) */
+  homopolar_motor: [
+    lazy(
+      () =>
+        import("@/components/animations/magnetics/HorseshoeMagnetDiskWidget"),
+    ),
+  ],
 };
 
 export default WIDGET_MAP;

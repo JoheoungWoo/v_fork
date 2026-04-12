@@ -63,6 +63,7 @@ const getCategory = (video) => {
   if (
     subject.includes("기기") ||
     idStr.includes("motor") ||
+    idStr.includes("homopolar") ||
     idStr.includes("machine") ||
     idStr.includes("induction") ||
     idStr.includes("generator") ||
@@ -115,6 +116,21 @@ const getCategory = (video) => {
   return "기타"; // 매칭되지 않는 영상
 };
 
+function sortVideosForList(list) {
+  return [...list].sort((a, b) => {
+    const getOrder = (title) => {
+      const m = (title || "").match(/^(\d+)\s*강/);
+      return m ? parseInt(m[1], 10) : 9999;
+    };
+    const oa = getOrder(a.title);
+    const ob = getOrder(b.title);
+    if (oa !== ob) return oa - ob;
+    const ta = new Date(a.created_at || 0).getTime();
+    const tb = new Date(b.created_at || 0).getTime();
+    return tb - ta;
+  });
+}
+
 export default function AiVideoList() {
   const { page, size, moveToList, moveToRead } = useCustomMove("/user/videos");
 
@@ -154,25 +170,22 @@ export default function AiVideoList() {
     fetchLectures();
   }, [activeTab]);
 
-  // 2. 현재 활성화된 탭(activeTab)에 따라 필터링 및 정렬
+  // 2. 탭별 목록 + 정렬
   const filteredVideos = useMemo(() => {
     if (!allLectures || allLectures.length === 0) return [];
 
     if (activeTab === "전체") {
-      return [...allLectures];
+      return sortVideosForList(allLectures);
     }
 
-    // 서버에서 subject로 내려준 경우 이미 한 과목만 있음 — 그래도 category로 한 번 더 맞춤
+    // API가 이미 ?subject= 로 과목을 걸러온 경우, 클라이언트 category 재필터에 걸리면
+    // (subject 문자열 미세 불일치 등) 행이 통째로 사라질 수 있음 → 그대로 신뢰
+    if (TAB_TO_DB_SUBJECT[activeTab]) {
+      return sortVideosForList(allLectures);
+    }
+
     const filtered = allLectures.filter((v) => v.category === activeTab);
-
-    return filtered.sort((a, b) => {
-      const getOrder = (title) => {
-        const match = title.match(/^(\d+)\s*강/);
-        return match ? parseInt(match[1], 10) : 9999;
-      };
-
-      return getOrder(a.title) - getOrder(b.title);
-    });
+    return sortVideosForList(filtered);
   }, [allLectures, activeTab]);
 
   // 3. 페이지네이션 범위 계산
