@@ -6,7 +6,7 @@ Command: npx gltfjsx@6.5.3 .\public\flemming.glb
 import { useAnimations, useGLTF } from "@react-three/drei";
 import React from "react";
 
-export function Flemming(props) {
+export default function Flemming(props) {
   const group = React.useRef();
   const { nodes, materials, animations } = useGLTF("/flemming.glb");
   const { actions } = useAnimations(animations, group);
