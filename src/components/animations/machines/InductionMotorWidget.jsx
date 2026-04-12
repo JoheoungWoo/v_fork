@@ -772,7 +772,7 @@ const DEFAULT_PARAMS = {
   xm: 40,
 };
 
-export default function InductionMotorWidget({
+export default function InductionMotorwidget({
   slip: slipProp,
   poles: polesProp,
   freq: freqProp,
