@@ -42,6 +42,7 @@ const WIDGET_MAP = {
   ],
   "5_flemming_law": [
     lazy(() => import("@/components/animations/magnetics/FlemmingWidget")),
+    lazy(() => import("@/components/leftHand/LeftHandViewer")), // 새로 추가된 부분
   ],
   "2_equipotential_3d": [
     lazy(() => import("@/components/animations/Equipotential3DWidget")),
