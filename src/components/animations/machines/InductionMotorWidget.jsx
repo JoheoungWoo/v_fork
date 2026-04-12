@@ -117,7 +117,8 @@ export default function InductionMotorWidget() {
         height: 520,
         borderRadius: 14,
         overflow: "hidden",
-        background: "linear-gradient(165deg, #0f172a 0%, #1e293b 55%, #0f172a 100%)",
+        background:
+          "linear-gradient(165deg, #0f172a 0%, #1e293b 55%, #0f172a 100%)",
         border: "1px solid rgba(51, 65, 85, 0.6)",
       }}
     >
@@ -152,16 +153,16 @@ export default function InductionMotorWidget() {
           운전 상태
         </div>
         <div>
-          동기 속도 (Nₛ): <strong style={{ color: "#f8fafc" }}>{Math.round(ns)}</strong>{" "}
-          RPM
+          동기 속도 (Nₛ):{" "}
+          <strong style={{ color: "#f8fafc" }}>{Math.round(ns)}</strong> RPM
         </div>
         <div>
           회전자 속도 (Nᵣ):{" "}
           <strong style={{ color: "#f8fafc" }}>{Math.round(nr)}</strong> RPM
         </div>
         <div>
-          슬립 (s): <strong style={{ color: "#f8fafc" }}>{slipPct.toFixed(1)}</strong>{" "}
-          %
+          슬립 (s):{" "}
+          <strong style={{ color: "#f8fafc" }}>{slipPct.toFixed(1)}</strong> %
         </div>
         <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
           극수 4극 · 주파수 {frequency.toFixed(0)} Hz · 부하 {load}%
