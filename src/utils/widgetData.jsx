@@ -1,5 +1,10 @@
 import { lazy } from "react";
 
+const PowerTrianglePowerFactorLazy = lazy(
+  () =>
+    import("@/components/animations/circuits/PowerTrianglePowerFactorWidget"),
+);
+
 /**
  * 🌟 [Single Source of Truth]
  * DB의 'lecture_id'를 키(Key) 값으로 사용하여 위젯을 직접 연결합니다.
@@ -34,13 +39,10 @@ const WIDGET_MAP = {
   "1_frequency_meaning": [
     lazy(() => import("@/components/animations/circuits/SineWaveWidget")),
   ],
-  /** 전기기사·회로: 전력 삼각형 P/Q/S, 역률, 콘덴서 보상 애니메이션 */
-  ee_power_triangle: [
-    lazy(
-      () =>
-        import("@/components/animations/circuits/PowerTrianglePowerFactorWidget"),
-    ),
-  ],
+  /** 전기기사·회로: 전력 삼각형 P/Q/S, 역률, 콘덴서 보상 (DB lecture_id 아무거나 하나만 맞추면 됨) */
+  ee_power_triangle: [PowerTrianglePowerFactorLazy],
+  /** Supabase 등에서 쓰는 lecture_id 예: power_triangle_lec */
+  power_triangle_lec: [PowerTrianglePowerFactorLazy],
   // ==========================================
   // 🧲 전자기학 (Electromagnetics)
   // ==========================================
