@@ -6,7 +6,7 @@ import MotorModel from "./MotorModel";
 
 const POLES = 4;
 
-/** 회전자 ref + Nr(RPM)으로 축 회전 (모델 축에 맞게 Y 사용) */
+/** 회전자 ref + Nr(RPM)으로 Z축 회전 (MotorModel 회전자 그룹) */
 function AnimatedMotor({ nrRpm }) {
   const rotorRef = useRef(null);
 

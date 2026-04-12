@@ -6,12 +6,13 @@ const ROWS = [
   { key: "pinky", label: "소지", flemingRole: null },
 ];
 
-const FLEMING_ACCENT = {
-  thumb: "accent-red-500",
-  index: "accent-emerald-500",
-  middle: "accent-blue-500",
-  ring: "accent-slate-400",
-  pinky: "accent-slate-400",
+/** Tailwind가 클래스 문자열을 정적으로 볼 수 있도록 전부 나열 */
+const FLEMING_RANGE_CLASS = {
+  thumb: "h-2 w-full cursor-pointer accent-red-500",
+  index: "h-2 w-full cursor-pointer accent-emerald-500",
+  middle: "h-2 w-full cursor-pointer accent-blue-500",
+  ring: "h-2 w-full cursor-pointer accent-slate-400",
+  pinky: "h-2 w-full cursor-pointer accent-slate-400",
 };
 
 /**
@@ -104,8 +105,10 @@ export default function FingerSliders({
               onChange={(e) => onChange(key, Number(e.target.value))}
               className={
                 showFlemingHints
-                  ? `h-2 w-full cursor-pointer ${FLEMING_ACCENT[key] ?? "accent-teal-600"} dark:${FLEMING_ACCENT[key] ?? "accent-teal-400"}`
-                  : "h-2 flex-1 cursor-pointer accent-teal-600 dark:accent-teal-400"
+                  ? FLEMING_RANGE_CLASS[key] ?? "h-2 w-full cursor-pointer accent-teal-600"
+                  : layout === "row"
+                    ? "h-2 w-full cursor-pointer accent-teal-600 dark:accent-teal-400"
+                    : "h-2 flex-1 cursor-pointer accent-teal-600 dark:accent-teal-400"
               }
             />
             <span
