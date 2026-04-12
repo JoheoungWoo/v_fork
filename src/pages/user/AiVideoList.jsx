@@ -22,16 +22,6 @@ const SUBJECT_TO_CATEGORY_TAB = {
   "AI Company": "Vision",
 };
 
-/** 탭 선택 시 API `?subject=` 에 넘길 DB subject (전체 탭은 요청 생략) */
-const TAB_TO_DB_SUBJECT = {
-  "기초 수학": "기초수학",
-  회로이론: "회로이론",
-  전자기학: "전자기학",
-  전기기기: "전기기기",
-  제어공학: "제어공학",
-  Vision: "AI Company",
-};
-
 // 🌟 DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
 const getCategory = (video) => {
   // console.log("video:", video);
@@ -139,18 +129,12 @@ export default function AiVideoList() {
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  // 1. 백엔드(Supabase lectures_tbl)에서 목록 — 탭별로 subject 쿼리로 필터 가능
+  // 1. 전체 목록 1회 로드 — 탭 전환은 클라이언트에서만 필터(API subject 미적용·구버전 서버에도 탭이 맞게 동작)
   useEffect(() => {
     const fetchLectures = async () => {
       try {
         setLoading(true);
-        const dbSubject = TAB_TO_DB_SUBJECT[activeTab];
-        const res = await apiClient.get("/api/video/list/all", {
-          params:
-            activeTab === "전체" || !dbSubject
-              ? undefined
-              : { subject: dbSubject },
-        });
+        const res = await apiClient.get("/api/video/list/all");
 
         const rawArray =
           res.data?.data || (Array.isArray(res.data) ? res.data : []);
@@ -168,19 +152,13 @@ export default function AiVideoList() {
       }
     };
     fetchLectures();
-  }, [activeTab]);
+  }, []);
 
-  // 2. 탭별 목록 + 정렬
+  // 2. 활성 탭 ↔ category 일치로만 목록 구성(연동 보장)
   const filteredVideos = useMemo(() => {
     if (!allLectures || allLectures.length === 0) return [];
 
     if (activeTab === "전체") {
-      return sortVideosForList(allLectures);
-    }
-
-    // API가 이미 ?subject= 로 과목을 걸러온 경우, 클라이언트 category 재필터에 걸리면
-    // (subject 문자열 미세 불일치 등) 행이 통째로 사라질 수 있음 → 그대로 신뢰
-    if (TAB_TO_DB_SUBJECT[activeTab]) {
       return sortVideosForList(allLectures);
     }
 
