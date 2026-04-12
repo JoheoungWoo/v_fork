@@ -42,7 +42,9 @@ const WIDGET_MAP = {
   ],
   "5_flemming_law": [
     lazy(() => import("@/components/animations/magnetics/FlemingWidget")),
-    lazy(() => import("@/components/animations/magnetics/FlemingLeftHand3DWidget")),
+    lazy(
+      () => import("@/components/animations/magnetics/FlemingLeftHand3DWidget"),
+    ),
   ],
   "2_equipotential_3d": [
     lazy(() => import("@/components/animations/Equipotential3DWidget")),
@@ -53,6 +55,13 @@ const WIDGET_MAP = {
   "4_vector_calculus": [
     lazy(
       () => import("@/components/animations/magnetics/VectorCalculus3DWidget"),
+    ),
+  ],
+  /** 말굽 자석 + 원판 3D 회전 — lecture_id를 DB와 맞추려면 키 이름을 바꿔 등록하세요. */
+  horseshoe_magnet_disk: [
+    lazy(
+      () =>
+        import("@/components/animations/magnetics/HorseshoeMagnetDiskWidget"),
     ),
   ],
 
@@ -108,10 +117,6 @@ const WIDGET_MAP = {
   ],
   dc_rectifier: [
     lazy(() => import("@/components/animations/DcRectificationWidget")),
-  ],
-  /** 말굽 자석 + 원판 3D 회전 — lecture_id를 DB와 맞추려면 키 이름을 바꿔 등록하세요. */
-  horseshoe_magnet_disk: [
-    lazy(() => import("@/components/animations/magnetics/HorseshoeMagnetDiskWidget")),
   ],
 
   // ==========================================

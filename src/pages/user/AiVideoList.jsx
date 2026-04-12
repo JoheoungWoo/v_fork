@@ -9,11 +9,39 @@ import HeroBanner from "./HeroBanner";
 import VideoCard from "./VideoCard";
 import VideoCategoryTabs from "./VideoCategoryTabs";
 
+/**
+ * Supabase `lectures_tbl.subject` 값 → VideoCategoryTabs 의 탭 id
+ * (DB에 넣은 문자열과 동일해야 함)
+ */
+const SUBJECT_TO_CATEGORY_TAB = {
+  기초수학: "기초 수학",
+  회로이론: "회로이론",
+  전자기학: "전자기학",
+  전기기기: "전기기기",
+  제어공학: "제어공학",
+  "AI Company": "Vision",
+};
+
+/** 탭 선택 시 API `?subject=` 에 넘길 DB subject (전체 탭은 요청 생략) */
+const TAB_TO_DB_SUBJECT = {
+  "기초 수학": "기초수학",
+  회로이론: "회로이론",
+  전자기학: "전자기학",
+  전기기기: "전기기기",
+  제어공학: "제어공학",
+  Vision: "AI Company",
+};
+
 // 🌟 DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
 const getCategory = (video) => {
   // console.log("video:", video);
   // 🌟 [핵심 방어막] video 객체 자체가 없으면 에러 내지 말고 "기타" 반환!
   if (!video) return "기타";
+
+  const subjectRaw = (video.subject || "").trim();
+  if (SUBJECT_TO_CATEGORY_TAB[subjectRaw]) {
+    return SUBJECT_TO_CATEGORY_TAB[subjectRaw];
+  }
 
   // 이제 안전하게 subject와 lecture_id를 추출할 수 있습니다.
   const subject = video.subject || "";
@@ -26,6 +54,7 @@ const getCategory = (video) => {
     idStr.includes("coulomb") ||
     idStr.includes("ampere") ||
     idStr.includes("poten") ||
+    idStr.includes("flemming") ||
     idStr.includes("vector_calculus") // 전자기학 벡터 미적분
   )
     return "전자기학";
@@ -94,14 +123,19 @@ export default function AiVideoList() {
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  // 1. 백엔드에서 데이터 페칭 및 카테고리 속성 부여
+  // 1. 백엔드(Supabase lectures_tbl)에서 목록 — 탭별로 subject 쿼리로 필터 가능
   useEffect(() => {
     const fetchLectures = async () => {
       try {
         setLoading(true);
-        const res = await apiClient.get("/api/video/list/all");
+        const dbSubject = TAB_TO_DB_SUBJECT[activeTab];
+        const res = await apiClient.get("/api/video/list/all", {
+          params:
+            activeTab === "전체" || !dbSubject
+              ? undefined
+              : { subject: dbSubject },
+        });
 
-        // 백엔드 응답이 res.data.data 인지 res.data 인지 안전하게 파싱
         const rawArray =
           res.data?.data || (Array.isArray(res.data) ? res.data : []);
 
@@ -109,27 +143,26 @@ export default function AiVideoList() {
           ...video,
           category: getCategory(video),
         }));
-        console.log("catotried data:", categorizedArray);
         setAllLectures(categorizedArray);
       } catch (err) {
         console.error("❌ 강의 목록 로드 실패:", err);
+        setAllLectures([]);
       } finally {
         setLoading(false);
       }
     };
     fetchLectures();
-  }, []);
+  }, [activeTab]);
 
   // 2. 현재 활성화된 탭(activeTab)에 따라 필터링 및 정렬
   const filteredVideos = useMemo(() => {
     if (!allLectures || allLectures.length === 0) return [];
 
     if (activeTab === "전체") {
-      // 🌟 전체 탭: 백엔드에서 넘겨준 순서(최신순) 그대로 반환
       return [...allLectures];
     }
 
-    // 🌟 특정 카테고리 탭: 필터링 후 lecture_id의 숫자 기준으로 오름차순 정렬
+    // 서버에서 subject로 내려준 경우 이미 한 과목만 있음 — 그래도 category로 한 번 더 맞춤
     const filtered = allLectures.filter((v) => v.category === activeTab);
 
     return filtered.sort((a, b) => {
@@ -176,7 +209,7 @@ export default function AiVideoList() {
             // console.log("video설명", video);
             return (
               <VideoCard
-                key={video.lecture_id}
+                key={video.lecture_id || video.id}
                 video={video}
                 onRead={moveToRead}
                 onOpenModal={setSelectedVideo}
