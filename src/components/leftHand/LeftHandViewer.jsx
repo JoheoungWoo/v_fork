@@ -80,19 +80,27 @@ export default function LeftHandViewer({ className = "" }) {
       className={`flex w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950 ${className}`}
     >
       <div className="h-[min(420px,55vh)] w-full min-h-[280px]">
-        <Canvas
-          shadows
-          camera={{ position: [0.35, 0.42, 0.55], fov: 42, near: 0.02, far: 50 }}
-          gl={{ antialias: true }}
-        >
-          <color attach="background" args={["#f4f4f5"]} />
-          <GltfErrorBoundary>
+        {/* 💡 수정 포인트: ErrorBoundary가 Canvas를 감싸도록 밖으로 이동! */}
+        <GltfErrorBoundary>
+          <Canvas
+            shadows
+            camera={{
+              position: [0.35, 0.42, 0.55],
+              fov: 42,
+              near: 0.02,
+              far: 50,
+            }}
+            gl={{ antialias: true }}
+          >
+            <color attach="background" args={["#f4f4f5"]} />
+            {/* 내부에는 순수한 3D 요소만 남깁니다 */}
             <Suspense fallback={null}>
               <HandScene values={values} />
             </Suspense>
-          </GltfErrorBoundary>
-        </Canvas>
+          </Canvas>
+        </GltfErrorBoundary>
       </div>
+
       <FingerSliders values={values} onChange={onSliderChange} />
     </div>
   );
