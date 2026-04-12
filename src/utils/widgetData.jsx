@@ -40,8 +40,16 @@ const WIDGET_MAP = {
   "1_coulombs_law": [
     lazy(() => import("@/components/animations/CoulombsLaw3DPage")),
   ],
+  /** 플레밍 방향 퀴즈 + 말굽자석·원판 3D (왼손 GLB는 lecture_id `flemming_left_hand_3d` 등 별도 키로 분리 가능) */
   "5_flemming_law": [
     lazy(() => import("@/components/animations/magnetics/FlemingWidget")),
+    lazy(
+      () =>
+        import("@/components/animations/magnetics/HorseshoeMagnetDiskWidget"),
+    ),
+  ],
+  /** 플레밍 왼손 GLB + 이미지 모드 — DB lecture_id를 이 값으로 두면 손 위젯만 씁니다. */
+  flemming_left_hand_3d: [
     lazy(
       () => import("@/components/animations/magnetics/FlemingLeftHand3DWidget"),
     ),
@@ -57,7 +65,7 @@ const WIDGET_MAP = {
       () => import("@/components/animations/magnetics/VectorCalculus3DWidget"),
     ),
   ],
-  /** 말굽 자석 + 원판 3D 회전 — lecture_id를 DB와 맞추려면 키 이름을 바꿔 등록하세요. */
+  /** 말굽 자석 + 원판만 (플레밍 퀴즈 없이) — Supabase `lecture_id`와 동일하게 맞추세요. */
   horseshoe_magnet_disk: [
     lazy(
       () =>
