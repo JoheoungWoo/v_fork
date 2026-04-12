@@ -8,13 +8,16 @@ export const LEFT_HAND_GLB_URL = "/models/left_hand.glb";
  * @param {{ values: Record<string, number> } & import('@react-three/fiber').GroupProps} props
  */
 export default function LeftHandModel({ values, ...props }) {
-  const { scene } = useGLTF(LEFT_HAND_GLB_URL);
-  const boneMap = useRef(
-    /** @type {Record<string, import('three').Bone>} */ ({}),
-  );
+  // 🔍 수정 포인트: nodes를 구조 분해 할당에 추가합니다.
+  const { scene, nodes } = useGLTF(LEFT_HAND_GLB_URL);
+
+  const boneMap = useRef({});
+
   useEffect(() => {
-    console.log("로드된 전체 노드:", nodes);
-  }, [nodes]);
+    // 이제 nodes가 정의되었으므로 에러가 사라집니다.
+    console.log("로드된 전체 노드 데이터:", nodes);
+    console.log("씬(Scene) 데이터:", scene);
+  }, [nodes, scene]);
   // useLayoutEffect(() => {
   //   boneMap.current = {};
   //   scene.traverse((child) => {
