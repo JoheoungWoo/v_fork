@@ -1,8 +1,7 @@
+import apiClient from "@/api/core/apiClient";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 // ─── 수식 렌더링 헬퍼 ───────────────────────────────────────────────────────
 const InlineMath = ({ math }) => {
@@ -99,10 +98,8 @@ const IntegralWidget = ({ quizData: quizDataProp }) => {
     setSelectedOptionIdx(null);
     setShowSolution(false);
     try {
-      const res = await fetch(`${API_BASE}/api/math/random?type=10_integral`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setQuizData(json);
+      const res = await apiClient.get("/api/math/random?type=10_integral");
+      setQuizData(res.data);
     } catch (err) {
       console.error("[IntegralWidget] fetch 실패:", err);
       setFetchError("퀴즈를 불러오지 못했습니다. 다시 시도해 주세요.");
