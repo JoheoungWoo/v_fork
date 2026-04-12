@@ -40,6 +40,11 @@ function HandScene({ values }) {
   return (
     <>
       <ambientLight intensity={0.55} />
+      {/* 🟢 테스트용 상자: 이 상자가 화면에 보인다면 Canvas는 정상입니다! */}
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[0.1, 0.1, 0.1]} />
+        <meshStandardMaterial color="orange" />
+      </mesh>
       <directionalLight
         castShadow
         position={[1.2, 2.5, 1.8]}
