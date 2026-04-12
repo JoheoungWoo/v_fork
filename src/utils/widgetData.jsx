@@ -42,8 +42,7 @@ const WIDGET_MAP = {
   ],
   "5_flemming_law": [
     lazy(() => import("@/components/animations/magnetics/FlemingWidget")),
-    // GLB: `public/models/left_hand.glb` (Blender: scripts/blender_left_hand.py)
-    lazy(() => import("@/components/leftHand/LeftHandViewer")),
+    lazy(() => import("@/components/animations/magnetics/FlemingLeftHand3DWidget")),
   ],
   "2_equipotential_3d": [
     lazy(() => import("@/components/animations/Equipotential3DWidget")),
