@@ -41,7 +41,7 @@ const WIDGET_MAP = {
     lazy(() => import("@/components/animations/CoulombsLaw3DPage")),
   ],
   "5_flemming_law": [
-    lazy(() => import("@/components/animations/magnetics/FlemingWidget")),
+    lazy(() => import("@/components/animations/magnetics/Flemming")),
   ],
   "2_equipotential_3d": [
     lazy(() => import("@/components/animations/Equipotential3DWidget")),
