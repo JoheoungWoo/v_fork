@@ -1,11 +1,17 @@
-import { Center, Environment, OrbitControls, useGLTF } from "@react-three/drei";
+import { Center, Environment, OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 
+import FlemingHandImageMesh from "@/components/leftHand/FlemingHandImageMesh.jsx";
+import {
+  FLEMING_HAND_IMAGE_BASE_HEIGHT,
+  FLEMING_HAND_IMAGE_EULER,
+  FLEMING_LEFT_HAND_IMAGE_URL,
+} from "@/components/leftHand/flemingHandAssets.js";
 import FingerSliders from "@/components/leftHand/FingerSliders.jsx";
 import { INITIAL_FINGER_VALUES } from "@/components/leftHand/leftHandBoneConfig.js";
-import LeftHandModel, { LEFT_HAND_GLB_URL } from "@/components/leftHand/LeftHandModel.jsx";
+import LeftHandModel from "@/components/leftHand/LeftHandModel.jsx";
 
 const COL = { I: 0x3b82f6, B: 0x10b981, F: 0xef4444 };
 
@@ -73,7 +79,7 @@ class GltfErrorBoundary extends React.Component {
   }
 }
 
-function FlemingScene({ bField, current, length, fingerValues }) {
+function FlemingScene({ bField, current, length, fingerValues, handTexture }) {
   const base = 0.42;
   const lenI = base * (0.55 + current * 0.22);
   const lenB = base * (0.55 + bField * 0.22);
@@ -97,7 +103,15 @@ function FlemingScene({ bField, current, length, fingerValues }) {
 
       <Center position={[0.02, 0.01, 0]}>
         <group rotation={[0.15, -0.85, 0.08]} scale={5.2}>
-          <LeftHandModel values={fingerValues} />
+          {handTexture ? (
+            <FlemingHandImageMesh
+              map={handTexture}
+              baseHeight={FLEMING_HAND_IMAGE_BASE_HEIGHT}
+              euler={FLEMING_HAND_IMAGE_EULER}
+            />
+          ) : (
+            <LeftHandModel values={fingerValues} />
+          )}
         </group>
       </Center>
 
@@ -116,16 +130,50 @@ function FlemingScene({ bField, current, length, fingerValues }) {
 
 /**
  * 플레밍 왼손 법칙: 검지 B · 중지 I · 엄지 F.
- * GLB 본(bone)에 슬라이더로 굽힘을 주어 손가락 자세를 맞출 수 있습니다.
+ * `flemingHandAssets.js`에 손 이미지 URL이 있고 파일이 로드되면 GLB 대신 평면에 표시합니다.
  */
 export default function FlemingLeftHand3DWidget() {
   const [bField, setBField] = useState(1.5);
   const [current, setCurrent] = useState(2.0);
   const [length, setLength] = useState(0.5);
   const [fingerValues, setFingerValues] = useState(() => ({ ...INITIAL_FINGER_VALUES }));
+  const [handTexture, setHandTexture] = useState(null);
 
   const onFingerChange = useCallback((key, value) => {
     setFingerValues((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  useEffect(() => {
+    const url = typeof FLEMING_LEFT_HAND_IMAGE_URL === "string" ? FLEMING_LEFT_HAND_IMAGE_URL.trim() : "";
+    if (!url) {
+      setHandTexture(null);
+      return;
+    }
+    let cancelled = false;
+    let loaded = null;
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (tex) => {
+        if (cancelled) {
+          tex.dispose();
+          return;
+        }
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 8;
+        loaded = tex;
+        setHandTexture(tex);
+      },
+      undefined,
+      () => {
+        if (!cancelled) setHandTexture(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+      if (loaded) loaded.dispose();
+      setHandTexture(null);
+    };
   }, []);
 
   const force = (bField * current * length).toFixed(2);
@@ -151,6 +199,7 @@ export default function FlemingLeftHand3DWidget() {
                 current={current}
                 length={length}
                 fingerValues={fingerValues}
+                handTexture={handTexture}
               />
             </Suspense>
           </Canvas>
@@ -241,21 +290,28 @@ export default function FlemingLeftHand3DWidget() {
           <div className="mt-1 text-4xl font-black tabular-nums text-white">{force}</div>
         </div>
 
-        <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[10px] text-slate-300 backdrop-blur-sm">
-          드래그로 회전 · 아래 슬라이더로 손가락 굽힘
+        <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-center text-[10px] text-slate-300 backdrop-blur-sm">
+          {handTexture
+            ? "드래그로 회전 · 손은 이미지(평면)로 표시됩니다"
+            : "드래그로 회전 · 아래 슬라이더로 손가락 굽힘"}
         </div>
       </div>
 
-      <FingerSliders
-        values={fingerValues}
-        onChange={onFingerChange}
-        variant="dark"
-        layout="row"
-        showFlemingHints
-        className="shrink-0 border-slate-700/80"
-      />
+      {handTexture ? (
+        <div className="shrink-0 border-t border-slate-700/80 bg-slate-950/90 px-3 py-2 text-center text-[10px] text-slate-500">
+          손 그림: <code className="text-slate-400">{FLEMING_LEFT_HAND_IMAGE_URL || "(미설정)"}</code>
+          — 크기·방향은 <code className="text-slate-400">flemingHandAssets.js</code>에서 조정
+        </div>
+      ) : (
+        <FingerSliders
+          values={fingerValues}
+          onChange={onFingerChange}
+          variant="dark"
+          layout="row"
+          showFlemingHints
+          className="shrink-0 border-slate-700/80"
+        />
+      )}
     </div>
   );
 }
-
-useGLTF.preload(LEFT_HAND_GLB_URL);
