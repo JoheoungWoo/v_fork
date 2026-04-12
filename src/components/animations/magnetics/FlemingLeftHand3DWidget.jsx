@@ -7,6 +7,7 @@ import FlemingHandImageMesh from "@/components/leftHand/FlemingHandImageMesh.jsx
 import {
   FLEMING_HAND_IMAGE_BASE_HEIGHT,
   FLEMING_HAND_IMAGE_EULER,
+  FLEMING_HAND_IMAGE_USE_BILLBOARD,
   FLEMING_LEFT_HAND_IMAGE_URL,
 } from "@/components/leftHand/flemingHandAssets.js";
 import FingerSliders from "@/components/leftHand/FingerSliders.jsx";
@@ -108,6 +109,7 @@ function FlemingScene({ bField, current, length, fingerValues, handTexture }) {
               map={handTexture}
               baseHeight={FLEMING_HAND_IMAGE_BASE_HEIGHT}
               euler={FLEMING_HAND_IMAGE_EULER}
+              billboard={FLEMING_HAND_IMAGE_USE_BILLBOARD}
             />
           ) : (
             <LeftHandModel values={fingerValues} />

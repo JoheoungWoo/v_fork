@@ -1,3 +1,4 @@
+import { Billboard } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
 
@@ -6,12 +7,14 @@ import * as THREE from "three";
  *   map: THREE.Texture,
  *   baseHeight?: number,
  *   euler?: [number, number, number],
+ *   billboard?: boolean,
  * } & import('@react-three/fiber').GroupProps} props
  */
 export default function FlemingHandImageMesh({
   map,
   baseHeight = 0.11,
   euler = [0, 0, 0],
+  billboard = true,
   ...groupProps
 }) {
   const [planeW, planeH] = useMemo(() => {
@@ -23,18 +26,28 @@ export default function FlemingHandImageMesh({
     return [aspect * h, h];
   }, [map, baseHeight]);
 
+  const plane = (
+    <mesh rotation={euler}>
+      <planeGeometry args={[planeW, planeH]} />
+      <meshBasicMaterial
+        map={map}
+        transparent
+        alphaTest={0.07}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+
   return (
     <group {...groupProps}>
-      <mesh rotation={euler}>
-        <planeGeometry args={[planeW, planeH]} />
-        <meshBasicMaterial
-          map={map}
-          transparent
-          alphaTest={0.07}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
+      {billboard ? (
+        <Billboard follow lockX={false} lockY={false} lockZ={false}>
+          {plane}
+        </Billboard>
+      ) : (
+        plane
+      )}
     </group>
   );
 }

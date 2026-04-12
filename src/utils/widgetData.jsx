@@ -109,6 +109,10 @@ const WIDGET_MAP = {
   dc_rectifier: [
     lazy(() => import("@/components/animations/DcRectificationWidget")),
   ],
+  /** 말굽 자석 + 원판 3D 회전 — lecture_id를 DB와 맞추려면 키 이름을 바꿔 등록하세요. */
+  horseshoe_magnet_disk: [
+    lazy(() => import("@/components/animations/magnetics/HorseshoeMagnetDiskWidget")),
+  ],
 
   // ==========================================
   // ⚙️ 전기기기 (Electrical Machines)

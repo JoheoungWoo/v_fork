@@ -12,3 +12,10 @@ export const FLEMING_HAND_IMAGE_BASE_HEIGHT = 0.11;
 
 /** 평면 추가 회전 [rx, ry, rz] (라디안). 앞뒤가 뒤집히면 예: [0, Math.PI, 0] */
 export const FLEMING_HAND_IMAGE_EULER = [0, 0, 0];
+
+/**
+ * true면 손 이미지가 항상 카메라를 향함(스프라이트). 단일 평면을 3D에서 돌릴 때
+ * 옆에서 “종이 한 장”처럼 보이는 현상을 줄입니다.
+ * false면 부모 그룹 회전에 고정된 평면(입체감은 GLB가 더 적합).
+ */
+export const FLEMING_HAND_IMAGE_USE_BILLBOARD = true;
