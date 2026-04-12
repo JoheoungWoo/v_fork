@@ -1,9 +1,23 @@
 import { useState } from "react";
 // 💡 플랫폼 환경에 맞게 수식 렌더러를 임포트하세요.
 // (예시로 에듀테크에서 가장 많이 쓰는 react-katex를 사용했습니다)
+import katex from "katex";
 import "katex/dist/katex.min.css";
-import { BlockMath, InlineMath } from "react-katex";
+const InlineMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: false,
+  });
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
+const BlockMath = ({ math }) => {
+  const html = katex.renderToString(math, {
+    throwOnError: false,
+    displayMode: true,
+  });
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 const IntegralWidget = ({ quizData }) => {
   const [a, setA] = useState(1);
   const [b, setB] = useState(4);
