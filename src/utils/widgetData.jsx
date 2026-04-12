@@ -34,6 +34,13 @@ const WIDGET_MAP = {
   "1_frequency_meaning": [
     lazy(() => import("@/components/animations/circuits/SineWaveWidget")),
   ],
+  /** 전기기사·회로: 전력 삼각형 P/Q/S, 역률, 콘덴서 보상 애니메이션 */
+  ee_power_triangle: [
+    lazy(
+      () =>
+        import("@/components/animations/circuits/PowerTrianglePowerFactorWidget"),
+    ),
+  ],
   // ==========================================
   // 🧲 전자기학 (Electromagnetics)
   // ==========================================
