@@ -166,6 +166,13 @@ const WIDGET_MAP = {
         import("@/components/animations/magnetics/HorseshoeMagnetDiskWidget"),
     ),
   ],
+  /** N–S 극 간극의 사각 철심 + 권선, 전류에 따른 철심 이동 3D */
+  iron_core_magnetic_gap: [
+    lazy(
+      () =>
+        import("@/components/animations/magnetics/IronCoreMagneticGapWidget"),
+    ),
+  ],
 };
 
 export default WIDGET_MAP;
