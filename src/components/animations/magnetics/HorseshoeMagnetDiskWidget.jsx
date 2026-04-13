@@ -1,95 +1,253 @@
-import { Environment, OrbitControls } from "@react-three/drei";
+import { Environment, Line, OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
 
-/** 말굽 자석: 양극 원주 + 상부 연결대 */
-function HorseshoeMagnet() {
+const DISK_Y = 0.15;
+const DISK_R = 0.42;
+/** 말굽 극 중심 X (원판 외연이 극 사이 자기장을 통과하도록) */
+const POLE_X = DISK_R + 0.06;
+const MAX_RPM = 240;
+
+/** 목재 베이스 + 절연 받침 느낌 */
+function WoodenBase() {
   return (
     <group>
-      <mesh position={[-0.38, 0.3, 0]} castShadow>
-        <cylinderGeometry args={[0.1, 0.12, 0.52, 24]} />
-        <meshStandardMaterial color="#b91c1c" metalness={0.38} roughness={0.42} />
+      <mesh castShadow receiveShadow position={[0, -0.038, 0]}>
+        <boxGeometry args={[2.35, 0.076, 1.65]} />
+        <meshStandardMaterial color="#5c3d2e" metalness={0.08} roughness={0.78} />
       </mesh>
-      <mesh position={[0.38, 0.3, 0]} castShadow>
-        <cylinderGeometry args={[0.1, 0.12, 0.52, 24]} />
-        <meshStandardMaterial color="#1d4ed8" metalness={0.38} roughness={0.42} />
-      </mesh>
-      <mesh position={[0, 0.56, 0]} castShadow>
-        <boxGeometry args={[0.84, 0.11, 0.14]} />
-        <meshStandardMaterial color="#64748b" metalness={0.48} roughness={0.48} />
+      <mesh castShadow receiveShadow position={[0, -0.001, 0]}>
+        <boxGeometry args={[2.28, 0.012, 1.58]} />
+        <meshStandardMaterial color="#78716c" metalness={0.12} roughness={0.65} />
       </mesh>
     </group>
   );
 }
 
-function AnimatedRig({ diskRpm, magnetRpm }) {
+/** 직류 배터리: + 단자(상단), − 단자(하단) */
+function BatteryPack({ position = [-0.78, 0.085, 0.52] }) {
+  return (
+    <group position={position}>
+      <mesh castShadow receiveShadow>
+        <cylinderGeometry args={[0.065, 0.068, 0.15, 28]} />
+        <meshStandardMaterial color="#334155" metalness={0.35} roughness={0.55} />
+      </mesh>
+      <mesh castShadow position={[0, 0.082, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.028, 20]} />
+        <meshStandardMaterial color="#dc2626" metalness={0.55} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, -0.078, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.022, 0.038, 20]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.4} roughness={0.5} side={THREE.DoubleSide} />
+      </mesh>
+      <Text position={[0.1, 0.06, 0]} fontSize={0.045} color="#fca5a5" anchorX="left">
+        +
+      </Text>
+      <Text position={[0.1, -0.05, 0]} fontSize={0.045} color="#94a3b8" anchorX="left">
+        −
+      </Text>
+    </group>
+  );
+}
+
+/**
+ * 말굽자석: 원판 외연이 N–S 사이 수직 자기장을 통과하도록 배치.
+ * magnetDirection 반전 시 N/S 색·라벨 교환.
+ */
+function HorseshoeMagnet({ magnetDirection }) {
+  const nOnTop = magnetDirection > 0;
+  const topColor = nOnTop ? "#b91c1c" : "#1d4ed8";
+  const botColor = nOnTop ? "#1d4ed8" : "#b91c1c";
+  const topLabel = nOnTop ? "N극" : "S극";
+  const botLabel = nOnTop ? "S극" : "N극";
+
+  return (
+    <group position={[POLE_X, 0, 0]}>
+      <mesh position={[0, DISK_Y - 0.13, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.095, 0.22, 26]} />
+        <meshStandardMaterial color={botColor} metalness={0.42} roughness={0.38} />
+      </mesh>
+      <mesh position={[0, DISK_Y + 0.13, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.095, 0.22, 26]} />
+        <meshStandardMaterial color={topColor} metalness={0.42} roughness={0.38} />
+      </mesh>
+      <mesh position={[0.14, DISK_Y, 0]} castShadow>
+        <boxGeometry args={[0.22, 0.34, 0.16]} />
+        <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.45} />
+      </mesh>
+      <Text position={[0.22, DISK_Y + 0.13, 0.12]} fontSize={0.048} color="#fecaca" anchorX="center">
+        {topLabel}
+      </Text>
+      <Text position={[0.22, DISK_Y - 0.13, 0.12]} fontSize={0.048} color="#bfdbfe" anchorX="center">
+        {botLabel}
+      </Text>
+    </group>
+  );
+}
+
+/** 브러시: 외연 접촉 블록 */
+function BrushContact({ diskY = DISK_Y }) {
+  const x = DISK_R - 0.015;
+  return (
+    <mesh castShadow position={[x, diskY, 0]}>
+      <boxGeometry args={[0.055, 0.06, 0.11]} />
+      <meshStandardMaterial color="#292524" metalness={0.25} roughness={0.72} />
+    </mesh>
+  );
+}
+
+function WireHarness({ batteryPos }) {
+  const [bx, by, bz] = batteryPos;
+  const axisTop = [0, 0.26, 0];
+  const plusStart = [bx, by + 0.08, bz];
+  const brushPoint = [DISK_R - 0.02, DISK_Y, 0];
+
+  const plusPath = useMemo(
+    () => [
+      plusStart,
+      [bx * 0.4, 0.2, bz * 0.35],
+      [0.08, 0.24, 0.12],
+      axisTop,
+    ],
+    [bx, by, bz],
+  );
+
+  const minusPath = useMemo(
+    () => [
+      [bx, by - 0.06, bz],
+      [0.15, DISK_Y - 0.02, 0.22],
+      [brushPoint[0] - 0.04, brushPoint[1], brushPoint[2] + 0.06],
+      brushPoint,
+    ],
+    [bx, by, bz],
+  );
+
+  return (
+    <group>
+      <Line points={plusPath} color="#ef4444" lineWidth={2.5} />
+      <Line points={minusPath} color="#64748b" lineWidth={2.5} />
+    </group>
+  );
+}
+
+function HomopolarScene({ isRunning, voltage, magnetDirection }) {
   const diskRef = useRef(null);
-  const magnetRef = useRef(null);
 
   useFrame((_, delta) => {
-    const diskRad = ((Math.PI * 2) / 60) * (Number.isFinite(diskRpm) ? diskRpm : 0);
-    const magRad = ((Math.PI * 2) / 60) * (Number.isFinite(magnetRpm) ? magnetRpm : 0);
-    if (diskRef.current) diskRef.current.rotation.y += diskRad * delta;
-    if (magnetRef.current) magnetRef.current.rotation.y += magRad * delta;
+    const g = diskRef.current;
+    if (!g) return;
+    const rpm = isRunning ? (voltage / 10) * MAX_RPM * magnetDirection : 0;
+    const radPerSec = (Math.PI * 2 * rpm) / 60;
+    g.rotation.y += radPerSec * delta;
   });
+
+  const batteryPos = useMemo(() => [-0.78, 0.085, 0.52], []);
 
   return (
     <>
-      <ambientLight intensity={0.28} />
-      <directionalLight castShadow position={[4, 6, 3]} intensity={1.15} />
-      <directionalLight position={[-4, 2, -2]} intensity={0.35} color="#bfdbfe" />
+      <ambientLight intensity={0.32} />
+      <directionalLight castShadow position={[3.5, 5.5, 2.5]} intensity={1.2} />
+      <directionalLight position={[-4, 2.5, -2]} intensity={0.38} color="#bfdbfe" />
+      <directionalLight position={[0, -2, 4]} intensity={0.22} color="#fde68a" />
 
       <Environment preset="city" />
 
-      <group ref={magnetRef} position={[0, 0, 0]}>
-        <HorseshoeMagnet />
-      </group>
+      <WoodenBase />
+      <BatteryPack position={batteryPos} />
+      <WireHarness batteryPos={batteryPos} />
 
-      <group ref={diskRef} position={[0, 0.045, 0]} rotation={[Math.PI / 2, 0, 0]}>
+      {/* 중심 금속축 (베이스 고정) */}
+      <mesh castShadow position={[0, 0.11, 0]} receiveShadow>
+        <cylinderGeometry args={[0.038, 0.042, 0.24, 20]} />
+        <meshStandardMaterial color="#57534e" metalness={0.65} roughness={0.35} />
+      </mesh>
+
+      <HorseshoeMagnet magnetDirection={magnetDirection} />
+      <BrushContact />
+
+      {/* 동판 + 축 상부: 회전체 */}
+      <group ref={diskRef} position={[0, DISK_Y, 0]}>
         <mesh castShadow receiveShadow>
-          <cylinderGeometry args={[0.46, 0.46, 0.07, 56]} />
-          <meshStandardMaterial color="#9ca3af" metalness={0.72} roughness={0.32} />
+          <cylinderGeometry args={[DISK_R, DISK_R, 0.048, 64]} />
+          <meshStandardMaterial color="#b45309" metalness={0.75} roughness={0.28} />
+        </mesh>
+        <mesh castShadow position={[0, 0.04, 0]}>
+          <cylinderGeometry args={[0.032, 0.028, 0.07, 18]} />
+          <meshStandardMaterial color="#a8a29e" metalness={0.7} roughness={0.32} />
         </mesh>
       </group>
 
-      <gridHelper args={[2.8, 14, 0x475569, 0x1e293b]} position={[0, 0.001, 0]} />
-
-      <OrbitControls makeDefault minDistance={1.2} maxDistance={8} target={[0, 0.22, 0]} enablePan />
+      <OrbitControls
+        makeDefault
+        minDistance={1.35}
+        maxDistance={7.5}
+        target={[0, DISK_Y, 0]}
+        enablePan
+      />
     </>
   );
 }
 
 /**
- * 말굽 자석 + 금속 원판 3D 시각화. 각각 Y축 회전 RPM을 슬라이더로 조절합니다.
+ * 호모폴라(패러데이 원판) 실험대: 베이스·배터리·전선·브러시·말굽자석·동판.
+ * 전원·전압·자기장 반전으로 회전 방향·속도를 확인합니다.
  */
 export default function HorseshoeMagnetDiskWidget() {
-  const [diskRpm, setDiskRpm] = useState(120);
-  const [magnetRpm, setMagnetRpm] = useState(8);
+  const [isRunning, setIsRunning] = useState(false);
+  const [voltage, setVoltage] = useState(5);
+  const [magnetDirection, setMagnetDirection] = useState(1);
 
   const panel = {
     position: "absolute",
     left: "50%",
-    bottom: 14,
+    bottom: 16,
     transform: "translateX(-50%)",
-    width: "min(400px, calc(100% - 24px))",
-    padding: "12px 14px",
-    borderRadius: 12,
+    width: "min(440px, calc(100% - 24px))",
+    padding: "14px 16px",
+    borderRadius: 14,
     background: "rgba(15, 23, 42, 0.94)",
     border: "1px solid rgba(148, 163, 184, 0.35)",
     color: "#e2e8f0",
     fontFamily: "system-ui, sans-serif",
-    fontSize: 12,
+    fontSize: 13,
     zIndex: 2,
+    boxShadow: "0 16px 48px rgba(0,0,0,0.45)",
   };
 
-  const label = { display: "block", fontWeight: 600, color: "#cbd5e1", marginBottom: 6 };
+  const label = { display: "block", fontWeight: 600, color: "#cbd5e1", marginBottom: 8 };
+
+  const powerBtnStyle = {
+    padding: "10px 16px",
+    borderRadius: 10,
+    border: "1px solid rgba(148,163,184,0.4)",
+    background: isRunning ? "rgba(21,128,61,0.5)" : "rgba(30,41,59,0.9)",
+    color: "#f8fafc",
+    fontWeight: 700,
+    cursor: "pointer",
+    fontSize: 13,
+    fontFamily: "system-ui, sans-serif",
+  };
+
+  const secondaryBtnStyle = {
+    padding: "10px 16px",
+    borderRadius: 10,
+    border: "1px solid rgba(56,189,248,0.35)",
+    background: "rgba(30,41,59,0.9)",
+    color: "#e2e8f0",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontSize: 13,
+    fontFamily: "system-ui, sans-serif",
+  };
 
   return (
     <div
       style={{
         position: "relative",
         width: "100%",
-        height: 500,
+        height: "min(750px, 88vh)",
+        minHeight: 560,
         borderRadius: 14,
         overflow: "hidden",
         background: "linear-gradient(165deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
@@ -99,58 +257,86 @@ export default function HorseshoeMagnetDiskWidget() {
       <div
         style={{
           position: "absolute",
-          top: 12,
-          left: 12,
+          top: 14,
+          left: 14,
           zIndex: 2,
-          maxWidth: "min(280px, calc(100% - 24px))",
-          padding: "10px 12px",
-          borderRadius: 10,
-          background: "rgba(15, 23, 42, 0.9)",
-          border: "1px solid rgba(148, 163, 184, 0.3)",
+          maxWidth: "min(320px, calc(100% - 28px))",
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "rgba(15, 23, 42, 0.92)",
+          border: "1px solid rgba(148, 163, 184, 0.32)",
           color: "#cbd5e1",
-          fontSize: 11,
-          lineHeight: 1.5,
+          fontSize: 12,
+          lineHeight: 1.55,
         }}
       >
-        <div style={{ fontWeight: 700, color: "#94a3b8", marginBottom: 6, fontSize: 10 }}>
-          말굽 자석 · 원판
+        <div style={{ fontWeight: 700, color: "#94a3b8", marginBottom: 8, fontSize: 11 }}>
+          호모폴라 · 패러데이 원판 실험대
         </div>
-        붉은 원주: N 극, 파란 원주: S 극. 원판은 도체·동판 등을 상상할 수 있는 단순 모델입니다. 자석과
-        원판의 회전은 서로 독립입니다(와전류·브레이크 등은 별도 모델에서 다룰 수 있습니다).
+        <strong style={{ color: "#e2e8f0" }}>베이스</strong> 위에{" "}
+        <strong style={{ color: "#e2e8f0" }}>축·동판</strong>이 서고,{" "}
+        <strong style={{ color: "#e2e8f0" }}>말굽자석</strong>이 원판 외연을 끼고 있습니다.{" "}
+        <strong style={{ color: "#fca5a5" }}>+</strong> 전선은 축(중심),{" "}
+        <strong style={{ color: "#64748b" }}>−</strong> 전선은{" "}
+        <strong style={{ color: "#e2e8f0" }}>브러시</strong>로 외연에 닿아 회로가 닫힙니다. 전원을 켜면
+        로렌츠 힘에 의해 동판이 돕니다(속도는 전압에 비례, 자기장 반전 시 방향 반대).
       </div>
 
       <Canvas
         shadows
-        camera={{ position: [1.55, 0.95, 1.55], fov: 42 }}
+        camera={{ position: [1.85, 1.05, 1.85], fov: 42 }}
         gl={{ antialias: true, alpha: false }}
         style={{ width: "100%", height: "100%" }}
       >
         <color attach="background" args={["#0b1220"]} />
         <Suspense fallback={null}>
-          <AnimatedRig diskRpm={diskRpm} magnetRpm={magnetRpm} />
+          <HomopolarScene
+            isRunning={isRunning}
+            voltage={voltage}
+            magnetDirection={magnetDirection}
+          />
         </Suspense>
       </Canvas>
 
       <div style={panel}>
-        <label style={label}>원판 RPM: {Math.round(diskRpm)} (−300 ~ 300)</label>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            alignItems: "center",
+            marginBottom: 14,
+          }}
+        >
+          <button
+            type="button"
+            style={powerBtnStyle}
+            onClick={() => setIsRunning((v) => !v)}
+          >
+            {isRunning ? "전원 Off" : "전원 On"}
+          </button>
+          <button
+            type="button"
+            style={secondaryBtnStyle}
+            onClick={() => setMagnetDirection((d) => -d)}
+          >
+            자기장 방향 반전 (N↔S)
+          </button>
+          <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>
+            상태: {isRunning ? "가동 중" : "정지"} · 자기장 계수: {magnetDirection > 0 ? "+1" : "−1"}
+          </span>
+        </div>
+        <label style={label}>
+          전압 (Voltage → 회전 속도): {voltage} V (1 ~ 10)
+        </label>
         <input
           type="range"
-          min={-300}
-          max={300}
-          step={5}
-          value={diskRpm}
-          onChange={(e) => setDiskRpm(Number(e.target.value))}
-          style={{ width: "100%", accentColor: "#94a3b8", marginBottom: 12 }}
-        />
-        <label style={label}>말굽 자석 RPM: {Math.round(magnetRpm)} (−60 ~ 60)</label>
-        <input
-          type="range"
-          min={-60}
-          max={60}
+          min={1}
+          max={10}
           step={1}
-          value={magnetRpm}
-          onChange={(e) => setMagnetRpm(Number(e.target.value))}
-          style={{ width: "100%", accentColor: "#a78bfa" }}
+          value={voltage}
+          onChange={(e) => setVoltage(Number(e.target.value))}
+          style={{ width: "100%", accentColor: "#38bdf8" }}
         />
       </div>
     </div>
