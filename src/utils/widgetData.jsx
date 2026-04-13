@@ -145,8 +145,7 @@ const WIDGET_MAP = {
   /** 변압기 결선: Y–Y, Δ–Δ, Y–Δ, V결선 — DB lecture_id 예: transformer_connection_types */
   transformer_connection_types: [
     lazy(
-      () =>
-        import("@/components/animations/machines/TransformerConnectionWidget"),
+      () => import("@/components/animations/machines/NeonYYTransformerWidget"),
     ),
   ],
   /** Supabase 등 별칭 */
