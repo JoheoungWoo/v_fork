@@ -142,6 +142,9 @@ const WIDGET_MAP = {
   "1_induction_motor": [
     lazy(() => import("@/components/animations/machines/InductionMotorWidget")),
   ],
+  "2_induction_motor": [
+    lazy(() => import("@/components/animations/machines/EMInductionWidget")),
+  ],
   /** 변압기: 정적 결선도 + Y-Y 3D 네온 시뮬 — DB lecture_id 예: transformer_connection_types */
   transformer_connection_types: [
     lazy(
