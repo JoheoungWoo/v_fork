@@ -131,12 +131,35 @@ function WireHarness({ batteryPos }) {
   );
 }
 
-function HomopolarScene({ isRunning, voltage, magnetDirection }) {
+/** 원판 상면 표식 — 대칭 원판만 있으면 회전이 육안으로 거의 안 보입니다. */
+function DiskSurfaceMarkers() {
+  const r = DISK_R * 0.88;
+  const y = 0.027;
+  return (
+    <group>
+      <mesh position={[r, y, 0]} castShadow>
+        <boxGeometry args={[0.09, 0.012, 0.05]} />
+        <meshStandardMaterial color="#ef4444" metalness={0.2} roughness={0.5} />
+      </mesh>
+      <mesh position={[r * -0.5, y, r * 0.866]} castShadow>
+        <boxGeometry args={[0.06, 0.012, 0.06]} />
+        <meshStandardMaterial color="#22c55e" metalness={0.2} roughness={0.5} />
+      </mesh>
+      <mesh position={[r * -0.5, y, r * -0.866]} castShadow>
+        <boxGeometry args={[0.05, 0.012, 0.08]} />
+        <meshStandardMaterial color="#3b82f6" metalness={0.2} roughness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+function HomopolarScene({ driveRef, magnetDirection }) {
   const diskRef = useRef(null);
 
   useFrame((_, delta) => {
     const g = diskRef.current;
     if (!g) return;
+    const { isRunning, voltage, magnetDirection } = driveRef.current;
     const rpm = isRunning ? (voltage / 10) * MAX_RPM * magnetDirection : 0;
     const radPerSec = (Math.PI * 2 * rpm) / 60;
     g.rotation.y += radPerSec * delta;
@@ -151,7 +174,9 @@ function HomopolarScene({ isRunning, voltage, magnetDirection }) {
       <directionalLight position={[-4, 2.5, -2]} intensity={0.38} color="#bfdbfe" />
       <directionalLight position={[0, -2, 4]} intensity={0.22} color="#fde68a" />
 
-      <Environment preset="city" />
+      <Suspense fallback={null}>
+        <Environment preset="city" />
+      </Suspense>
 
       <WoodenBase />
       <BatteryPack position={batteryPos} />
@@ -172,6 +197,7 @@ function HomopolarScene({ isRunning, voltage, magnetDirection }) {
           <cylinderGeometry args={[DISK_R, DISK_R, 0.048, 64]} />
           <meshStandardMaterial color="#b45309" metalness={0.75} roughness={0.28} />
         </mesh>
+        <DiskSurfaceMarkers />
         <mesh castShadow position={[0, 0.04, 0]}>
           <cylinderGeometry args={[0.032, 0.028, 0.07, 18]} />
           <meshStandardMaterial color="#a8a29e" metalness={0.7} roughness={0.32} />
@@ -197,6 +223,18 @@ export default function HorseshoeMagnetDiskWidget() {
   const [isRunning, setIsRunning] = useState(false);
   const [voltage, setVoltage] = useState(5);
   const [magnetDirection, setMagnetDirection] = useState(1);
+
+  const driveRef = useRef({
+    isRunning: false,
+    voltage: 5,
+    magnetDirection: 1,
+  });
+  driveRef.current = { isRunning, voltage, magnetDirection };
+
+  const displayRpm = useMemo(() => {
+    if (!isRunning) return 0;
+    return Math.round((voltage / 10) * MAX_RPM * magnetDirection);
+  }, [isRunning, voltage, magnetDirection]);
 
   const panel = {
     position: "absolute",
@@ -280,21 +318,23 @@ export default function HorseshoeMagnetDiskWidget() {
         <strong style={{ color: "#64748b" }}>−</strong> 전선은{" "}
         <strong style={{ color: "#e2e8f0" }}>브러시</strong>로 외연에 닿아 회로가 닫힙니다. 전원을 켜면
         로렌츠 힘에 의해 동판이 돕니다(속도는 전압에 비례, 자기장 반전 시 방향 반대).
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(71,85,105,0.45)" }}>
+          <span style={{ color: "#94a3b8" }}>표시 RPM(시뮬): </span>
+          <strong style={{ color: "#38bdf8" }}>{displayRpm}</strong>
+          <span style={{ color: "#64748b", fontSize: 11 }}> · 원판 위 색 띠가 돌아가면 정상입니다.</span>
+        </div>
       </div>
 
       <Canvas
         shadows
+        frameloop="always"
         camera={{ position: [1.85, 1.05, 1.85], fov: 42 }}
         gl={{ antialias: true, alpha: false }}
         style={{ width: "100%", height: "100%" }}
       >
         <color attach="background" args={["#0b1220"]} />
         <Suspense fallback={null}>
-          <HomopolarScene
-            isRunning={isRunning}
-            voltage={voltage}
-            magnetDirection={magnetDirection}
-          />
+          <HomopolarScene driveRef={driveRef} magnetDirection={magnetDirection} />
         </Suspense>
       </Canvas>
 
@@ -313,7 +353,7 @@ export default function HorseshoeMagnetDiskWidget() {
             style={powerBtnStyle}
             onClick={() => setIsRunning((v) => !v)}
           >
-            {isRunning ? "전원 Off" : "전원 On"}
+            {isRunning ? "전원 끄기" : "전원 켜기"}
           </button>
           <button
             type="button"
