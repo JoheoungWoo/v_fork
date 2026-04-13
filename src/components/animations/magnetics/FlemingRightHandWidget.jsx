@@ -33,8 +33,7 @@ function WireSegment({ from, to, radius = 0.022, color = "#94a3b8" }) {
   );
 }
 
-function RotatingLoop({ vMag, vDir }) {
-  const groupRef = useRef(null);
+function RotatingLoop() {
   const w = 0.9;
   const h = 1.15;
   const pts = useMemo(
@@ -47,19 +46,51 @@ function RotatingLoop({ vMag, vDir }) {
     [w, h],
   );
 
-  useFrame((_, delta) => {
-    const g = groupRef.current;
-    if (!g) return;
-    const omega = (0.3 + vMag * 2.2) * vDir;
-    g.rotation.y += omega * delta;
-  });
-
   return (
-    <group ref={groupRef}>
+    <group>
       <WireSegment from={pts.lt} to={pts.rt} color="#a16207" />
       <WireSegment from={pts.rt} to={pts.rb} color="#e879f9" />
       <WireSegment from={pts.rb} to={pts.lb} color="#a16207" />
       <WireSegment from={pts.lb} to={pts.lt} color="#e879f9" />
+    </group>
+  );
+}
+
+function RotatingCommutator({ angleRef, emfRef }) {
+  const groupRef = useRef(null);
+  const pulseRef = useRef(null);
+  const phaseRef = useRef(0);
+  const radius = 0.2;
+
+  useFrame((_, delta) => {
+    const g = groupRef.current;
+    const pulse = pulseRef.current;
+    if (!g || !pulse) return;
+    g.rotation.y = angleRef.current;
+    const emf = emfRef.current;
+    const absE = Math.abs(emf);
+    const dir = Math.sign(emf) || 1;
+    phaseRef.current = (phaseRef.current + delta * (0.5 + absE * 2.5) * dir + 20) % (Math.PI * 2);
+    const a = phaseRef.current;
+    pulse.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+    pulse.scale.setScalar(absE < 0.03 ? 0.001 : 0.05 + absE * 0.06);
+    if (pulse.material) pulse.material.emissiveIntensity = 0.9 + absE * 1.7;
+  });
+
+  return (
+    <group ref={groupRef} position={[0, -0.82, 0]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 0.1, 28, 1, false, 0, Math.PI]} />
+        <meshStandardMaterial color="#f97316" metalness={0.6} roughness={0.35} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 0.1, 28, 1, false, Math.PI, Math.PI]} />
+        <meshStandardMaterial color="#fb923c" metalness={0.6} roughness={0.35} />
+      </mesh>
+      <mesh ref={pulseRef}>
+        <sphereGeometry args={[1, 12, 12]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -132,37 +163,43 @@ function Arrow3D({
 }
 
 function RightHandScene({ vMag, vDir, bDir }) {
+  const rotorGroupRef = useRef(null);
+  const rotAngleRef = useRef(0);
+  const emfRef = useRef(0);
   const pulseRef = useRef(null);
   const phaseRef = useRef(0);
 
   const vecB = useMemo(() => new THREE.Vector3(bDir, 0, 0), [bDir]);
-  const vecV = useMemo(
-    () => new THREE.Vector3(0, 0, vDir * vMag),
-    [vDir, vMag],
-  );
-  const vecI = useMemo(
-    () => new THREE.Vector3().crossVectors(vecV, vecB),
-    [vecV, vecB],
-  );
+  const vecV = useMemo(() => new THREE.Vector3(0, 0, vDir * vMag), [vDir, vMag]);
+  const vecI = useMemo(() => new THREE.Vector3().crossVectors(vecV, vecB), [vecV, vecB]);
   const iNorm =
     vecI.length() > 1e-6
       ? vecI.clone().normalize().multiplyScalar(Math.min(1, vMag))
       : new THREE.Vector3();
 
   useFrame((_, delta) => {
+    const rotor = rotorGroupRef.current;
     const pulse = pulseRef.current;
-    if (!pulse) return;
-    if (iNorm.length() < 1e-6) {
+    if (!rotor || !pulse) return;
+    const omega = (0.3 + vMag * 2.2) * vDir;
+    rotAngleRef.current += omega * delta;
+    rotor.rotation.y = rotAngleRef.current;
+
+    const emf = vMag * Math.sin(rotAngleRef.current) * bDir * Math.sign(vDir || 1);
+    emfRef.current = emf;
+    const iY = Math.sign(emf) * Math.min(1, Math.abs(emf));
+
+    if (Math.abs(emf) < 0.03) {
       pulse.visible = false;
       return;
     }
     pulse.visible = true;
-    phaseRef.current = (phaseRef.current + delta * (0.8 + vMag * 1.6)) % 1;
+    phaseRef.current = (phaseRef.current + delta * (0.8 + Math.abs(emf) * 2.2)) % 1;
     const y = -0.7 + phaseRef.current * 1.4;
-    const dirSign = Math.sign(iNorm.y) || 1;
+    const dirSign = Math.sign(iY) || 1;
     pulse.position.set(0, y * dirSign, 0);
-    pulse.scale.setScalar(0.08 + vMag * 0.08);
-    pulse.material.emissiveIntensity = 1 + vMag * 1.2;
+    pulse.scale.setScalar(Math.abs(emf) < 0.03 ? 0.001 : 0.08 + Math.abs(emf) * 0.1);
+    pulse.material.emissiveIntensity = 0.9 + Math.abs(emf) * 1.4;
   });
 
   return (
@@ -222,15 +259,14 @@ function RightHandScene({ vMag, vDir, bDir }) {
         </mesh>
       ))}
 
-      <mesh castShadow position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.08, 0.08, 1.6, 20]} />
-        <meshStandardMaterial
-          color={COL.rod}
-          metalness={0.65}
-          roughness={0.32}
-        />
-      </mesh>
-      <RotatingLoop vMag={vMag} vDir={vDir} />
+      <group ref={rotorGroupRef}>
+        <mesh castShadow position={[0, 0, 0]}>
+          <cylinderGeometry args={[0.08, 0.08, 1.6, 20]} />
+          <meshStandardMaterial color={COL.rod} metalness={0.65} roughness={0.32} />
+        </mesh>
+        <RotatingLoop />
+        <RotatingCommutator angleRef={rotAngleRef} emfRef={emfRef} />
+      </group>
       <Text
         position={[0.17, 0.95, 0]}
         fontSize={0.08}
