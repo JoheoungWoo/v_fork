@@ -101,11 +101,9 @@ export default function EMInductionWidget() {
     sun.position.set(3, 10, 5);
     sun.castShadow = true;
     scene.add(sun);
-    scene.add(
-      Object.assign(new THREE.DirectionalLight(0xddeeff, 0.3), {
-        position: new THREE.Vector3(-4, 2, -3),
-      }),
-    );
+    const fillLight = new THREE.DirectionalLight(0xddeeff, 0.3);
+    fillLight.position.set(-4, 2, -3);
+    scene.add(fillLight);
     const nGlow = new THREE.PointLight(0xff3333, 0.8, 8);
     nGlow.position.set(-4.5, 0, 0);
     scene.add(nGlow);
