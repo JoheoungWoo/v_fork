@@ -63,8 +63,7 @@ function RotatingLoop({ emfRef }) {
   useFrame((_, delta) => {
     const emf = emfRef.current;
     const absE = Math.abs(emf);
-    const dir = Math.sign(emf) || 1;
-    phaseRef.current = (phaseRef.current + delta * (0.25 + absE * 1.8) * dir + 10) % 1;
+    phaseRef.current = (phaseRef.current + delta * (0.25 + absE * 1.8) + 10) % 1;
     const pulses = [p1Ref.current, p2Ref.current, p3Ref.current];
     const offsets = [0, 0.33, 0.66];
     pulses.forEach((p, i) => {
@@ -115,8 +114,7 @@ function RotatingCommutator({ angleRef, emfRef }) {
     g.rotation.y = angleRef.current;
     const emf = emfRef.current;
     const absE = Math.abs(emf);
-    const dir = Math.sign(emf) || 1;
-    phaseRef.current = (phaseRef.current + delta * (0.5 + absE * 2.5) * dir + 20) % (Math.PI * 2);
+    phaseRef.current = (phaseRef.current + delta * (0.5 + absE * 2.5) + 20) % (Math.PI * 2);
     const a = phaseRef.current;
     pulse.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
     pulse.scale.setScalar(absE < 0.03 ? 0.001 : 0.05 + absE * 0.06);
@@ -212,40 +210,24 @@ function RightHandScene({ vMag, vDir, bDir }) {
   const rotorGroupRef = useRef(null);
   const rotAngleRef = useRef(0);
   const emfRef = useRef(0);
-  const pulseRef = useRef(null);
-  const phaseRef = useRef(0);
 
   const vecB = useMemo(() => new THREE.Vector3(bDir, 0, 0), [bDir]);
   const vecV = useMemo(() => new THREE.Vector3(0, 0, vDir * vMag), [vDir, vMag]);
   const vecI = useMemo(() => new THREE.Vector3().crossVectors(vecV, vecB), [vecV, vecB]);
-  const iNorm =
-    vecI.length() > 1e-6
-      ? vecI.clone().normalize().multiplyScalar(Math.min(1, vMag))
-      : new THREE.Vector3();
+  const iNorm = useMemo(
+    () => new THREE.Vector3(0, Math.max(0.05, Math.min(1, Math.abs(vecI.y))), 0),
+    [vecI],
+  );
 
   useFrame((_, delta) => {
     const rotor = rotorGroupRef.current;
-    const pulse = pulseRef.current;
-    if (!rotor || !pulse) return;
+    if (!rotor) return;
     const omega = (0.3 + vMag * 2.2) * vDir;
     rotAngleRef.current += omega * delta;
     rotor.rotation.y = rotAngleRef.current;
 
     const emf = vMag * Math.sin(rotAngleRef.current) * bDir * Math.sign(vDir || 1);
     emfRef.current = emf;
-    const iY = Math.sign(emf) * Math.min(1, Math.abs(emf));
-
-    if (Math.abs(emf) < 0.03) {
-      pulse.visible = false;
-      return;
-    }
-    pulse.visible = true;
-    phaseRef.current = (phaseRef.current + delta * (0.8 + Math.abs(emf) * 2.2)) % 1;
-    const y = -0.7 + phaseRef.current * 1.4;
-    const dirSign = Math.sign(iY) || 1;
-    pulse.position.set(0, y * dirSign, 0);
-    pulse.scale.setScalar(Math.abs(emf) < 0.03 ? 0.001 : 0.08 + Math.abs(emf) * 0.1);
-    pulse.material.emissiveIntensity = 0.9 + Math.abs(emf) * 1.4;
   });
 
   return (
@@ -318,16 +300,6 @@ function RightHandScene({ vMag, vDir, bDir }) {
         회전 도체 루프
       </Text>
 
-      <mesh ref={pulseRef}>
-        <sphereGeometry args={[1, 12, 12]} />
-        <meshStandardMaterial
-          color={COL.I}
-          emissive={COL.I}
-          emissiveIntensity={1.1}
-          toneMapped={false}
-        />
-      </mesh>
-
       <Arrow3D
         origin={[-0.05, 0.8, 0.62]}
         dir={[bDir, 0, 0]}
@@ -364,7 +336,7 @@ export default function FlemingRightHandWidget() {
   const [vMag, setVMag] = useState(0.8);
   const [vDir, setVDir] = useState(1);
   const [bDir, setBDir] = useState(1);
-  const iDir = vMag < 0.01 ? 0 : vDir * bDir;
+  const iDir = vMag < 0.01 ? 0 : 1;
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] p-5 font-sans shadow-2xl md:p-8">
@@ -419,7 +391,7 @@ export default function FlemingRightHandWidget() {
       <div className="mb-4 text-xs text-slate-400">
         현재 유도전류 방향 I:{" "}
         <span className="font-mono text-emerald-300">
-          {iDir === 0 ? "0" : iDir > 0 ? "+Y (위)" : "-Y (아래)"}
+          {iDir === 0 ? "0" : "+Y (위, 단방향)"}
         </span>
       </div>
 
