@@ -3,9 +3,9 @@ import * as THREE from "three";
 
 /**
  * 전자기 유도 DC 발전기 3D 위젯
- * - 코일(Wire Coil)이 Y축 기준으로 좌우 회전
- * - N-S 자극 사이에서 코일이 자기장(Z축)을 끊음
- * - Split Ring Commutator + Carbon Brush + Battery 회로
+ * - 자석: X축 좌우 배치 (N=-X, S=+X), 자기장 방향 X축
+ * - 코일: Z축(회전축)으로 좌우 회전 → Y방향 도선이 자기장 절단
+ * - 밝은 배경
  * DB lecture_id: 'electromagnetic_induction'
  */
 export default function EMInductionWidget() {
@@ -18,7 +18,7 @@ export default function EMInductionWidget() {
     showFlux: false,
     showCurrent: true,
   });
-  const sceneRef = useRef(null);
+  const sceneRef = useRef({});
 
   const [speed, setSpeed] = useState(1.0);
   const [bField, setBField] = useState(1.0);
@@ -26,10 +26,9 @@ export default function EMInductionWidget() {
   const [showFlux, setShowFlux] = useState(false);
   const [showCurrent, setShowCurrent] = useState(true);
   const [hudAngle, setHudAngle] = useState(0);
-  const [hudEmf, setHudEmf] = useState(0);
+  const [hudEmf, setHudEmf] = useState("0.0");
   const [hudDir, setHudDir] = useState("대기중");
 
-  // sync refs
   useEffect(() => {
     stateRef.current.speed = speed;
   }, [speed]);
@@ -41,15 +40,14 @@ export default function EMInductionWidget() {
   }, [paused]);
   useEffect(() => {
     stateRef.current.showFlux = showFlux;
-    if (sceneRef.current?.fluxGroup)
+    if (sceneRef.current.fluxGroup)
       sceneRef.current.fluxGroup.visible = showFlux;
   }, [showFlux]);
   useEffect(() => {
     stateRef.current.showCurrent = showCurrent;
-    if (sceneRef.current?.arrows)
-      sceneRef.current.arrows.forEach((a) => {
-        a.visible = showCurrent;
-      });
+    sceneRef.current.arrows?.forEach((a) => {
+      a.visible = showCurrent;
+    });
   }, [showCurrent]);
 
   useEffect(() => {
@@ -63,56 +61,51 @@ export default function EMInductionWidget() {
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
 
-    // ── Scene / Camera ────────────────────────────────────────
+    // ── Scene ─────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x060b14);
-    scene.fog = new THREE.Fog(0x060b14, 14, 24);
+    scene.background = new THREE.Color(0xf1f5f9); // 밝은 slate
+    scene.fog = new THREE.Fog(0xf1f5f9, 16, 28);
 
+    // ── Camera ────────────────────────────────────────────────
+    // 자석: X축 좌우, 코일: Z축 회전
+    // 카메라는 약간 위/뒤에서 사선으로 → 자석+코일 모두 잘 보임
     const cam = new THREE.PerspectiveCamera(
-      42,
+      40,
       el.clientWidth / el.clientHeight,
       0.1,
       80,
     );
-    // 카메라: 자석이 Z축(-Z=N, +Z=S)에 배치, 코일 Y축 회전
-    // 정면에서 보면 코일의 좌우 회전이 잘 보임
-    cam.position.set(0, 3.8, 9.5);
-    cam.lookAt(0, 0.2, 0);
+    cam.position.set(0, 5.5, 9.0);
+    cam.lookAt(0, 0.3, 0);
 
     // ── Lights ────────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0x1e3a5f, 1.8));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(4, 8, 4);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    sun.position.set(5, 10, 6);
     sun.castShadow = true;
     scene.add(sun);
-    const nLight = new THREE.PointLight(0xff3030, 1.2, 7);
-    nLight.position.set(0, 0, -3.2);
-    scene.add(nLight);
-    const sLight = new THREE.PointLight(0x3060ff, 1.2, 7);
-    sLight.position.set(0, 0, 3.2);
-    scene.add(sLight);
+    const fill = new THREE.DirectionalLight(0xe0e8ff, 0.4);
+    fill.position.set(-4, 2, -4);
+    scene.add(fill);
+    const nGlow = new THREE.PointLight(0xff4444, 0.6, 6);
+    nGlow.position.set(-3.5, 0, 0);
+    scene.add(nGlow);
+    const sGlow = new THREE.PointLight(0x4466ff, 0.6, 6);
+    sGlow.position.set(3.5, 0, 0);
+    scene.add(sGlow);
 
     // ── Grid ──────────────────────────────────────────────────
-    const grid = new THREE.GridHelper(14, 28, 0x1e293b, 0x0f172a);
-    grid.position.y = -2.2;
+    const grid = new THREE.GridHelper(16, 32, 0xc8d6e0, 0xdde6ee);
+    grid.position.y = -2.3;
     scene.add(grid);
 
-    // ── Helper: tube from point A to B ────────────────────────
-    const tubeMat = (color, emissive = color, ei = 0.1) =>
-      new THREE.MeshStandardMaterial({
-        color,
-        emissive,
-        emissiveIntensity: ei,
-        metalness: 0.3,
-        roughness: 0.4,
-      });
-
-    function addTube(from, to, radius = 0.05, mat) {
+    // ── Helpers ───────────────────────────────────────────────
+    function addTube(from, to, radius, mat) {
       const dir = new THREE.Vector3().subVectors(to, from);
       const len = dir.length();
       const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
       const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius, radius, len, 12),
+        new THREE.CylinderGeometry(radius, radius, len, 14),
         mat,
       );
       mesh.position.copy(mid);
@@ -123,127 +116,146 @@ export default function EMInductionWidget() {
       return mesh;
     }
 
-    // ── MAGNETS (자석 N=-Z, S=+Z) ────────────────────────────
-    // 코일이 Y축 회전 → 자기장은 Z축 방향(N→S: -Z→+Z)
-    function makeMagnet(color, z) {
+    // ── MAGNETS: X축 좌우 (N=-X, S=+X) ──────────────────────
+    // 자기장 방향: N(−X) → S(+X), 즉 +X 방향
+    // 코일이 Z축으로 회전하면 Y방향 도선이 자기장(X)을 끊음 → EMF 발생
+    function makeMagnet(color, x, labelText, labelColor) {
       const g = new THREE.Group();
+
+      // 메인 블록
       const bodyMat = new THREE.MeshStandardMaterial({
         color,
-        roughness: 0.35,
-        metalness: 0.25,
+        roughness: 0.3,
+        metalness: 0.2,
       });
-      // 메인 블록
       const body = new THREE.Mesh(
-        new THREE.BoxGeometry(2.2, 2.6, 0.75),
+        new THREE.BoxGeometry(0.85, 2.8, 2.0),
         bodyMat,
       );
       g.add(body);
-      // 극면 (안쪽)
+
+      // 극면 (안쪽 면, 코일 쪽)
       const faceMat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(color).addScalar(0.12),
-        roughness: 0.25,
+        color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.18),
+        roughness: 0.2,
         metalness: 0.1,
       });
       const face = new THREE.Mesh(
-        new THREE.BoxGeometry(2.0, 2.4, 0.18),
+        new THREE.BoxGeometry(0.18, 2.6, 1.8),
         faceMat,
       );
-      face.position.z = z < 0 ? 0.46 : -0.46;
+      face.position.x = x < 0 ? 0.51 : -0.51;
       g.add(face);
-      g.position.set(0, 0, z);
-      scene.add(g);
-      return g;
-    }
-    makeMagnet(0xcc2222, -3.0); // N
-    makeMagnet(0x1144cc, 3.0); // S
 
-    // 극 레이블 (Canvas texture)
-    function makeLabel(text, color, pos) {
+      // 극 레이블
       const cv = document.createElement("canvas");
       cv.width = 128;
       cv.height = 128;
       const ctx = cv.getContext("2d");
-      ctx.fillStyle = color;
-      ctx.font = "bold 96px Arial";
+      ctx.fillStyle = labelColor;
+      ctx.font = "bold 100px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(text, 64, 64);
-      const tex = new THREE.CanvasTexture(cv);
-      const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.8, 0.8),
+      ctx.fillText(labelText, 64, 64);
+      const lbl = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.7, 0.7),
         new THREE.MeshBasicMaterial({
-          map: tex,
+          map: new THREE.CanvasTexture(cv),
           transparent: true,
           side: THREE.DoubleSide,
         }),
       );
-      mesh.position.set(...pos);
-      scene.add(mesh);
-    }
-    makeLabel("N", "#ff7777", [0, 0.5, -3.05]);
-    makeLabel("S", "#7799ff", [0, 0.5, 3.05]);
+      lbl.position.set(x < 0 ? 0.55 : -0.55, 0.4, 1.05);
+      g.add(lbl);
 
-    // ── AXLE (Y축 회전축 → X방향 수평봉) ────────────────────
+      g.position.x = x;
+      scene.add(g);
+      return g;
+    }
+    makeMagnet(0xdc2626, -3.6, "N", "#ff8888"); // N극 왼쪽
+    makeMagnet(0x1d4ed8, 3.6, "S", "#88aaff"); // S극 오른쪽
+
+    // ── AXLE: Z축 방향 회전축 ─────────────────────────────────
+    // 코일이 Z축으로 회전하므로 axle은 Z방향 수평봉
     const axle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.055, 0.055, 6.5, 16),
+      new THREE.CylinderGeometry(0.055, 0.055, 7.0, 14),
       new THREE.MeshStandardMaterial({
         color: 0x94a3b8,
-        metalness: 0.9,
+        metalness: 0.85,
         roughness: 0.15,
       }),
     );
-    axle.rotation.z = Math.PI / 2; // X축으로 눕힘 (좌우)
+    axle.rotation.x = Math.PI / 2; // Z축으로 눕힘
     scene.add(axle);
 
-    // ── COIL GROUP (Y축 기준 회전) ────────────────────────────
+    // ── COIL GROUP (Z축 회전) ─────────────────────────────────
+    // 코일은 XY 평면의 사각형, Z축 회전 → 좌우 도선(Y방향, x=±CW/2)이 자기장 절단
     const coilGroup = new THREE.Group();
     scene.add(coilGroup);
 
-    // 코일: XZ 평면의 사각형 루프, Y축 회전
-    // 코일 좌측(x=-W/2), 우측(x=+W/2) 도선이 자기장을 끊음
-    const CW = 1.7; // 코일 폭 (X방향)
-    const CH = 1.9; // 코일 높이 (Y방향)
-    const coilYellowMat = tubeMat(0xfacc15, 0xfacc15, 0.2);
-    const coilDimMat = tubeMat(0xe2b800, 0xe2b800, 0.05);
+    const CW = 1.7; // 코일 X폭
+    const CH = 1.9; // 코일 Y높이
 
-    // 좌우 유효 도선 (자기장 끊는 쪽)
+    const wireMatL = new THREE.MeshStandardMaterial({
+      color: 0xeab308,
+      emissive: 0xeab308,
+      emissiveIntensity: 0.2,
+      metalness: 0.3,
+      roughness: 0.4,
+    });
+    const wireMatR = new THREE.MeshStandardMaterial({
+      color: 0xeab308,
+      emissive: 0xeab308,
+      emissiveIntensity: 0.2,
+      metalness: 0.3,
+      roughness: 0.4,
+    });
+    const wireMatConn = new THREE.MeshStandardMaterial({
+      color: 0xca8a04,
+      emissive: 0xca8a04,
+      emissiveIntensity: 0.05,
+      metalness: 0.3,
+      roughness: 0.5,
+    });
+
+    // 유효 도선: 좌(x=-CW/2), 우(x=+CW/2) → Y방향으로 뻗음
     const wireL = addTube(
       new THREE.Vector3(-CW / 2, -CH / 2, 0),
       new THREE.Vector3(-CW / 2, CH / 2, 0),
       0.058,
-      coilYellowMat.clone(),
+      wireMatL,
     );
     const wireR = addTube(
       new THREE.Vector3(CW / 2, -CH / 2, 0),
       new THREE.Vector3(CW / 2, CH / 2, 0),
       0.058,
-      coilYellowMat.clone(),
+      wireMatR,
     );
-    // 상하 연결 도선
+    // 연결 도선: 상하
     const wireTop = addTube(
       new THREE.Vector3(-CW / 2, CH / 2, 0),
       new THREE.Vector3(CW / 2, CH / 2, 0),
-      0.042,
-      coilDimMat.clone(),
+      0.04,
+      wireMatConn.clone(),
     );
     const wireBot = addTube(
       new THREE.Vector3(-CW / 2, -CH / 2, 0),
       new THREE.Vector3(CW / 2, -CH / 2, 0),
-      0.042,
-      coilDimMat.clone(),
+      0.04,
+      wireMatConn.clone(),
     );
     coilGroup.add(wireL, wireR, wireTop, wireBot);
 
-    // ── COMMUTATOR (Split Ring, Y축 회전) ─────────────────────
+    // ── COMMUTATOR (Z축 회전, X축 끝에 배치 → 실제론 Z축 끝) ─
+    // 회전축이 Z이므로 commutator는 Z ±2.6에 배치
     const commMat = new THREE.MeshStandardMaterial({
-      color: 0xf97316,
-      emissive: 0xf97316,
-      emissiveIntensity: 0.08,
-      metalness: 0.7,
-      roughness: 0.2,
+      color: 0xea580c,
+      emissive: 0xea580c,
+      emissiveIntensity: 0.1,
+      metalness: 0.65,
+      roughness: 0.25,
     });
     for (let s = 0; s < 2; s++) {
-      // X축 방향으로 배치, Y축 회전이므로 commutator도 같이 회전
       const half = new THREE.Mesh(
         new THREE.CylinderGeometry(
           0.22,
@@ -253,140 +265,160 @@ export default function EMInductionWidget() {
           1,
           false,
           s * Math.PI,
-          Math.PI * 0.9,
+          Math.PI * 0.88,
         ),
         commMat,
       );
-      // commutator는 축 끝에 배치 (X ±2.5)
-      half.rotation.z = Math.PI / 2;
-      half.position.set(s === 0 ? 2.5 : -2.5, 0, 0);
+      // Z축이 회전축 → cylinder를 X축으로 세운 뒤 Z방향 배치
+      half.rotation.x = Math.PI / 2;
+      half.position.set(0, 0, s === 0 ? 2.7 : -2.7);
       coilGroup.add(half);
     }
 
-    // ── CARBON BRUSHES (고정, 정류자 접촉) ───────────────────
+    // ── CARBON BRUSHES ────────────────────────────────────────
     const brushMat = new THREE.MeshStandardMaterial({
-      color: 0x64748b,
-      roughness: 0.7,
+      color: 0x475569,
+      roughness: 0.8,
     });
     [
-      [2.5, 0.28],
-      [2.5, -0.28],
-      [-2.5, 0.28],
-      [-2.5, -0.28],
-    ].forEach(([x, z]) => {
+      [0, 0.28, 2.7],
+      [0, -0.28, 2.7],
+      [0, 0.28, -2.7],
+      [0, -0.28, -2.7],
+    ].forEach(([x, y, z]) => {
       const b = new THREE.Mesh(
-        new THREE.BoxGeometry(0.13, 0.38, 0.22),
+        new THREE.BoxGeometry(0.22, 0.38, 0.13),
         brushMat,
       );
-      b.position.set(x, -0.26, z);
+      b.position.set(x, y - 0.25, z);
       scene.add(b);
+      // 스프링
+      const sp = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 0.28, 8),
+        new THREE.MeshStandardMaterial({ color: 0x64748b }),
+      );
+      sp.position.set(x, y + 0.07, z);
+      scene.add(sp);
     });
 
     // ── CURRENT ARROWS ────────────────────────────────────────
-    const arrowGeo = new THREE.ConeGeometry(0.075, 0.22, 8);
-    const arrowMatL = new THREE.MeshBasicMaterial({ color: 0x22c55e });
-    const arrowMatR = new THREE.MeshBasicMaterial({ color: 0x22c55e });
-    const arrL1 = new THREE.Mesh(arrowGeo, arrowMatL.clone());
-    const arrL2 = new THREE.Mesh(arrowGeo, arrowMatL.clone());
-    const arrR1 = new THREE.Mesh(arrowGeo, arrowMatR.clone());
-    const arrR2 = new THREE.Mesh(arrowGeo, arrowMatR.clone());
+    const arrowGeo = new THREE.ConeGeometry(0.072, 0.21, 8);
+    const makeArrow = (pos) => {
+      const m = new THREE.Mesh(
+        arrowGeo,
+        new THREE.MeshBasicMaterial({ color: 0x16a34a }),
+      );
+      m.position.copy(pos);
+      coilGroup.add(m);
+      return m;
+    };
+    const arrL1 = makeArrow(new THREE.Vector3(-CW / 2, -0.32, 0));
+    const arrL2 = makeArrow(new THREE.Vector3(-CW / 2, 0.32, 0));
+    const arrR1 = makeArrow(new THREE.Vector3(CW / 2, 0.32, 0));
+    const arrR2 = makeArrow(new THREE.Vector3(CW / 2, -0.32, 0));
     const arrows = [arrL1, arrL2, arrR1, arrR2];
-    arrL1.position.set(-CW / 2, -0.35, 0);
-    arrL2.position.set(-CW / 2, 0.35, 0);
-    arrR1.position.set(CW / 2, 0.35, 0);
-    arrR2.position.set(CW / 2, -0.35, 0);
-    arrows.forEach((a) => coilGroup.add(a));
-    sceneRef.current = { ...sceneRef.current, arrows };
+    sceneRef.current.arrows = arrows;
 
-    // ── MAGNETIC FLUX LINES (Z축 방향: N→S) ──────────────────
+    // ── MAGNETIC FLUX LINES (X축 방향: N→S) ──────────────────
     const fluxGroup = new THREE.Group();
-    const fluxMat = new THREE.LineBasicMaterial({
-      color: 0xfbbf24,
-      opacity: 0.3,
+    const fluxLineMat = new THREE.LineBasicMaterial({
+      color: 0xef4444,
+      opacity: 0.22,
       transparent: true,
     });
-    for (let x = -0.8; x <= 0.8; x += 0.4) {
-      for (let y = -0.7; y <= 0.7; y += 0.35) {
+    const fluxArrowMat = new THREE.MeshBasicMaterial({
+      color: 0xef4444,
+      opacity: 0.35,
+      transparent: true,
+    });
+    for (let y = -0.65; y <= 0.65; y += 0.325) {
+      for (let z = -0.55; z <= 0.55; z += 0.55) {
         const pts = [];
-        for (let z = -2.2; z <= 2.2; z += 0.15)
+        for (let x = -2.9; x <= 2.9; x += 0.18)
           pts.push(new THREE.Vector3(x, y, z));
-        const geo = new THREE.BufferGeometry().setFromPoints(pts);
-        fluxGroup.add(new THREE.Line(geo, fluxMat));
-        // 화살표 헤드
-        const ah = new THREE.Mesh(
-          new THREE.ConeGeometry(0.04, 0.12, 6),
-          new THREE.MeshBasicMaterial({
-            color: 0xfbbf24,
-            opacity: 0.4,
-            transparent: true,
-          }),
+        fluxGroup.add(
+          new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(pts),
+            fluxLineMat,
+          ),
         );
-        ah.position.set(x, y, 0.3);
-        // Z방향으로 회전 (Y→Z)
-        ah.rotation.x = Math.PI / 2;
-        fluxGroup.add(ah);
+        // 화살표
+        for (let x = -1.5; x <= 1.5; x += 1.5) {
+          const ah = new THREE.Mesh(
+            new THREE.ConeGeometry(0.038, 0.11, 6),
+            fluxArrowMat.clone(),
+          );
+          ah.rotation.z = -Math.PI / 2; // X축 방향
+          ah.position.set(x, y, z);
+          fluxGroup.add(ah);
+        }
       }
     }
     fluxGroup.visible = false;
     scene.add(fluxGroup);
-    sceneRef.current = { ...sceneRef.current, fluxGroup };
+    sceneRef.current.fluxGroup = fluxGroup;
 
-    // ── PULLEY (상단, X축 방향) ────────────────────────────────
+    // ── PULLEY (상단, Z축 방향) ───────────────────────────────
     const pulleyGroup = new THREE.Group();
     const pRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.38, 0.055, 8, 24),
-      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.75 }),
+      new THREE.TorusGeometry(0.36, 0.053, 8, 24),
+      new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.75,
+        roughness: 0.3,
+      }),
     );
-    // Pulley는 Y축 회전이므로 XZ면에 배치
-    pRing.rotation.y = Math.PI / 2;
+    pRing.rotation.x = Math.PI / 2; // XY면에 눕힘
     pulleyGroup.add(pRing);
     const pHub = new THREE.Mesh(
       new THREE.CylinderGeometry(0.07, 0.07, 0.22, 12),
       new THREE.MeshStandardMaterial({ color: 0x64748b }),
     );
-    pHub.rotation.z = Math.PI / 2;
+    pHub.rotation.x = Math.PI / 2;
     pulleyGroup.add(pHub);
-    pulleyGroup.position.set(2.5, 2.3, 0);
+    pulleyGroup.position.set(0, 2.4, 2.7);
     scene.add(pulleyGroup);
 
-    // 벨트 와이어
+    // 벨트
     const beltMat = new THREE.LineBasicMaterial({ color: 0x78716c });
-    const beltPts1 = [
-      new THREE.Vector3(2.5, 0.12, 0),
-      new THREE.Vector3(2.5, 1.92, 0),
-    ];
     scene.add(
       new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(beltPts1),
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0.12, 2.7),
+          new THREE.Vector3(0, 2.04, 2.7),
+        ]),
         beltMat,
       ),
     );
-    const beltPts2 = [
-      new THREE.Vector3(2.5, 2.3, 0.38),
-      new THREE.Vector3(0, 2.9, 0),
-      new THREE.Vector3(0, 0, 0),
-    ];
     scene.add(
       new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(beltPts2),
-        new THREE.LineBasicMaterial({ color: 0x57534e }),
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 2.4, 3.06),
+          new THREE.Vector3(0, 3.1, 0),
+          new THREE.Vector3(0, 0, 0),
+        ]),
+        new THREE.LineBasicMaterial({ color: 0x64748b }),
       ),
     );
 
-    // ── BATTERY (하단) ────────────────────────────────────────
+    // ── BATTERY (하단 중앙) ───────────────────────────────────
     const battGroup = new THREE.Group();
-    battGroup.position.set(0, -2.5, 0);
+    battGroup.position.set(0, -2.55, 0);
     const battBody = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 0.5, 0.7),
-      new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.5 }),
+      new THREE.BoxGeometry(1.5, 0.5, 0.68),
+      new THREE.MeshStandardMaterial({
+        color: 0x15803d,
+        roughness: 0.45,
+        metalness: 0.1,
+      }),
     );
     battGroup.add(battBody);
     [
-      [-0.5, "+", 0xfacc15],
-      [0.5, "−", 0x94a3b8],
-    ].forEach(([dx, label, col]) => {
+      [-0.45, 0xfacc15],
+      [0.45, 0x94a3b8],
+    ].forEach(([dx, col]) => {
       const t = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.06, 0.14, 8),
+        new THREE.CylinderGeometry(0.06, 0.06, 0.13, 8),
         new THREE.MeshStandardMaterial({ color: col }),
       );
       t.position.set(dx, 0.32, 0);
@@ -394,107 +426,106 @@ export default function EMInductionWidget() {
     });
     scene.add(battGroup);
 
-    // 회로 와이어 (Y축 배치된 commutator와 연결 → X축 끝에서 수직으로 내려와 배터리로)
-    const wireMat = new THREE.LineBasicMaterial({ color: 0xef4444 });
-    const wireMat2 = new THREE.LineBasicMaterial({ color: 0x3b82f6 });
-    const makeWire = (pts, mat) => {
+    // 회로 와이어 (Z축 양쪽 commutator → 배터리)
+    const addWire = (pts, color) => {
       scene.add(
         new THREE.Line(
           new THREE.BufferGeometry().setFromPoints(
             pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
           ),
-          mat,
+          new THREE.LineBasicMaterial({ color, linewidth: 2 }),
         ),
       );
     };
-    makeWire(
+    addWire(
       [
-        [-2.5, -0.5, 0],
-        [-2.5, -2.3, 0],
-        [-0.8, -2.3, 0],
+        [0, -0.5, 2.7],
+        [0, -2.3, 2.7],
+        [0, -2.3, 0.4],
       ],
-      wireMat,
+      0xdc2626,
     );
-    makeWire(
+    addWire(
       [
-        [0.8, -2.3, 0],
-        [2.5, -2.3, 0],
-        [2.5, -0.5, 0],
+        [0, -2.3, -0.4],
+        [0, -2.3, -2.7],
+        [0, -0.5, -2.7],
       ],
-      wireMat2,
+      0x2563eb,
+    );
+    // 배터리 연결 짧은 선
+    addWire(
+      [
+        [-0.45, -2.3, 0],
+        [-0.45, -2.4, 0],
+      ],
+      0xdc2626,
+    );
+    addWire(
+      [
+        [0.45, -2.4, 0],
+        [0.45, -2.3, 0],
+      ],
+      0x2563eb,
     );
 
     // ── ANIMATION LOOP ────────────────────────────────────────
     let lastT = performance.now();
     let rafId;
-    let camT = 0;
 
     function animate(now) {
       rafId = requestAnimationFrame(animate);
       const dt = Math.min((now - lastT) / 1000, 0.05);
       lastT = now;
 
-      const {
-        angle: prevAngle,
-        speed,
-        bField,
-        paused,
-        showCurrent,
-      } = stateRef.current;
-      let angle = prevAngle;
-      if (!paused) angle += speed * dt * 1.4;
-      stateRef.current.angle = angle;
+      const { speed, bField, paused, showCurrent } = stateRef.current;
+      if (!paused) stateRef.current.angle += speed * dt * 1.5;
+      const angle = stateRef.current.angle;
 
-      // ── 코일 Y축 회전 ────────────────────────────────────────
-      coilGroup.rotation.y = angle;
-      pulleyGroup.rotation.y -= speed * dt * 0.9;
+      // 코일 Z축 회전
+      coilGroup.rotation.z = angle;
+      pulleyGroup.rotation.x -= speed * dt * 0.85;
 
-      // ── EMF 계산 ──────────────────────────────────────────────
-      // 코일 법선이 Z축(자기장 방향)과 이루는 각 = angle
-      // Φ = B·A·cos(angle), EMF = -dΦ/dt ∝ sin(angle)
-      const emf = bField * Math.sin(angle); // -1 ~ +1 정규화
-      const emfV = (emf * 120).toFixed(1); // 스케일된 전압
+      // EMF: 자기장 X축, 코일 법선 처음 X축
+      // Φ = B·cos(angle), EMF ∝ B·sin(angle)
+      const emf = bField * Math.sin(angle);
+      const emfV = (emf * 120).toFixed(1);
 
-      // ── 전류 방향 화살표 ──────────────────────────────────────
+      // 전류 방향 화살표
       const dir = Math.sign(emf) || 1;
-      arrL1.rotation.x = dir > 0 ? 0 : Math.PI;
-      arrL2.rotation.x = dir > 0 ? 0 : Math.PI;
-      arrR1.rotation.x = dir > 0 ? Math.PI : 0;
-      arrR2.rotation.x = dir > 0 ? Math.PI : 0;
-      const alpha = Math.min(1, Math.abs(emf) * 1.3);
+      arrL1.rotation.z = dir > 0 ? 0 : Math.PI;
+      arrL2.rotation.z = dir > 0 ? 0 : Math.PI;
+      arrR1.rotation.z = dir > 0 ? Math.PI : 0;
+      arrR2.rotation.z = dir > 0 ? Math.PI : 0;
+      const alpha = Math.min(1, Math.abs(emf) * 1.2);
       arrows.forEach((a) => {
-        a.material.opacity = 0.15 + alpha * 0.85;
+        a.material.opacity = 0.12 + alpha * 0.88;
         a.material.transparent = true;
         a.visible = showCurrent;
       });
 
-      // ── 코일 발광 ─────────────────────────────────────────────
-      const emissiveCol =
+      // 코일 도선 발광 색
+      const abs = Math.abs(emf);
+      wireMatL.emissive.set(
         emf >= 0
-          ? new THREE.Color(0.05, 0.45 * Math.abs(emf), 0.05)
-          : new THREE.Color(0.45 * Math.abs(emf), 0.05, 0.05);
-      [wireL, wireR].forEach((w) => {
-        w.material.emissive = emissiveCol;
-        w.material.emissiveIntensity = 0.05 + Math.abs(emf) * 0.6;
-      });
+          ? new THREE.Color(0.0, 0.35 * abs, 0.0)
+          : new THREE.Color(0.5 * abs, 0.0, 0.0),
+      );
+      wireMatL.emissiveIntensity = 0.08 + abs * 0.55;
+      wireMatR.emissive.copy(wireMatL.emissive);
+      wireMatR.emissiveIntensity = wireMatL.emissiveIntensity;
 
-      // ── HUD 업데이트 ──────────────────────────────────────────
+      // HUD
       const deg = Math.round(((((angle * 180) / Math.PI) % 360) + 360) % 360);
       setHudAngle(deg);
-      setHudEmf(parseFloat(emfV));
-      setHudDir(
-        Math.abs(emf) < 0.05
-          ? "전환점 (0V)"
-          : emf > 0
-            ? "→ 정방향"
-            : "← 역방향",
-      );
+      setHudEmf(emfV);
+      setHudDir(abs < 0.05 ? "전환점 (0V)" : emf > 0 ? "→ 정방향" : "← 역방향");
 
       renderer.render(scene, cam);
     }
     rafId = requestAnimationFrame(animate);
 
-    // ── Resize ────────────────────────────────────────────────
+    // Resize
     const ro = new ResizeObserver(() => {
       if (!el) return;
       renderer.setSize(el.clientWidth, el.clientHeight);
@@ -511,8 +542,20 @@ export default function EMInductionWidget() {
     };
   }, []);
 
-  const emfPct = Math.min(100, Math.abs(hudEmf) / 1.2);
-  const emfColor = hudEmf >= 0 ? "#22c55e" : "#ef4444";
+  const emfAbs = Math.abs(parseFloat(hudEmf));
+  const emfPct = Math.min(100, emfAbs / 1.2);
+  const emfColor = parseFloat(hudEmf) >= 0 ? "#16a34a" : "#dc2626";
+
+  const btnStyle = (active) => ({
+    padding: "4px 13px",
+    fontSize: 12,
+    cursor: "pointer",
+    border: `0.5px solid ${active ? "#3b82f6" : "#cbd5e1"}`,
+    borderRadius: 8,
+    background: active ? "#eff6ff" : "#ffffff",
+    color: active ? "#1d4ed8" : "#64748b",
+    transition: "all 0.15s",
+  });
 
   return (
     <div
@@ -529,10 +572,10 @@ export default function EMInductionWidget() {
           width: "100%",
           aspectRatio: "16/9",
           maxHeight: 420,
-          border: "0.5px solid rgba(255,255,255,0.1)",
+          border: "0.5px solid #e2e8f0",
           borderRadius: 12,
           overflow: "hidden",
-          background: "#060b14",
+          background: "#f1f5f9",
         }}
       >
         <div ref={mountRef} style={{ width: "100%", height: "100%" }} />
@@ -556,17 +599,18 @@ export default function EMInductionWidget() {
             <div
               key={label}
               style={{
-                background: "rgba(6,11,20,0.80)",
-                border: "0.5px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.88)",
+                border: "0.5px solid #e2e8f0",
                 borderRadius: 6,
                 padding: "3px 10px",
                 fontSize: 11,
-                color: "#e2e8f0",
+                color: "#1e293b",
                 fontVariantNumeric: "tabular-nums",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
               }}
             >
-              <span style={{ color: "#64748b" }}>{label} </span>
-              {val}
+              <span style={{ color: "#94a3b8" }}>{label} </span>
+              <span style={{ fontWeight: 500 }}>{val}</span>
             </div>
           ))}
         </div>
@@ -578,7 +622,7 @@ export default function EMInductionWidget() {
             bottom: 10,
             left: "50%",
             transform: "translateX(-50%)",
-            width: "min(280px,78%)",
+            width: "min(280px,76%)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -592,7 +636,7 @@ export default function EMInductionWidget() {
             style={{
               width: "100%",
               height: 5,
-              background: "rgba(255,255,255,0.07)",
+              background: "rgba(0,0,0,0.08)",
               borderRadius: 3,
               overflow: "hidden",
             }}
@@ -620,73 +664,53 @@ export default function EMInductionWidget() {
           alignItems: "center",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 12,
-            color: "var(--color-text-secondary)",
-            flex: 1,
-            minWidth: 180,
-          }}
-        >
-          <label style={{ minWidth: 76 }}>회전 속도</label>
-          <input
-            type="range"
-            min={0}
-            max={3}
-            step={0.05}
-            value={speed}
-            onChange={(e) => setSpeed(parseFloat(e.target.value))}
-            style={{ flex: 1 }}
-          />
-          <output
+        {[
+          ["회전 속도", 0, 3, 0.05, speed, setSpeed, `${speed.toFixed(1)}×`],
+          [
+            "자기장 세기",
+            0.3,
+            2,
+            0.05,
+            bField,
+            setBField,
+            `${bField.toFixed(1)} T`,
+          ],
+        ].map(([label, min, max, step, val, setter, out]) => (
+          <div
+            key={label}
             style={{
-              minWidth: 36,
-              textAlign: "right",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
               fontSize: 12,
-              color: "var(--color-text-primary)",
-              fontVariantNumeric: "tabular-nums",
+              color: "#64748b",
+              flex: 1,
+              minWidth: 180,
             }}
           >
-            {speed.toFixed(1)}×
-          </output>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 12,
-            color: "var(--color-text-secondary)",
-            flex: 1,
-            minWidth: 180,
-          }}
-        >
-          <label style={{ minWidth: 76 }}>자기장 세기</label>
-          <input
-            type="range"
-            min={0.3}
-            max={2}
-            step={0.05}
-            value={bField}
-            onChange={(e) => setBField(parseFloat(e.target.value))}
-            style={{ flex: 1 }}
-          />
-          <output
-            style={{
-              minWidth: 36,
-              textAlign: "right",
-              fontSize: 12,
-              color: "var(--color-text-primary)",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {bField.toFixed(1)} T
-          </output>
-        </div>
+            <label style={{ minWidth: 76, color: "#475569" }}>{label}</label>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={val}
+              onChange={(e) => setter(parseFloat(e.target.value))}
+              style={{ flex: 1 }}
+            />
+            <span
+              style={{
+                minWidth: 36,
+                textAlign: "right",
+                fontSize: 12,
+                color: "#1e293b",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {out}
+            </span>
+          </div>
+        ))}
 
         <div style={{ display: "flex", gap: 6 }}>
           {[
@@ -694,22 +718,7 @@ export default function EMInductionWidget() {
             ["자속선", () => setShowFlux((v) => !v), showFlux],
             ["전류 표시", () => setShowCurrent((v) => !v), showCurrent],
           ].map(([label, fn, active]) => (
-            <button
-              key={label}
-              onClick={fn}
-              style={{
-                padding: "4px 12px",
-                fontSize: 12,
-                cursor: "pointer",
-                border: `0.5px solid ${active ? "var(--color-border-info, #3b82f6)" : "var(--color-border-secondary, rgba(255,255,255,0.2))"}`,
-                borderRadius: 8,
-                background: active ? "rgba(59,130,246,0.15)" : "transparent",
-                color: active
-                  ? "var(--color-text-info, #60a5fa)"
-                  : "var(--color-text-secondary, #94a3b8)",
-                transition: "all 0.15s",
-              }}
-            >
+            <button key={label} onClick={fn} style={btnStyle(active)}>
               {label}
             </button>
           ))}
@@ -723,17 +732,17 @@ export default function EMInductionWidget() {
           flexWrap: "wrap",
           gap: 12,
           fontSize: 11,
-          color: "var(--color-text-secondary, #94a3b8)",
+          color: "#64748b",
           paddingTop: 2,
         }}
       >
         {[
-          ["#cc2222", "N극"],
-          ["#1144cc", "S극"],
-          ["#facc15", "Wire Coil"],
-          ["#f97316", "Commutator / Brush"],
-          ["#22c55e", "전류 방향"],
-          ["#fbbf24", "자속선 (Magnetic Flux)"],
+          ["#dc2626", "N극"],
+          ["#1d4ed8", "S극"],
+          ["#eab308", "Wire Coil"],
+          ["#ea580c", "Commutator / Brush"],
+          ["#16a34a", "전류 방향"],
+          ["#ef4444", "자속선 (Magnetic Flux)"],
         ].map(([color, label]) => (
           <div
             key={label}
