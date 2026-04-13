@@ -3,6 +3,137 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
+/** 백엔드가 준 omega_t + series[].i 만 그림 (계산 없음) */
+function CurrentWaveformChart({ spec }) {
+  const { polylines, w, h } = useMemo(() => {
+    if (!spec?.omega_t?.length || !spec?.series?.length) {
+      return { polylines: [], w: 720, h: 200 };
+    }
+    const W = 720;
+    const H = 200;
+    const pad = { l: 44, r: 18, t: 14, b: 36 };
+    const plotW = W - pad.l - pad.r;
+    const plotH = H - pad.t - pad.b;
+    const wt = spec.omega_t;
+    const xMin = wt[0];
+    const xMax = wt[wt.length - 1];
+    const yMin = spec.y_min ?? -1.2;
+    const yMax = spec.y_max ?? 1.2;
+    const mapX = (x) => pad.l + ((x - xMin) / (xMax - xMin || 1)) * plotW;
+    const mapY = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin || 1)) * plotH;
+
+    const lines = spec.series.map((s) => {
+      const pts = wt
+        .map((t, i) => {
+          const yv = s.i[i];
+          if (yv === undefined) return null;
+          return `${mapX(t).toFixed(2)},${mapY(yv).toFixed(2)}`;
+        })
+        .filter(Boolean)
+        .join(" ");
+      return { key: s.label, color: s.color, points: pts };
+    });
+    return { polylines: lines, w: W, h: H };
+  }, [spec]);
+
+  if (!polylines.length) return null;
+
+  const pad = { l: 44, r: 18, t: 14, b: 36 };
+  const yMin = spec.y_min ?? -1.2;
+  const yMax = spec.y_max ?? 1.2;
+  const plotW = w - pad.l - pad.r;
+  const plotH = h - pad.t - pad.b;
+  const zeroY = pad.t + (1 - (0 - yMin) / (yMax - yMin || 1)) * plotH;
+
+  return (
+    <div
+      style={{
+        padding: "10px 14px 14px",
+        background: "#121218",
+        borderTop: "1px solid #2a2a34",
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#e0e0e8" }}>
+        {spec.title}
+      </div>
+      {spec.subtitle ? (
+        <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
+          {spec.subtitle}
+        </div>
+      ) : null}
+      <svg
+        width="100%"
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ marginTop: 8, maxHeight: 220 }}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <rect
+          x={pad.l}
+          y={pad.t}
+          width={plotW}
+          height={plotH}
+          fill="none"
+          stroke="#333"
+          strokeWidth={1}
+        />
+        <line
+          x1={pad.l}
+          y1={zeroY}
+          x2={pad.l + plotW}
+          y2={zeroY}
+          stroke="#444"
+          strokeWidth={1}
+          strokeDasharray="4 4"
+        />
+        {polylines.map((pl) => (
+          <polyline
+            key={pl.key}
+            fill="none"
+            stroke={pl.color}
+            strokeWidth={2}
+            points={pl.points}
+          />
+        ))}
+        <text
+          x={w / 2}
+          y={h - 8}
+          textAnchor="middle"
+          fill="#888"
+          fontSize={11}
+        >
+          {spec.x_label}
+        </text>
+        <text
+          x={14}
+          y={pad.t + plotH / 2}
+          fill="#888"
+          fontSize={11}
+          transform={`rotate(-90, 14, ${pad.t + plotH / 2})`}
+        >
+          {spec.y_label}
+        </text>
+        <g transform={`translate(${pad.l + plotW + 8}, ${pad.t + 4})`}>
+          {spec.series.map((s, i) => (
+            <g key={s.label} transform={`translate(0, ${i * 16})`}>
+              <line
+                x1={0}
+                y1={6}
+                x2={18}
+                y2={6}
+                stroke={s.color}
+                strokeWidth={2}
+              />
+              <text x={22} y={10} fill="#ccc" fontSize={11}>
+                {s.label}
+              </text>
+            </g>
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 /**
  * 전류 입자 — 경로·속도·색은 백엔드 JSON.
  * timePhaseShift: 균형 3상 시각 위상 (0, 1/3, 2/3) × path 세그먼트 수만큼 더해 동기.
@@ -83,7 +214,7 @@ const Wiring3DViewer = ({ widgetData }) => {
       <div
         style={{
           width: "100%",
-          height: "600px",
+          minHeight: 400,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -96,18 +227,19 @@ const Wiring3DViewer = ({ widgetData }) => {
     );
   }
 
-  const { coils, wires, labels, animations, current_legend } =
+  const { coils, wires, labels, animations, current_legend, current_waveforms } =
     widgetData.scene_data;
 
   return (
     <div
       style={{
         width: "100%",
-        height: "600px",
         backgroundColor: "#1a1a1a",
         borderRadius: "8px",
         overflow: "hidden",
         position: "relative",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {current_legend?.items?.length ? (
@@ -152,7 +284,8 @@ const Wiring3DViewer = ({ widgetData }) => {
           ))}
         </div>
       ) : null}
-      <Canvas camera={{ position: [0, 0, 15], fov: 60 }}>
+      <div style={{ height: 520, width: "100%" }}>
+      <Canvas camera={{ position: [0, 0, 15], fov: 60 }} style={{ height: "100%", width: "100%" }}>
         {/* 기본 조명 세팅 */}
         <ambientLight intensity={0.8} />
         <directionalLight position={[10, 10, 10]} intensity={1.5} />
@@ -224,6 +357,10 @@ const Wiring3DViewer = ({ widgetData }) => {
               ),
           )}
       </Canvas>
+      </div>
+      {current_waveforms ? (
+        <CurrentWaveformChart spec={current_waveforms} />
+      ) : null}
     </div>
   );
 };
