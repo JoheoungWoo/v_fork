@@ -2,11 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 /**
- * 전자기 유도 DC 발전기 3D 위젯
- * - 자석: X축 좌우 배치 (N=-X, S=+X), 자기장 방향 X축
- * - 코일: Z축(회전축)으로 좌우 회전 → Y방향 도선이 자기장 절단
- * - 밝은 배경
- * DB lecture_id: 'electromagnetic_induction'
+ * 전자기 유도 DC 발전기 3D 위젯 v4
+ *
+ * 좌표계:
+ *   - 자석: X축 좌우 (N=-X, S=+X), 자기장 B = +X 방향
+ *   - 회전축: Y축 (수직 기둥)
+ *   - 코일: XZ 평면에서 시작, Y축 회전 → 좌우로 시계/반시계 회전
+ *
+ * 플레밍 왼손 법칙:
+ *   유효 도선 = Z방향 (z=+CH/2 앞 도선, z=-CH/2 뒤 도선)
+ *   B=+X, 앞 도선 전류=+Z → F = (+Z)×(+X) = -Y (아래) ... 아님
+ *
+ *   올바른 설정:
+ *   코일이 Y축 회전 → 도선은 Y방향으로 뻗어야 F가 XZ 평면 내 접선방향
+ *   B=+X, 도선 전류=+Y → F = I(+Y × +X) = I(-Z) → Z방향 힘
+ *   → 코일의 XZ 좌표 변화 = 시계/반시계 회전 ✓
+ *
+ * 구조:
+ *   - 코일: Y방향 도선 (좌 x=-w/2, 우 x=+w/2), 수평 연결선(Z방향)
+ *   - 회전축: Y축 수직봉
+ *   - Commutator: Y축 회전축 하단에 수평 배치, 코일과 함께 Y축 회전
+ *   - Carbon Brush: Z축 방향 고정 접점
+ *   - 자석: X축 좌우, 코일 양옆
+ *   - 카메라: 약간 위/앞에서 → 자석 좌우, 코일 좌우 회전이 잘 보임
  */
 export default function EMInductionWidget() {
   const mountRef = useRef(null);
@@ -45,7 +63,7 @@ export default function EMInductionWidget() {
   }, [showFlux]);
   useEffect(() => {
     stateRef.current.showCurrent = showCurrent;
-    sceneRef.current.arrows?.forEach((a) => {
+    sceneRef.current.curArrows?.forEach((a) => {
       a.visible = showCurrent;
     });
   }, [showCurrent]);
@@ -54,422 +72,450 @@ export default function EMInductionWidget() {
     const el = mountRef.current;
     if (!el) return;
 
-    // ── Renderer ──────────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    // ── Renderer ────────────────────────────────────────────
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.setSize(el.clientWidth, el.clientHeight);
     el.appendChild(renderer.domElement);
 
-    // ── Scene ─────────────────────────────────────────────────
+    // ── Scene ───────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf1f5f9); // 밝은 slate
-    scene.fog = new THREE.Fog(0xf1f5f9, 16, 28);
+    scene.background = new THREE.Color(0xf0f4f8);
+    scene.fog = new THREE.Fog(0xf0f4f8, 20, 34);
 
-    // ── Camera ────────────────────────────────────────────────
-    // 자석: X축 좌우, 코일: Z축 회전
-    // 카메라는 약간 위/뒤에서 사선으로 → 자석+코일 모두 잘 보임
+    // ── Camera ──────────────────────────────────────────────
+    // 정면 약간 위에서 → 자석(좌우), 코일 XZ 좌우 회전 모두 보임
     const cam = new THREE.PerspectiveCamera(
       40,
       el.clientWidth / el.clientHeight,
       0.1,
       80,
     );
-    cam.position.set(0, 5.5, 9.0);
-    cam.lookAt(0, 0.3, 0);
+    cam.position.set(0, 5.0, 11.0);
+    cam.lookAt(0, 0.0, 0);
 
-    // ── Lights ────────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0xffffff, 1.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-    sun.position.set(5, 10, 6);
+    // ── Lights ──────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0xffffff, 1.9));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    sun.position.set(3, 10, 5);
     sun.castShadow = true;
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xe0e8ff, 0.4);
-    fill.position.set(-4, 2, -4);
-    scene.add(fill);
-    const nGlow = new THREE.PointLight(0xff4444, 0.6, 6);
-    nGlow.position.set(-3.5, 0, 0);
+    scene.add(
+      Object.assign(new THREE.DirectionalLight(0xddeeff, 0.3), {
+        position: new THREE.Vector3(-4, 2, -3),
+      }),
+    );
+    const nGlow = new THREE.PointLight(0xff3333, 0.8, 8);
+    nGlow.position.set(-4.5, 0, 0);
     scene.add(nGlow);
-    const sGlow = new THREE.PointLight(0x4466ff, 0.6, 6);
-    sGlow.position.set(3.5, 0, 0);
+    const sGlow = new THREE.PointLight(0x3355ff, 0.8, 8);
+    sGlow.position.set(4.5, 0, 0);
     scene.add(sGlow);
 
-    // ── Grid ──────────────────────────────────────────────────
-    const grid = new THREE.GridHelper(16, 32, 0xc8d6e0, 0xdde6ee);
-    grid.position.y = -2.3;
+    // ── Grid ────────────────────────────────────────────────
+    const grid = new THREE.GridHelper(20, 40, 0xc0cdd6, 0xd8e4ec);
+    grid.position.y = -3.4;
     scene.add(grid);
 
-    // ── Helpers ───────────────────────────────────────────────
-    function addTube(from, to, radius, mat) {
-      const dir = new THREE.Vector3().subVectors(to, from);
-      const len = dir.length();
-      const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
+    // ── Utility ─────────────────────────────────────────────
+    const Y3 = new THREE.Vector3(0, 1, 0);
+    function tube(from, to, r, mat) {
+      const d = new THREE.Vector3().subVectors(to, from);
+      const len = d.length();
       const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius, radius, len, 14),
+        new THREE.CylinderGeometry(r, r, len, 14),
         mat,
       );
-      mesh.position.copy(mid);
-      mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0),
-        dir.normalize(),
-      );
+      mesh.position.copy(from).addScaledVector(d, 0.5);
+      mesh.quaternion.setFromUnitVectors(Y3, d.clone().normalize());
       return mesh;
     }
 
     // ── MAGNETS: X축 좌우 (N=-X, S=+X) ──────────────────────
-    // 자기장 방향: N(−X) → S(+X), 즉 +X 방향
-    // 코일이 Z축으로 회전하면 Y방향 도선이 자기장(X)을 끊음 → EMF 발생
-    function makeMagnet(color, x, labelText, labelColor) {
+    function makeMagnet(x, color, letter, lc) {
       const g = new THREE.Group();
-
-      // 메인 블록
-      const bodyMat = new THREE.MeshStandardMaterial({
+      const bm = new THREE.MeshStandardMaterial({
         color,
-        roughness: 0.3,
-        metalness: 0.2,
+        roughness: 0.28,
+        metalness: 0.18,
       });
-      const body = new THREE.Mesh(
-        new THREE.BoxGeometry(0.85, 2.8, 2.0),
-        bodyMat,
-      );
-      g.add(body);
-
-      // 극면 (안쪽 면, 코일 쪽)
-      const faceMat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.18),
-        roughness: 0.2,
-        metalness: 0.1,
+      // 몸체 — 얇은 폭(X), 큰 높이(Y), 깊이(Z)
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(1.0, 3.0, 2.0), bm));
+      // 극면 (코일 쪽)
+      const fm = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.14),
+        roughness: 0.18,
       });
-      const face = new THREE.Mesh(
-        new THREE.BoxGeometry(0.18, 2.6, 1.8),
-        faceMat,
-      );
-      face.position.x = x < 0 ? 0.51 : -0.51;
+      const face = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.8, 1.8), fm);
+      face.position.x = x < 0 ? 0.58 : -0.58;
       g.add(face);
-
       // 극 레이블
       const cv = document.createElement("canvas");
       cv.width = 128;
       cv.height = 128;
       const ctx = cv.getContext("2d");
-      ctx.fillStyle = labelColor;
-      ctx.font = "bold 100px Arial";
+      ctx.fillStyle = lc;
+      ctx.font = "bold 90px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(labelText, 64, 64);
-      const lbl = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.7, 0.7),
-        new THREE.MeshBasicMaterial({
-          map: new THREE.CanvasTexture(cv),
-          transparent: true,
-          side: THREE.DoubleSide,
-        }),
-      );
-      lbl.position.set(x < 0 ? 0.55 : -0.55, 0.4, 1.05);
+      ctx.fillText(letter, 64, 64);
+      const lm = new THREE.MeshBasicMaterial({
+        map: new THREE.CanvasTexture(cv),
+        transparent: true,
+        side: THREE.DoubleSide,
+      });
+      const lbl = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.85), lm);
+      lbl.position.set(x < 0 ? 0.62 : -0.62, 0.2, 1.05);
       g.add(lbl);
-
       g.position.x = x;
       scene.add(g);
       return g;
     }
-    makeMagnet(0xdc2626, -3.6, "N", "#ff8888"); // N극 왼쪽
-    makeMagnet(0x1d4ed8, 3.6, "S", "#88aaff"); // S극 오른쪽
+    makeMagnet(-4.2, 0xcc2020, "N", "#ffaaaa");
+    makeMagnet(4.2, 0x1133bb, "S", "#aabbff");
 
-    // ── AXLE: Z축 방향 회전축 ─────────────────────────────────
-    // 코일이 Z축으로 회전하므로 axle은 Z방향 수평봉
+    // ── ROTATION AXIS: Y축 수직봉 ────────────────────────────
     const axle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.055, 0.055, 7.0, 14),
+      new THREE.CylinderGeometry(0.055, 0.055, 8.0, 14),
       new THREE.MeshStandardMaterial({
         color: 0x94a3b8,
-        metalness: 0.85,
-        roughness: 0.15,
+        metalness: 0.9,
+        roughness: 0.12,
       }),
     );
-    axle.rotation.x = Math.PI / 2; // Z축으로 눕힘
+    axle.position.y = 0.5;
     scene.add(axle);
 
-    // ── COIL GROUP (Z축 회전) ─────────────────────────────────
-    // 코일은 XY 평면의 사각형, Z축 회전 → 좌우 도선(Y방향, x=±CW/2)이 자기장 절단
+    // ── COIL GROUP (Y축 회전 = 수평면에서 시계/반시계) ──────
+    // 코일: Y방향 도선 (좌 x=-W, 우 x=+W)
+    //        Z방향 연결선 (앞 z=+D/2, 뒤 z=-D/2)
+    // B=+X, 좌도선 전류=+Y → F=(-Z) 방향 → 코일 시계/반시계 ✓
     const coilGroup = new THREE.Group();
     scene.add(coilGroup);
 
-    const CW = 1.7; // 코일 X폭
-    const CH = 1.9; // 코일 Y높이
+    const CW = 2.0; // 코일 X폭 (자석 사이 들어가도록)
+    const CD = 2.0; // 코일 Z깊이
+    const CH = 2.0; // 도선 Y높이
 
-    const wireMatL = new THREE.MeshStandardMaterial({
-      color: 0xeab308,
-      emissive: 0xeab308,
+    const wireLMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706,
+      emissive: 0xd97706,
       emissiveIntensity: 0.2,
-      metalness: 0.3,
+      metalness: 0.25,
       roughness: 0.4,
     });
-    const wireMatR = new THREE.MeshStandardMaterial({
-      color: 0xeab308,
-      emissive: 0xeab308,
-      emissiveIntensity: 0.2,
-      metalness: 0.3,
-      roughness: 0.4,
-    });
-    const wireMatConn = new THREE.MeshStandardMaterial({
-      color: 0xca8a04,
-      emissive: 0xca8a04,
+    const wireRMat = wireLMat.clone();
+    const connMat = new THREE.MeshStandardMaterial({
+      color: 0xa16207,
+      emissive: 0xa16207,
       emissiveIntensity: 0.05,
-      metalness: 0.3,
-      roughness: 0.5,
     });
 
-    // 유효 도선: 좌(x=-CW/2), 우(x=+CW/2) → Y방향으로 뻗음
-    const wireL = addTube(
+    // 좌 도선: x=-CW/2, y: -CH/2 → +CH/2, z=0 (초기 위치)
+    // 코일이 Y축 회전하면 이 도선이 XZ 평면에서 좌우로 돌아감
+    const wireL = tube(
       new THREE.Vector3(-CW / 2, -CH / 2, 0),
       new THREE.Vector3(-CW / 2, CH / 2, 0),
-      0.058,
-      wireMatL,
+      0.062,
+      wireLMat,
     );
-    const wireR = addTube(
+    const wireR = tube(
       new THREE.Vector3(CW / 2, -CH / 2, 0),
       new THREE.Vector3(CW / 2, CH / 2, 0),
-      0.058,
-      wireMatR,
+      0.062,
+      wireRMat,
     );
-    // 연결 도선: 상하
-    const wireTop = addTube(
+    // 상 연결: y=+CH/2, z: -CD/2 → +CD/2
+    const wireTopF = tube(
       new THREE.Vector3(-CW / 2, CH / 2, 0),
       new THREE.Vector3(CW / 2, CH / 2, 0),
-      0.04,
-      wireMatConn.clone(),
+      0.042,
+      connMat.clone(),
     );
-    const wireBot = addTube(
+    const wireTopB = tube(
       new THREE.Vector3(-CW / 2, -CH / 2, 0),
       new THREE.Vector3(CW / 2, -CH / 2, 0),
-      0.04,
-      wireMatConn.clone(),
+      0.042,
+      connMat.clone(),
     );
-    coilGroup.add(wireL, wireR, wireTop, wireBot);
 
-    // ── COMMUTATOR (Z축 회전, X축 끝에 배치 → 실제론 Z축 끝) ─
-    // 회전축이 Z이므로 commutator는 Z ±2.6에 배치
+    // 실제로 코일을 정면에서 보면 직사각형 루프 → XZ가 아니라 XY면
+    // Y축 회전하면 XY면 루프가 수평 회전 → 좌우 도선이 자석 사이를 왔다갔다 ✓
+    coilGroup.add(wireL, wireR, wireTopF, wireTopB);
+
+    // ── COMMUTATOR: 코일 하단(y=-CH/2-0.4)에 수평 배치 ─────
+    // Y축 회전 → Commutator도 수평(XZ면)에서 회전
+    const commY = -CH / 2 - 0.5;
+    const commR = 0.4;
     const commMat = new THREE.MeshStandardMaterial({
-      color: 0xea580c,
-      emissive: 0xea580c,
-      emissiveIntensity: 0.1,
-      metalness: 0.65,
-      roughness: 0.25,
+      color: 0xf97316,
+      emissive: 0xf97316,
+      emissiveIntensity: 0.14,
+      metalness: 0.72,
+      roughness: 0.2,
     });
-    for (let s = 0; s < 2; s++) {
-      const half = new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          0.22,
-          0.22,
-          0.2,
-          16,
-          1,
-          false,
-          s * Math.PI,
-          Math.PI * 0.88,
-        ),
-        commMat,
-      );
-      // Z축이 회전축 → cylinder를 X축으로 세운 뒤 Z방향 배치
-      half.rotation.x = Math.PI / 2;
-      half.position.set(0, 0, s === 0 ? 2.7 : -2.7);
-      coilGroup.add(half);
-    }
+    // 반원 0 (0 ~ π)
+    const comm0 = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        commR,
+        commR,
+        0.24,
+        20,
+        1,
+        false,
+        0,
+        Math.PI * 0.92,
+      ),
+      commMat,
+    );
+    comm0.position.set(0, commY, 0);
+    coilGroup.add(comm0);
+    // 반원 1 (π ~ 2π)
+    const comm1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        commR,
+        commR,
+        0.24,
+        20,
+        1,
+        false,
+        Math.PI,
+        Math.PI * 0.92,
+      ),
+      commMat,
+    );
+    comm1.position.set(0, commY, 0);
+    coilGroup.add(comm1);
 
-    // ── CARBON BRUSHES ────────────────────────────────────────
-    const brushMat = new THREE.MeshStandardMaterial({
+    // 상하 캡 디스크
+    const capMat = new THREE.MeshStandardMaterial({
+      color: 0xfdba74,
+      metalness: 0.5,
+      roughness: 0.4,
+    });
+    [-0.13, 0.13].forEach((dy) => {
+      const cap = new THREE.Mesh(
+        new THREE.RingGeometry(0.06, commR, 20),
+        capMat,
+      );
+      cap.rotation.x = -Math.PI / 2;
+      cap.position.set(0, commY + dy, 0);
+      coilGroup.add(cap);
+    });
+
+    // ── CARBON BRUSHES: Z축 방향 고정 ────────────────────────
+    // Commutator가 Y축으로 돌면 Z축 방향 브러시가 각 반원에 교대로 접촉
+    const brushM = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.88,
+    });
+    const springM = new THREE.MeshStandardMaterial({
       color: 0x475569,
-      roughness: 0.8,
+      roughness: 0.6,
     });
-    [
-      [0, 0.28, 2.7],
-      [0, -0.28, 2.7],
-      [0, 0.28, -2.7],
-      [0, -0.28, -2.7],
-    ].forEach(([x, y, z]) => {
-      const b = new THREE.Mesh(
-        new THREE.BoxGeometry(0.22, 0.38, 0.13),
-        brushMat,
+    const holderM = new THREE.MeshStandardMaterial({ color: 0x334155 });
+
+    [commR + 0.22, -(commR + 0.22)].forEach((bz, i) => {
+      // 브러시 헤드
+      const bh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.32, 0.16),
+        brushM,
       );
-      b.position.set(x, y - 0.25, z);
-      scene.add(b);
+      bh.position.set(0, commY, bz);
+      scene.add(bh);
       // 스프링
-      const sp = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.03, 0.03, 0.28, 8),
-        new THREE.MeshStandardMaterial({ color: 0x64748b }),
+      const sp = tube(
+        new THREE.Vector3(0, commY + 0.25, bz),
+        new THREE.Vector3(0, commY + 0.65, bz),
+        0.033,
+        springM,
       );
-      sp.position.set(x, y + 0.07, z);
       scene.add(sp);
+      // 지지대
+      const h = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.55, 0.12),
+        holderM,
+      );
+      h.position.set(0, commY + 0.88, bz);
+      scene.add(h);
+      // 리드선: 브러시 → 배터리 쪽으로 내려감
+      const leadMat = new THREE.LineBasicMaterial({
+        color: i === 0 ? 0xdc2626 : 0x1d4ed8,
+      });
+      scene.add(
+        new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, commY - 0.18, bz),
+            new THREE.Vector3(0, commY - 0.8, bz),
+            new THREE.Vector3(0, commY - 0.8, bz * 0.3),
+            new THREE.Vector3(i === 0 ? -0.6 : 0.6, commY - 1.4, 0),
+          ]),
+          leadMat,
+        ),
+      );
     });
 
-    // ── CURRENT ARROWS ────────────────────────────────────────
-    const arrowGeo = new THREE.ConeGeometry(0.072, 0.21, 8);
-    const makeArrow = (pos) => {
+    // ── CURRENT ARROWS: Y방향 도선에 표시 ───────────────────
+    // 좌도선(x=-CW/2): emf>0 → 위(+Y), emf<0 → 아래(-Y)
+    // 우도선(x=+CW/2): 반대
+    const arrowGeo = new THREE.ConeGeometry(0.082, 0.26, 8);
+    const mkArrow = (x, y) => {
       const m = new THREE.Mesh(
         arrowGeo,
-        new THREE.MeshBasicMaterial({ color: 0x16a34a }),
+        new THREE.MeshBasicMaterial({
+          color: 0x16a34a,
+          transparent: true,
+          opacity: 0.9,
+        }),
       );
-      m.position.copy(pos);
+      m.position.set(x, y, 0);
       coilGroup.add(m);
       return m;
     };
-    const arrL1 = makeArrow(new THREE.Vector3(-CW / 2, -0.32, 0));
-    const arrL2 = makeArrow(new THREE.Vector3(-CW / 2, 0.32, 0));
-    const arrR1 = makeArrow(new THREE.Vector3(CW / 2, 0.32, 0));
-    const arrR2 = makeArrow(new THREE.Vector3(CW / 2, -0.32, 0));
-    const arrows = [arrL1, arrL2, arrR1, arrR2];
-    sceneRef.current.arrows = arrows;
+    const arrLU = mkArrow(-CW / 2, 0.5); // 좌 위
+    const arrLD = mkArrow(-CW / 2, -0.5); // 좌 아래
+    const arrRU = mkArrow(CW / 2, 0.5); // 우 위
+    const arrRD = mkArrow(CW / 2, -0.5); // 우 아래
+    const curArrows = [arrLU, arrLD, arrRU, arrRD];
+    sceneRef.current.curArrows = curArrows;
 
-    // ── MAGNETIC FLUX LINES (X축 방향: N→S) ──────────────────
+    // ── MAGNETIC FLUX LINES (X축 방향) ───────────────────────
     const fluxGroup = new THREE.Group();
-    const fluxLineMat = new THREE.LineBasicMaterial({
-      color: 0xef4444,
+    const fluxLMat = new THREE.LineBasicMaterial({
+      color: 0xff5555,
       opacity: 0.22,
       transparent: true,
     });
-    const fluxArrowMat = new THREE.MeshBasicMaterial({
-      color: 0xef4444,
-      opacity: 0.35,
-      transparent: true,
-    });
-    for (let y = -0.65; y <= 0.65; y += 0.325) {
-      for (let z = -0.55; z <= 0.55; z += 0.55) {
+    for (let y = -0.7; y <= 0.7; y += 0.35) {
+      for (let z = -0.6; z <= 0.6; z += 0.6) {
         const pts = [];
-        for (let x = -2.9; x <= 2.9; x += 0.18)
+        for (let x = -3.5; x <= 3.5; x += 0.2)
           pts.push(new THREE.Vector3(x, y, z));
         fluxGroup.add(
           new THREE.Line(
             new THREE.BufferGeometry().setFromPoints(pts),
-            fluxLineMat,
+            fluxLMat,
           ),
         );
-        // 화살표
-        for (let x = -1.5; x <= 1.5; x += 1.5) {
+        [-2, 0, 2].forEach((ax) => {
           const ah = new THREE.Mesh(
-            new THREE.ConeGeometry(0.038, 0.11, 6),
-            fluxArrowMat.clone(),
+            new THREE.ConeGeometry(0.044, 0.13, 6),
+            new THREE.MeshBasicMaterial({
+              color: 0xff5555,
+              opacity: 0.38,
+              transparent: true,
+            }),
           );
-          ah.rotation.z = -Math.PI / 2; // X축 방향
-          ah.position.set(x, y, z);
+          ah.rotation.z = -Math.PI / 2;
+          ah.position.set(ax, y, z);
           fluxGroup.add(ah);
-        }
+        });
       }
     }
     fluxGroup.visible = false;
     scene.add(fluxGroup);
     sceneRef.current.fluxGroup = fluxGroup;
 
-    // ── PULLEY (상단, Z축 방향) ───────────────────────────────
-    const pulleyGroup = new THREE.Group();
+    // ── PULLEY: 수직축 상단 ───────────────────────────────────
+    const pulleyG = new THREE.Group();
     const pRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.36, 0.053, 8, 24),
+      new THREE.TorusGeometry(0.44, 0.058, 8, 28),
       new THREE.MeshStandardMaterial({
         color: 0x94a3b8,
-        metalness: 0.75,
-        roughness: 0.3,
+        metalness: 0.72,
+        roughness: 0.28,
       }),
     );
-    pRing.rotation.x = Math.PI / 2; // XY면에 눕힘
-    pulleyGroup.add(pRing);
+    // Pulley가 XZ면에서 Y축 회전 → rotation.x = 0 (기본 XZ면)
+    pulleyG.add(pRing);
     const pHub = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.07, 0.22, 12),
+      new THREE.CylinderGeometry(0.07, 0.07, 0.25, 12),
       new THREE.MeshStandardMaterial({ color: 0x64748b }),
     );
-    pHub.rotation.x = Math.PI / 2;
-    pulleyGroup.add(pHub);
-    pulleyGroup.position.set(0, 2.4, 2.7);
-    scene.add(pulleyGroup);
+    pulleyG.add(pHub);
+    pulleyG.position.set(0.6, CH / 2 + 0.65, 0);
+    scene.add(pulleyG);
 
-    // 벨트
-    const beltMat = new THREE.LineBasicMaterial({ color: 0x78716c });
+    // 벨트 라인
+    const beltM = new THREE.LineBasicMaterial({ color: 0x78716c });
     scene.add(
       new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(0, 0.12, 2.7),
-          new THREE.Vector3(0, 2.04, 2.7),
+          new THREE.Vector3(0, CH / 2 + 0.0, 0),
+          new THREE.Vector3(0.6, CH / 2 + 0.65, 0),
+          new THREE.Vector3(0.6, CH / 2 + 1.8, 0),
         ]),
-        beltMat,
-      ),
-    );
-    scene.add(
-      new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(0, 2.4, 3.06),
-          new THREE.Vector3(0, 3.1, 0),
-          new THREE.Vector3(0, 0, 0),
-        ]),
-        new THREE.LineBasicMaterial({ color: 0x64748b }),
+        beltM,
       ),
     );
 
-    // ── BATTERY (하단 중앙) ───────────────────────────────────
-    const battGroup = new THREE.Group();
-    battGroup.position.set(0, -2.55, 0);
+    // ── BATTERY: 하단 (크게) ──────────────────────────────────
+    const battY = commY - 2.2;
+    const battGrp = new THREE.Group();
+    battGrp.position.set(0, battY, 0);
+
     const battBody = new THREE.Mesh(
-      new THREE.BoxGeometry(1.5, 0.5, 0.68),
+      new THREE.BoxGeometry(2.4, 0.78, 1.1),
       new THREE.MeshStandardMaterial({
         color: 0x15803d,
-        roughness: 0.45,
-        metalness: 0.1,
+        roughness: 0.38,
+        metalness: 0.14,
       }),
     );
-    battGroup.add(battBody);
+    battGrp.add(battBody);
+    // + / - 터미널
     [
-      [-0.45, 0xfacc15],
-      [0.45, 0x94a3b8],
+      [-0.7, 0xfacc15],
+      [0.7, 0x94a3b8],
     ].forEach(([dx, col]) => {
       const t = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.06, 0.13, 8),
-        new THREE.MeshStandardMaterial({ color: col }),
+        new THREE.CylinderGeometry(0.095, 0.095, 0.2, 10),
+        new THREE.MeshStandardMaterial({ color: col, metalness: 0.8 }),
       );
-      t.position.set(dx, 0.32, 0);
-      battGroup.add(t);
+      t.position.set(dx, 0.48, 0);
+      battGrp.add(t);
     });
-    scene.add(battGroup);
+    // 배터리 레이블
+    const bcv = document.createElement("canvas");
+    bcv.width = 256;
+    bcv.height = 96;
+    const bctx = bcv.getContext("2d");
+    bctx.fillStyle = "#ffffff";
+    bctx.font = "bold 42px Arial";
+    bctx.textAlign = "center";
+    bctx.textBaseline = "middle";
+    bctx.fillText("⚡ Energy Storage", 128, 48);
+    const blbl = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.2, 0.65),
+      new THREE.MeshBasicMaterial({
+        map: new THREE.CanvasTexture(bcv),
+        transparent: true,
+        side: THREE.DoubleSide,
+      }),
+    );
+    blbl.position.set(0, 0, 0.58);
+    battGrp.add(blbl);
+    scene.add(battGrp);
 
-    // 회로 와이어 (Z축 양쪽 commutator → 배터리)
-    const addWire = (pts, color) => {
+    // 배터리 연결선
+    [
+      [-0.7, 0xdc2626],
+      [0.7, 0x1d4ed8],
+    ].forEach(([dx, col]) => {
       scene.add(
         new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints(
-            pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
-          ),
-          new THREE.LineBasicMaterial({ color, linewidth: 2 }),
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(dx, battY + 0.48, 0),
+            new THREE.Vector3(dx, battY + 0.8, 0),
+            new THREE.Vector3(dx, commY - 1.4, 0),
+          ]),
+          new THREE.LineBasicMaterial({ color: col }),
         ),
       );
-    };
-    addWire(
-      [
-        [0, -0.5, 2.7],
-        [0, -2.3, 2.7],
-        [0, -2.3, 0.4],
-      ],
-      0xdc2626,
-    );
-    addWire(
-      [
-        [0, -2.3, -0.4],
-        [0, -2.3, -2.7],
-        [0, -0.5, -2.7],
-      ],
-      0x2563eb,
-    );
-    // 배터리 연결 짧은 선
-    addWire(
-      [
-        [-0.45, -2.3, 0],
-        [-0.45, -2.4, 0],
-      ],
-      0xdc2626,
-    );
-    addWire(
-      [
-        [0.45, -2.4, 0],
-        [0.45, -2.3, 0],
-      ],
-      0x2563eb,
-    );
+    });
 
-    // ── ANIMATION LOOP ────────────────────────────────────────
+    // ── ANIMATION LOOP ───────────────────────────────────────
     let lastT = performance.now();
     let rafId;
 
@@ -479,53 +525,71 @@ export default function EMInductionWidget() {
       lastT = now;
 
       const { speed, bField, paused, showCurrent } = stateRef.current;
-      if (!paused) stateRef.current.angle += speed * dt * 1.5;
+      if (!paused) stateRef.current.angle += speed * dt * 1.4;
       const angle = stateRef.current.angle;
 
-      // 코일 Z축 회전
-      coilGroup.rotation.z = angle;
-      pulleyGroup.rotation.x -= speed * dt * 0.85;
+      // ── Y축 회전: 코일이 수평면에서 시계/반시계 ──────────
+      coilGroup.rotation.y = angle;
+      pulleyG.rotation.y = -angle * 0.88;
 
-      // EMF: 자기장 X축, 코일 법선 처음 X축
-      // Φ = B·cos(angle), EMF ∝ B·sin(angle)
+      // ── EMF 계산 ──────────────────────────────────────────
+      // 코일 법선 처음 +Z(정면), B=+X
+      // Φ = B·A·cos(angle_between_normal_and_B)
+      // 법선이 +Z에서 시작, Y축 회전 → 법선 = (sin a, 0, cos a)
+      // Φ = B·sin(angle), EMF = -dΦ/dt ∝ -cos(angle)...
+      // 실용적으로: EMF = B·sin(angle) (각도 0에서 법선⊥B, EMF=0)
       const emf = bField * Math.sin(angle);
       const emfV = (emf * 120).toFixed(1);
+      const absE = Math.abs(emf);
 
-      // 전류 방향 화살표
+      // ── 전류 화살표 방향 ──────────────────────────────────
+      // 플레밍 왼손: B=+X, 좌도선 전류=+Y(emf>0) → F=-Z (코일 Z방향 힘 → 시계 방향 회전)
+      // 화살표 방향: emf>0 → 좌도선 위, 우도선 아래
+      //              emf<0 → 좌도선 아래, 우도선 위
       const dir = Math.sign(emf) || 1;
-      arrL1.rotation.z = dir > 0 ? 0 : Math.PI;
-      arrL2.rotation.z = dir > 0 ? 0 : Math.PI;
-      arrR1.rotation.z = dir > 0 ? Math.PI : 0;
-      arrR2.rotation.z = dir > 0 ? Math.PI : 0;
-      const alpha = Math.min(1, Math.abs(emf) * 1.2);
-      arrows.forEach((a) => {
-        a.material.opacity = 0.12 + alpha * 0.88;
-        a.material.transparent = true;
+      arrLU.rotation.z = dir > 0 ? 0 : Math.PI; // 좌 위: 위(emf>0)
+      arrLD.rotation.z = dir > 0 ? 0 : Math.PI;
+      arrRU.rotation.z = dir > 0 ? Math.PI : 0; // 우: 반대
+      arrRD.rotation.z = dir > 0 ? Math.PI : 0;
+
+      // 실제로는 하나씩만 표시 (두 위치 중 하나)
+      arrLU.position.y = 0.45 * dir;
+      arrLD.position.y = -0.45 * dir;
+      arrRU.position.y = 0.45 * dir;
+      arrRD.position.y = -0.45 * dir;
+
+      const alpha = Math.min(1, absE * 1.3);
+      curArrows.forEach((a) => {
+        a.material.opacity = 0.1 + alpha * 0.9;
         a.visible = showCurrent;
       });
 
-      // 코일 도선 발광 색
-      const abs = Math.abs(emf);
-      wireMatL.emissive.set(
+      // ── 도선 발광 ─────────────────────────────────────────
+      const gc =
         emf >= 0
-          ? new THREE.Color(0.0, 0.35 * abs, 0.0)
-          : new THREE.Color(0.5 * abs, 0.0, 0.0),
-      );
-      wireMatL.emissiveIntensity = 0.08 + abs * 0.55;
-      wireMatR.emissive.copy(wireMatL.emissive);
-      wireMatR.emissiveIntensity = wireMatL.emissiveIntensity;
+          ? new THREE.Color(0, 0.4 * absE, 0)
+          : new THREE.Color(0.5 * absE, 0, 0);
+      [wireLMat, wireRMat].forEach((m) => {
+        m.emissive.copy(gc);
+        m.emissiveIntensity = 0.06 + absE * 0.65;
+      });
 
-      // HUD
+      // ── HUD ───────────────────────────────────────────────
       const deg = Math.round(((((angle * 180) / Math.PI) % 360) + 360) % 360);
       setHudAngle(deg);
       setHudEmf(emfV);
-      setHudDir(abs < 0.05 ? "전환점 (0V)" : emf > 0 ? "→ 정방향" : "← 역방향");
+      setHudDir(
+        absE < 0.05
+          ? "전환점 (0V)"
+          : emf > 0
+            ? "시계방향 (CW)"
+            : "반시계방향 (CCW)",
+      );
 
       renderer.render(scene, cam);
     }
     rafId = requestAnimationFrame(animate);
 
-    // Resize
     const ro = new ResizeObserver(() => {
       if (!el) return;
       renderer.setSize(el.clientWidth, el.clientHeight);
@@ -542,12 +606,12 @@ export default function EMInductionWidget() {
     };
   }, []);
 
-  const emfAbs = Math.abs(parseFloat(hudEmf));
-  const emfPct = Math.min(100, emfAbs / 1.2);
-  const emfColor = parseFloat(hudEmf) >= 0 ? "#16a34a" : "#dc2626";
+  const emfNum = parseFloat(hudEmf);
+  const emfPct = Math.min(100, Math.abs(emfNum) / 1.2);
+  const emfColor = emfNum >= 0 ? "#16a34a" : "#dc2626";
 
-  const btnStyle = (active) => ({
-    padding: "4px 13px",
+  const btnS = (active) => ({
+    padding: "5px 14px",
     fontSize: 12,
     cursor: "pointer",
     border: `0.5px solid ${active ? "#3b82f6" : "#cbd5e1"}`,
@@ -571,11 +635,11 @@ export default function EMInductionWidget() {
           position: "relative",
           width: "100%",
           aspectRatio: "16/9",
-          maxHeight: 420,
+          maxHeight: 480,
           border: "0.5px solid #e2e8f0",
           borderRadius: 12,
           overflow: "hidden",
-          background: "#f1f5f9",
+          background: "#f0f4f8",
         }}
       >
         <div ref={mountRef} style={{ width: "100%", height: "100%" }} />
@@ -599,14 +663,14 @@ export default function EMInductionWidget() {
             <div
               key={label}
               style={{
-                background: "rgba(255,255,255,0.88)",
+                background: "rgba(255,255,255,0.92)",
                 border: "0.5px solid #e2e8f0",
                 borderRadius: 6,
                 padding: "3px 10px",
                 fontSize: 11,
                 color: "#1e293b",
                 fontVariantNumeric: "tabular-nums",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
               }}
             >
               <span style={{ color: "#94a3b8" }}>{label} </span>
@@ -622,7 +686,7 @@ export default function EMInductionWidget() {
             bottom: 10,
             left: "50%",
             transform: "translateX(-50%)",
-            width: "min(280px,76%)",
+            width: "min(300px,76%)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -635,7 +699,7 @@ export default function EMInductionWidget() {
           <div
             style={{
               width: "100%",
-              height: 5,
+              height: 6,
               background: "rgba(0,0,0,0.08)",
               borderRadius: 3,
               overflow: "hidden",
@@ -647,7 +711,7 @@ export default function EMInductionWidget() {
                 width: `${emfPct}%`,
                 background: emfColor,
                 borderRadius: 3,
-                transition: "width 0.05s, background 0.1s",
+                transition: "width 0.05s, background 0.12s",
               }}
             />
           </div>
@@ -688,7 +752,7 @@ export default function EMInductionWidget() {
               minWidth: 180,
             }}
           >
-            <label style={{ minWidth: 76, color: "#475569" }}>{label}</label>
+            <label style={{ minWidth: 78, color: "#475569" }}>{label}</label>
             <input
               type="range"
               min={min}
@@ -700,9 +764,8 @@ export default function EMInductionWidget() {
             />
             <span
               style={{
-                minWidth: 36,
+                minWidth: 40,
                 textAlign: "right",
-                fontSize: 12,
                 color: "#1e293b",
                 fontVariantNumeric: "tabular-nums",
               }}
@@ -711,14 +774,13 @@ export default function EMInductionWidget() {
             </span>
           </div>
         ))}
-
         <div style={{ display: "flex", gap: 6 }}>
           {[
             ["일시정지", () => setPaused((p) => !p), paused],
             ["자속선", () => setShowFlux((v) => !v), showFlux],
             ["전류 표시", () => setShowCurrent((v) => !v), showCurrent],
           ].map(([label, fn, active]) => (
-            <button key={label} onClick={fn} style={btnStyle(active)}>
+            <button key={label} onClick={fn} style={btnS(active)}>
               {label}
             </button>
           ))}
@@ -737,12 +799,12 @@ export default function EMInductionWidget() {
         }}
       >
         {[
-          ["#dc2626", "N극"],
-          ["#1d4ed8", "S극"],
-          ["#eab308", "Wire Coil"],
-          ["#ea580c", "Commutator / Brush"],
+          ["#cc2020", "N극"],
+          ["#1133bb", "S극"],
+          ["#d97706", "Wire Coil (Y방향 도선)"],
+          ["#f97316", "Commutator / Brush"],
           ["#16a34a", "전류 방향"],
-          ["#ef4444", "자속선 (Magnetic Flux)"],
+          ["#ff5555", "자속선 (Magnetic Flux)"],
         ].map(([color, label]) => (
           <div
             key={label}
@@ -759,6 +821,26 @@ export default function EMInductionWidget() {
             {label}
           </div>
         ))}
+      </div>
+
+      {/* 플레밍 법칙 설명 */}
+      <div
+        style={{
+          marginTop: 10,
+          padding: "8px 14px",
+          background: "#f8fafc",
+          border: "0.5px solid #e2e8f0",
+          borderRadius: 8,
+          fontSize: 11,
+          color: "#475569",
+          lineHeight: 1.7,
+        }}
+      >
+        <strong style={{ color: "#1e293b" }}>플레밍 왼손 법칙</strong> —{" "}
+        <strong>B = +X</strong>(N→S 방향), 도선 전류 <strong>I = ±Y</strong>, 힘{" "}
+        <strong>F = I(L × B) = ∓Z</strong> → 코일이 수평면(XZ)에서{" "}
+        <strong>시계/반시계 회전</strong>. EMF 최대: 코일 면이 자기장에
+        평행(90°·270°), EMF=0: 수직(0°·180°, 전환점).
       </div>
     </div>
   );
