@@ -1,4 +1,4 @@
-import { OrbitControls } from "@react-three/drei";
+import { Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useRef, useState } from "react";
 
@@ -42,15 +42,15 @@ const Magnet = ({ speed, strength, currentTextRef, currentValueRef }) => {
 
 // 3. 3D 검류계 (바늘 포함)
 const Galvanometer3D = ({ currentValueRef }) => {
-  const needleRef = useRef();
+  const needlePivotRef = useRef();
   const MAX_CURRENT = 30; // mA 스케일
 
   useFrame(() => {
-    if (!needleRef.current) return;
+    if (!needlePivotRef.current) return;
     const i = currentValueRef.current || 0;
     const n = Math.max(-1, Math.min(1, i / MAX_CURRENT));
     // 좌(-)~우(+) 흔들림
-    needleRef.current.rotation.z = -n * 0.85;
+    needlePivotRef.current.rotation.z = -n * 0.95;
   });
 
   return (
@@ -63,17 +63,54 @@ const Galvanometer3D = ({ currentValueRef }) => {
         <cylinderGeometry args={[0.42, 0.42, 0.05, 36]} />
         <meshStandardMaterial color="#e2e8f0" />
       </mesh>
-      <mesh ref={needleRef} position={[0, 0.16, 0]}>
-        <boxGeometry args={[0.02, 0.02, 0.5]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.35} />
-      </mesh>
+      <group ref={needlePivotRef} position={[0, 0.16, 0]}>
+        <mesh position={[0.2, 0, 0]}>
+          <boxGeometry args={[0.4, 0.02, 0.02]} />
+          <meshStandardMaterial
+            color="#ef4444"
+            emissive="#ef4444"
+            emissiveIntensity={0.45}
+          />
+        </mesh>
+      </group>
       <mesh position={[0, 0.16, 0]}>
         <sphereGeometry args={[0.03, 12, 12]} />
         <meshStandardMaterial color="#111827" />
       </mesh>
+      <mesh position={[-0.56, 0.07, 0]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.08, 14]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.5} roughness={0.35} />
+      </mesh>
+      <mesh position={[0.56, 0.07, 0]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.08, 14]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.5} roughness={0.35} />
+      </mesh>
     </group>
   );
 };
+
+const CircuitWires = () => (
+  <group>
+    <Line
+      points={[
+        [1.5, 0.1, 0.9],
+        [2.4, 0.1, 0.6],
+        [3.05, 0.18, -1.7],
+      ]}
+      color="#dc2626"
+      lineWidth={2}
+    />
+    <Line
+      points={[
+        [-1.5, -0.1, -0.9],
+        [0.6, -0.15, -1.8],
+        [4.1, 0.18, -3.35],
+      ]}
+      color="#1d4ed8"
+      lineWidth={2}
+    />
+  </group>
+);
 
 // 2. 코일(솔레노이드) 컴포넌트
 const Coil = ({ turns }) => {
@@ -204,6 +241,7 @@ export default function ElectromagneticInductionApp() {
 
         {/* 3D 검류계 */}
         <Galvanometer3D currentValueRef={currentValueRef} />
+        <CircuitWires />
 
         {/* 바닥 그리드 및 마우스 컨트롤 */}
         <gridHelper args={[20, 20]} />
