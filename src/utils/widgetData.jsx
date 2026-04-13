@@ -63,6 +63,12 @@ const WIDGET_MAP = {
       () => import("@/components/animations/magnetics/FlemingLeftHand3DWidget"),
     ),
   ],
+  /** 플레밍 오른손 법칙(발전기): B, v, I(=v×B) 3D 시각화 */
+  flemming_right_hand_3d: [
+    lazy(
+      () => import("@/components/animations/magnetics/FlemingRightHandWidget"),
+    ),
+  ],
   "2_equipotential_3d": [
     lazy(() => import("@/components/animations/Equipotential3DWidget")),
   ],
