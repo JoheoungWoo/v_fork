@@ -147,7 +147,13 @@ function WireHarness({ batteryPos }) {
 }
 
 /** 균형 3상 정현파 u,v,w (120° 위상차). 전기 주파수 f = (|RPM|/MAX)·f_max, dφ/dt = 2πf. */
-function ThreePhaseWaveformPanel({ isRunning, voltage, magnetDirection }) {
+function ThreePhaseWaveformPanel({
+  isRunning,
+  voltage,
+  magnetDirection,
+  layout = "overlay",
+  chartHeight = 172,
+}) {
   const [phase, setPhase] = useState(0);
   const phaseRef = useRef(0);
   const motorRef = useRef(0);
@@ -195,20 +201,25 @@ function ThreePhaseWaveformPanel({ isRunning, voltage, magnetDirection }) {
     return pts;
   }, [phase]);
 
+  const isOverlay = layout === "overlay";
+
   return (
     <div
       style={{
-        position: "absolute",
-        top: 14,
-        right: 14,
-        zIndex: 2,
-        width: "min(340px, calc(100% - 28px))",
+        position: isOverlay ? "absolute" : "relative",
+        top: isOverlay ? 14 : undefined,
+        right: isOverlay ? 14 : undefined,
+        left: isOverlay ? undefined : undefined,
+        zIndex: isOverlay ? 2 : 1,
+        width: isOverlay ? "min(340px, calc(100% - 28px))" : "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
         padding: "12px 12px 10px",
         borderRadius: 12,
         background: "rgba(15, 23, 42, 0.94)",
         border: "1px solid rgba(148, 163, 184, 0.32)",
-        boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
-        pointerEvents: "none",
+        boxShadow: isOverlay ? "0 12px 40px rgba(0,0,0,0.45)" : "none",
+        pointerEvents: isOverlay ? "none" : "auto",
       }}
     >
       <div
@@ -236,7 +247,7 @@ function ThreePhaseWaveformPanel({ isRunning, voltage, magnetDirection }) {
           : ` (= U상이 초에 약 ${fHz.toFixed(1)}번 진동 · 원판 ${Math.round(rpmAbs)} RPM에 비례)`}
         {motorRpm < 0 ? " · 시간 진행 반대(역방향)" : ""}
       </div>
-      <div style={{ height: 172, width: "100%" }}>
+      <div style={{ height: chartHeight, width: "100%" }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 2, right: 4, left: -12, bottom: 0 }}>
             <CartesianGrid stroke="#334155" strokeDasharray="4 4" />
@@ -414,6 +425,17 @@ export default function HorseshoeMagnetDiskWidget() {
   const [voltage, setVoltage] = useState(5);
   const [magnetDirection, setMagnetDirection] = useState(1);
 
+  const [layoutWide, setLayoutWide] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : true,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    setLayoutWide(mq.matches);
+    const onChange = () => setLayoutWide(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   const driveRef = useRef({
     isRunning: false,
     voltage: 5,
@@ -426,7 +448,7 @@ export default function HorseshoeMagnetDiskWidget() {
     return Math.round((voltage / 10) * MAX_RPM * magnetDirection);
   }, [isRunning, voltage, magnetDirection]);
 
-  const panel = {
+  const panelOverlay = {
     position: "absolute",
     left: "50%",
     bottom: 16,
@@ -441,6 +463,19 @@ export default function HorseshoeMagnetDiskWidget() {
     fontSize: 13,
     zIndex: 2,
     boxShadow: "0 16px 48px rgba(0,0,0,0.45)",
+  };
+
+  const panelStacked = {
+    position: "relative",
+    width: "100%",
+    padding: "14px 16px",
+    borderRadius: 12,
+    background: "rgba(15, 23, 42, 0.96)",
+    border: "1px solid rgba(148, 163, 184, 0.35)",
+    color: "#e2e8f0",
+    fontFamily: "system-ui, sans-serif",
+    fontSize: 13,
+    boxSizing: "border-box",
   };
 
   const label = { display: "block", fontWeight: 600, color: "#cbd5e1", marginBottom: 8 };
@@ -469,112 +504,179 @@ export default function HorseshoeMagnetDiskWidget() {
     fontFamily: "system-ui, sans-serif",
   };
 
+  const introCardStyleOverlay = {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    zIndex: 2,
+    maxWidth: "min(320px, calc(100% - 28px))",
+    padding: "12px 14px",
+    borderRadius: 12,
+    background: "rgba(15, 23, 42, 0.92)",
+    border: "1px solid rgba(148, 163, 184, 0.32)",
+    color: "#cbd5e1",
+    fontSize: 12,
+    lineHeight: 1.55,
+  };
+
+  const introCardStyleStacked = {
+    ...introCardStyleOverlay,
+    position: "relative",
+    top: undefined,
+    left: undefined,
+    maxWidth: "100%",
+    zIndex: 1,
+  };
+
+  const introInner = (
+    <>
+      <div style={{ fontWeight: 700, color: "#94a3b8", marginBottom: 8, fontSize: 11 }}>
+        호모폴라 · 패러데이 원판 실험대
+      </div>
+      <strong style={{ color: "#e2e8f0" }}>베이스</strong> 위에{" "}
+      <strong style={{ color: "#e2e8f0" }}>축·동판</strong>이 서고,{" "}
+      <strong style={{ color: "#e2e8f0" }}>말굽자석</strong>이 원판 외연을 끼고 있습니다.{" "}
+      <strong style={{ color: "#fca5a5" }}>+</strong> 전선은 축(중심),{" "}
+      <strong style={{ color: "#64748b" }}>−</strong> 전선은{" "}
+      <strong style={{ color: "#e2e8f0" }}>브러시</strong>로 외연에 닿아 회로가 닫힙니다. 전원을 켜면
+      로렌츠 힘에 의해 동판이 돕니다(속도는 전압에 비례, 자기장 반전 시 방향 반대).
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(71,85,105,0.45)" }}>
+        <span style={{ color: "#94a3b8" }}>표시 RPM(시뮬): </span>
+        <strong style={{ color: "#38bdf8" }}>{displayRpm}</strong>
+        <span style={{ color: "#64748b", fontSize: 11 }}> · 원판 위 색 띠가 돌아가면 정상입니다.</span>
+      </div>
+    </>
+  );
+
+  const controlsInner = (
+    <>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 14,
+        }}
+      >
+        <button
+          type="button"
+          style={powerBtnStyle}
+          onClick={() => setIsRunning((v) => !v)}
+        >
+          {isRunning ? "전원 끄기" : "전원 켜기"}
+        </button>
+        <button
+          type="button"
+          style={secondaryBtnStyle}
+          onClick={() => setMagnetDirection((d) => -d)}
+        >
+          자기장 방향 반전 (N↔S)
+        </button>
+        <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>
+          상태: {isRunning ? "가동 중" : "정지"} · 자기장 계수: {magnetDirection > 0 ? "+1" : "−1"}
+        </span>
+      </div>
+      <label style={label}>
+        전압 (Voltage → 회전 속도): {voltage} V (1 ~ 10)
+      </label>
+      <input
+        type="range"
+        min={1}
+        max={10}
+        step={1}
+        value={voltage}
+        onChange={(e) => setVoltage(Number(e.target.value))}
+        style={{ width: "100%", accentColor: "#38bdf8" }}
+      />
+    </>
+  );
+
   return (
     <div
       style={{
         position: "relative",
         width: "100%",
-        height: "min(750px, 88vh)",
-        minHeight: 560,
+        display: "flex",
+        flexDirection: "column",
         borderRadius: 14,
         overflow: "hidden",
         background: "linear-gradient(165deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
         border: "1px solid rgba(51, 65, 85, 0.55)",
+        ...(layoutWide
+          ? { height: "min(750px, 88vh)", minHeight: 560 }
+          : { minHeight: 0 }),
       }}
     >
       <div
         style={{
-          position: "absolute",
-          top: 14,
-          left: 14,
-          zIndex: 2,
-          maxWidth: "min(320px, calc(100% - 28px))",
-          padding: "12px 14px",
-          borderRadius: 12,
-          background: "rgba(15, 23, 42, 0.92)",
-          border: "1px solid rgba(148, 163, 184, 0.32)",
-          color: "#cbd5e1",
-          fontSize: 12,
-          lineHeight: 1.55,
+          position: "relative",
+          width: "100%",
+          flexShrink: 0,
+          overflow: "hidden",
+          ...(layoutWide
+            ? { flex: 1, minHeight: 400, height: "100%" }
+            : {
+                height: "min(52vh, 420px)",
+                minHeight: 280,
+              }),
         }}
       >
-        <div style={{ fontWeight: 700, color: "#94a3b8", marginBottom: 8, fontSize: 11 }}>
-          호모폴라 · 패러데이 원판 실험대
-        </div>
-        <strong style={{ color: "#e2e8f0" }}>베이스</strong> 위에{" "}
-        <strong style={{ color: "#e2e8f0" }}>축·동판</strong>이 서고,{" "}
-        <strong style={{ color: "#e2e8f0" }}>말굽자석</strong>이 원판 외연을 끼고 있습니다.{" "}
-        <strong style={{ color: "#fca5a5" }}>+</strong> 전선은 축(중심),{" "}
-        <strong style={{ color: "#64748b" }}>−</strong> 전선은{" "}
-        <strong style={{ color: "#e2e8f0" }}>브러시</strong>로 외연에 닿아 회로가 닫힙니다. 전원을 켜면
-        로렌츠 힘에 의해 동판이 돕니다(속도는 전압에 비례, 자기장 반전 시 방향 반대).
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(71,85,105,0.45)" }}>
-          <span style={{ color: "#94a3b8" }}>표시 RPM(시뮬): </span>
-          <strong style={{ color: "#38bdf8" }}>{displayRpm}</strong>
-          <span style={{ color: "#64748b", fontSize: 11 }}> · 원판 위 색 띠가 돌아가면 정상입니다.</span>
-        </div>
+        <Canvas
+          shadows
+          frameloop="always"
+          camera={{ position: [1.85, 1.05, 1.85], fov: 42 }}
+          gl={{ antialias: true, alpha: false }}
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "block",
+            touchAction: "none",
+          }}
+        >
+          <color attach="background" args={["#0b1220"]} />
+          <Suspense fallback={null}>
+            <HomopolarScene driveRef={driveRef} magnetDirection={magnetDirection} />
+          </Suspense>
+        </Canvas>
+
+        {layoutWide && (
+          <>
+            <div style={introCardStyleOverlay}>{introInner}</div>
+            <ThreePhaseWaveformPanel
+              isRunning={isRunning}
+              voltage={voltage}
+              magnetDirection={magnetDirection}
+              layout="overlay"
+            />
+            <div style={panelOverlay}>{controlsInner}</div>
+          </>
+        )}
       </div>
 
-      <ThreePhaseWaveformPanel
-        isRunning={isRunning}
-        voltage={voltage}
-        magnetDirection={magnetDirection}
-      />
-
-      <Canvas
-        shadows
-        frameloop="always"
-        camera={{ position: [1.85, 1.05, 1.85], fov: 42 }}
-        gl={{ antialias: true, alpha: false }}
-        style={{ width: "100%", height: "100%" }}
-      >
-        <color attach="background" args={["#0b1220"]} />
-        <Suspense fallback={null}>
-          <HomopolarScene driveRef={driveRef} magnetDirection={magnetDirection} />
-        </Suspense>
-      </Canvas>
-
-      <div style={panel}>
+      {!layoutWide && (
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            gap: 10,
-            alignItems: "center",
-            marginBottom: 14,
+            flexDirection: "column",
+            gap: 12,
+            padding: 12,
+            background: "rgba(2, 6, 23, 0.55)",
+            borderTop: "1px solid rgba(51, 65, 85, 0.65)",
+            flex: "0 0 auto",
           }}
         >
-          <button
-            type="button"
-            style={powerBtnStyle}
-            onClick={() => setIsRunning((v) => !v)}
-          >
-            {isRunning ? "전원 끄기" : "전원 켜기"}
-          </button>
-          <button
-            type="button"
-            style={secondaryBtnStyle}
-            onClick={() => setMagnetDirection((d) => -d)}
-          >
-            자기장 방향 반전 (N↔S)
-          </button>
-          <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>
-            상태: {isRunning ? "가동 중" : "정지"} · 자기장 계수: {magnetDirection > 0 ? "+1" : "−1"}
-          </span>
+          <div style={introCardStyleStacked}>{introInner}</div>
+          <ThreePhaseWaveformPanel
+            isRunning={isRunning}
+            voltage={voltage}
+            magnetDirection={magnetDirection}
+            layout="inline"
+            chartHeight={196}
+          />
+          <div style={panelStacked}>{controlsInner}</div>
         </div>
-        <label style={label}>
-          전압 (Voltage → 회전 속도): {voltage} V (1 ~ 10)
-        </label>
-        <input
-          type="range"
-          min={1}
-          max={10}
-          step={1}
-          value={voltage}
-          onChange={(e) => setVoltage(Number(e.target.value))}
-          style={{ width: "100%", accentColor: "#38bdf8" }}
-        />
-      </div>
+      )}
     </div>
   );
 }
