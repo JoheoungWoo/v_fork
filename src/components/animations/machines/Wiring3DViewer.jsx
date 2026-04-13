@@ -3,13 +3,19 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
-// ==========================================
-// 1. 전류 입자 (제3고조파 순환 애니메이션) 컴포넌트
-// ==========================================
-const CurrentParticle = ({ path, speed, color, size }) => {
+/**
+ * 전류 입자 — 경로·속도·색은 백엔드 JSON.
+ * timePhaseShift: 균형 3상 시각 위상 (0, 1/3, 2/3) × path 세그먼트 수만큼 더해 동기.
+ */
+const CurrentParticle = ({
+  path,
+  speed,
+  color,
+  size,
+  timePhaseShift = 0,
+}) => {
   const meshRef = useRef();
 
-  // 파이썬 배열로 된 path 좌표들을 Three.js Vector3 객체로 변환
   const vectorPath = useMemo(() => {
     return path.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
   }, [path]);
@@ -17,24 +23,24 @@ const CurrentParticle = ({ path, speed, color, size }) => {
   useFrame((state) => {
     if (!vectorPath || vectorPath.length < 2) return;
 
-    // 경과 시간에 따른 현재 경로 위치 계산
-    const time = (state.clock.elapsedTime * speed) % vectorPath.length;
-    const index = Math.floor(time);
-    const nextIndex = (index + 1) % vectorPath.length;
-    const progress = time - index; // 0 ~ 1 사이의 보간율
+    const L = vectorPath.length;
+    const offset = (timePhaseShift % 1) * L;
+    let t = state.clock.elapsedTime * speed + offset;
+    t = ((t % L) + L) % L;
+    const index = Math.floor(t);
+    const nextIndex = (index + 1) % L;
+    const progress = t - index;
 
     const p1 = vectorPath[index];
     const p2 = vectorPath[nextIndex];
 
     if (meshRef.current) {
-      // 선형 보간(Lerp)을 사용하여 입자를 점과 점 사이로 부드럽게 이동시킴
       meshRef.current.position.lerpVectors(p1, p2, progress);
     }
   });
 
   return (
     <Sphere ref={meshRef} args={[size, 16, 16]}>
-      {/* MeshBasicMaterial을 사용하여 빛의 영향을 받지 않고 자체 발광하는 것처럼 표현 */}
       <meshBasicMaterial color={color} toneMapped={false} />
     </Sphere>
   );
@@ -90,7 +96,8 @@ const Wiring3DViewer = ({ widgetData }) => {
     );
   }
 
-  const { coils, wires, labels, animations } = widgetData.scene_data;
+  const { coils, wires, labels, animations, current_legend } =
+    widgetData.scene_data;
 
   return (
     <div
@@ -100,9 +107,51 @@ const Wiring3DViewer = ({ widgetData }) => {
         backgroundColor: "#1a1a1a",
         borderRadius: "8px",
         overflow: "hidden",
+        position: "relative",
       }}
     >
-      {/* Canvas: Three.js의 렌더링 컨텍스트 */}
+      {current_legend?.items?.length ? (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 12,
+            zIndex: 1,
+            background: "rgba(0,0,0,0.55)",
+            padding: "8px 12px",
+            borderRadius: 8,
+            fontSize: 12,
+            color: "#ddd",
+            pointerEvents: "none",
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            {current_legend.title}
+          </div>
+          {current_legend.items.map((it, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 4,
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: it.color,
+                  boxShadow: `0 0 6px ${it.color}`,
+                }}
+              />
+              <span>{it.phase}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <Canvas camera={{ position: [0, 0, 15], fov: 60 }}>
         {/* 기본 조명 세팅 */}
         <ambientLight intensity={0.8} />
@@ -161,13 +210,16 @@ const Wiring3DViewer = ({ widgetData }) => {
         {animations &&
           animations.map(
             (anim, idx) =>
-              anim.active && (
+              anim.active &&
+              Array.isArray(anim.path) &&
+              anim.path.length >= 2 && (
                 <CurrentParticle
-                  key={`anim-${idx}`}
+                  key={anim.id || `anim-${idx}`}
                   path={anim.path}
-                  speed={anim.speed || 2.0}
-                  color={anim.color || "#ff0000"}
-                  size={anim.size || 0.25}
+                  speed={anim.speed ?? 1.0}
+                  color={anim.color || "#ffffff"}
+                  size={anim.size ?? 0.2}
+                  timePhaseShift={anim.time_phase_shift ?? 0}
                 />
               ),
           )}
