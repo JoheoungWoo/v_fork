@@ -18,10 +18,11 @@ const DISK_R = 0.42;
 /** 말굽 극 중심 X (원판 외연이 극 사이 자기장을 통과하도록) */
 const POLE_X = DISK_R + 0.06;
 const MAX_RPM = 240;
-/** 최대 RPM일 때 파형 위상이 한 스로틀 프레임당 진행하는 라디안 (주파수 ∝ |RPM|) */
-const WAVE_PHASE_STEP_AT_MAX_RPM = 0.118;
-/** 패널에 표시하는 가시 주파수 스케일 (Hz, 최대 RPM에서 이 값) */
-const WAVE_FREQ_HZ_AT_MAX_RPM = 3.2;
+/**
+ * 최대 원판 RPM일 때 U상 전기 주파수 f (Hz).
+ * 위상은 dφ/dt = 2πf 로 적분하므로 숫자와 화면 속도가 일치합니다.
+ */
+const WAVE_FREQ_HZ_AT_MAX_RPM = 4;
 
 /** 목재 베이스 + 절연 받침 느낌 */
 function WoodenBase() {
@@ -145,28 +146,36 @@ function WireHarness({ batteryPos }) {
   );
 }
 
-/** 균형 3상 정현파 u,v,w (120° 위상차). 스크롤 속도·부호 = 원판 RPM과 동일 비율(정지 시 0 Hz). */
+/** 균형 3상 정현파 u,v,w (120° 위상차). 전기 주파수 f = (|RPM|/MAX)·f_max, dφ/dt = 2πf. */
 function ThreePhaseWaveformPanel({ isRunning, voltage, magnetDirection }) {
   const [phase, setPhase] = useState(0);
-  const speedRef = useRef(0);
+  const phaseRef = useRef(0);
+  const motorRef = useRef(0);
 
   const motorRpm = isRunning ? (voltage / 10) * MAX_RPM * magnetDirection : 0;
   const rpmAbs = Math.abs(motorRpm);
-  const fVis = (rpmAbs / MAX_RPM) * WAVE_FREQ_HZ_AT_MAX_RPM;
-
-  speedRef.current =
-    rpmAbs < 1e-6
-      ? 0
-      : (rpmAbs / MAX_RPM) * WAVE_PHASE_STEP_AT_MAX_RPM * Math.sign(motorRpm);
+  const fHz = (rpmAbs / MAX_RPM) * WAVE_FREQ_HZ_AT_MAX_RPM;
+  motorRef.current = motorRpm;
 
   useEffect(() => {
     let raf = 0;
-    let last = 0;
+    let last = performance.now();
+    let lastUi = last;
     const loop = (now) => {
       raf = requestAnimationFrame(loop);
-      if (now - last < 36) return;
+      const dt = Math.min((now - last) / 1000, 0.08);
       last = now;
-      setPhase((p) => p + speedRef.current);
+
+      const mr = motorRef.current;
+      const mag = Math.abs(mr);
+      const f = (mag / MAX_RPM) * WAVE_FREQ_HZ_AT_MAX_RPM;
+      const dir = mag < 1e-6 ? 0 : Math.sign(mr);
+      phaseRef.current += 2 * Math.PI * f * dt * dir;
+
+      if (now - lastUi >= 33) {
+        lastUi = now;
+        setPhase(phaseRef.current);
+      }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -221,9 +230,11 @@ function ThreePhaseWaveformPanel({ isRunning, voltage, magnetDirection }) {
           lineHeight: 1.4,
         }}
       >
-        표시 주파수 약 <strong style={{ color: "#38bdf8" }}>{fVis.toFixed(2)}</strong> Hz
-        {rpmAbs < 1e-6 ? " (정지)" : ` · 원판 ${Math.round(rpmAbs)} RPM에 비례`}
-        {motorRpm < 0 ? " · 역방향" : ""}
+        전기 주파수 <strong style={{ color: "#38bdf8" }}>{fHz.toFixed(2)}</strong> Hz
+        {rpmAbs < 1e-6
+          ? " (정지, U상이 초당 0주기)"
+          : ` (= U상이 초에 약 ${fHz.toFixed(1)}번 진동 · 원판 ${Math.round(rpmAbs)} RPM에 비례)`}
+        {motorRpm < 0 ? " · 시간 진행 반대(역방향)" : ""}
       </div>
       <div style={{ height: 172, width: "100%" }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -302,9 +313,9 @@ function ThreePhaseWaveformPanel({ isRunning, voltage, magnetDirection }) {
           lineHeight: 1.45,
         }}
       >
-        3개 상은 120° 위상차·동일 크기입니다. 파형이 흐르는 속도(주파수)는 위 원판의 회전 속도(RPM)에
-        비례하며, 자기장 반전 시 진행 방향도 같이 바뀝니다. 유도전동기 3상 급전 참고용이며 실험대 전원은
-        DC입니다.
+        3개 상은 120° 위상차·동일 크기입니다. 위 Hz는 U상이 1초에 몇 번 사인파 한 주기를 도는지이며,
+        그래프는 dφ/dt = 2πf로 움직여 숫자와 같습니다. 크기는 원판 RPM에 비례하고, 자기장 반전 시
+        시간 방향만 반대입니다. 참고용 3상이며 실험대는 DC입니다.
       </p>
     </div>
   );
