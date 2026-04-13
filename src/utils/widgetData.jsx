@@ -133,6 +133,16 @@ const WIDGET_MAP = {
   // ==========================================
   "1_laplace_stability": [
     lazy(() => import("@/components/animations/controls/Laplace3DWidget")),
+    lazy(
+      () =>
+        import("@/components/animations/controls/LaplaceTimeComparisonWidget"),
+    ),
+  ],
+  laplace_time_compare: [
+    lazy(
+      () =>
+        import("@/components/animations/controls/LaplaceTimeComparisonWidget"),
+    ),
   ],
 
   // ==========================================
