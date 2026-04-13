@@ -75,24 +75,28 @@ export default function ElectromagneticInductionApp() {
   return (
     <div
       style={{
-        width: "100vw",
-        height: "100vh",
+        width: "100%",
+        height: "min(72vh, 620px)",
+        minHeight: 420,
         display: "flex",
         flexDirection: "column",
+        borderRadius: 12,
+        overflow: "hidden",
       }}
     >
       {/* 상단 컨트롤 패널 */}
       <div
         style={{
-          padding: "20px",
+          padding: "14px 16px",
           background: "#2c3e50",
           color: "white",
           display: "flex",
-          gap: "20px",
+          flexWrap: "wrap",
+          gap: "14px",
           alignItems: "center",
         }}
       >
-        <div>
+        <div style={{ minWidth: 180 }}>
           <label>자석 이동 속도: {speed}</label>
           <br />
           <input
@@ -104,7 +108,7 @@ export default function ElectromagneticInductionApp() {
             onChange={(e) => setSpeed(parseFloat(e.target.value))}
           />
         </div>
-        <div>
+        <div style={{ minWidth: 180 }}>
           <label>코일 감은 수: {turns}</label>
           <br />
           <input
@@ -116,7 +120,7 @@ export default function ElectromagneticInductionApp() {
             onChange={(e) => setTurns(parseInt(e.target.value))}
           />
         </div>
-        <div>
+        <div style={{ minWidth: 180 }}>
           <label>자석의 세기: {strength}</label>
           <br />
           <input
@@ -133,12 +137,14 @@ export default function ElectromagneticInductionApp() {
         <div
           style={{
             marginLeft: "auto",
+            minWidth: 220,
             background: "#34495e",
             padding: "10px 20px",
             borderRadius: "8px",
+            border: "1px solid rgba(255,255,255,0.15)",
           }}
         >
-          <h3>유도 전류 (검류계)</h3>
+          <h3 style={{ margin: "0 0 6px 0", fontSize: 14 }}>유도 전류 (검류계)</h3>
           <h2 style={{ color: "#2ecc71", margin: 0 }}>
             <span ref={currentMeterRef}>0.00</span> mA
           </h2>
@@ -146,7 +152,7 @@ export default function ElectromagneticInductionApp() {
       </div>
 
       {/* 3D 캔버스 영역 */}
-      <Canvas camera={{ position: [5, 5, 5], fov: 50 }}>
+      <Canvas style={{ flex: 1 }} camera={{ position: [5, 5, 5], fov: 50 }}>
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 10]} intensity={1} />
 

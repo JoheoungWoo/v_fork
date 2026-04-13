@@ -783,6 +783,51 @@ export default function EMInductionWidget() {
             </button>
           ))}
         </div>
+        <div
+          style={{
+            marginLeft: "auto",
+            minWidth: 170,
+            padding: "8px 12px",
+            borderRadius: 10,
+            border: "0.5px solid #cbd5e1",
+            background: "#f8fafc",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>
+            검류계 (유도 전류)
+          </div>
+          <div
+            style={{
+              fontSize: 18,
+              lineHeight: 1.1,
+              fontWeight: 700,
+              color: emfColor,
+              fontVariantNumeric: "tabular-nums",
+              marginBottom: 6,
+            }}
+          >
+            {hudEmf} mA
+          </div>
+          <div
+            style={{
+              width: "100%",
+              height: 6,
+              background: "rgba(100,116,139,0.2)",
+              borderRadius: 999,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${emfPct}%`,
+                height: "100%",
+                background: emfColor,
+                transition: "width 0.05s linear",
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Legend */}
