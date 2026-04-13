@@ -31,6 +31,42 @@ const TIP_W = new THREE.Vector3((R * Math.sqrt(3)) / 2, -R * 0.5, 0);
 
 const Y_UP = new THREE.Vector3(0, 1, 0);
 
+/** Y-Y 기하: 중심·끝점 (전류 흐름 입자용) */
+const PRI_C = new THREE.Vector3(-1.38, 0, 0);
+const SEC_C = new THREE.Vector3(1.38, 0, 0);
+const PRI_TIPS = [TIP_U, TIP_V, TIP_W].map((t) => PRI_C.clone().add(t));
+const SEC_TIPS = [TIP_U, TIP_V, TIP_W].map((t) => SEC_C.clone().add(t));
+const I_NORM = 1.8;
+
+function placeFlowOnLeg(mesh, from, to, iNorm) {
+  if (!mesh) return;
+  const s = THREE.MathUtils.clamp(0.5 + 0.44 * iNorm, 0.06, 0.94);
+  mesh.position.lerpVectors(from, to, s);
+  const sc = 0.11 + Math.min(1, Math.abs(iNorm)) * 0.16;
+  mesh.scale.setScalar(sc);
+  const m = mesh.material;
+  if (m && "emissiveIntensity" in m) {
+    m.emissiveIntensity = 0.9 + Math.abs(iNorm) * 1.4;
+  }
+}
+
+function orientFlowCone(cone, from, to, currentVal) {
+  if (!cone) return;
+  const axis = new THREE.Vector3().subVectors(to, from);
+  const len = axis.length();
+  if (len < 1e-6) return;
+  axis.normalize();
+  if (currentVal < 0) axis.negate();
+  const iNorm = currentVal / I_NORM;
+  const s = THREE.MathUtils.clamp(0.5 + 0.44 * iNorm, 0.06, 0.94);
+  cone.position.lerpVectors(from, to, s);
+  const q = new THREE.Quaternion();
+  q.setFromUnitVectors(Y_UP, axis);
+  cone.quaternion.copy(q);
+  const show = Math.abs(currentVal) > 0.04;
+  cone.scale.setScalar(show ? 0.22 + Math.min(1, Math.abs(currentVal) / I_NORM) * 0.18 : 0.001);
+}
+
 const NeonCylinder = forwardRef(function NeonCylinder({ from, to, color }, ref) {
   const groupRef = useRef(null);
 
@@ -118,14 +154,33 @@ function YYScene3D({ timeRef, flagsRef, showNeutral }) {
   const sW = useRef(null);
   const nMesh = useRef(null);
 
+  const fDotPU = useRef(null);
+  const fDotPV = useRef(null);
+  const fDotPW = useRef(null);
+  const fDotSU = useRef(null);
+  const fDotSV = useRef(null);
+  const fDotSW = useRef(null);
+  const fDotN = useRef(null);
+  const fConePU = useRef(null);
+  const fConePV = useRef(null);
+  const fConePW = useRef(null);
+  const fConeSU = useRef(null);
+  const fConeSV = useRef(null);
+  const fConeSW = useRef(null);
+  const fConeN = useRef(null);
+
   useFrame(() => {
     const t = timeRef.current;
-    const { isUnbalanced, showNeutral } = flagsRef.current;
+    const { isUnbalanced, showNeutral: neutralOn } = flagsRef.current;
     const ampU = isUnbalanced ? 1.8 : 1;
     const iU = ampU * Math.sin(t);
     const iV = Math.sin(t - (2 * Math.PI) / 3);
     const iW = Math.sin(t - (4 * Math.PI) / 3);
     const iN = iU + iV + iW;
+
+    const nU = iU / I_NORM;
+    const nV = iV / I_NORM;
+    const nW = iW / I_NORM;
 
     const glow = (obj, i) => {
       const m = obj?.material;
@@ -141,8 +196,31 @@ function YYScene3D({ timeRef, flagsRef, showNeutral }) {
 
     const nm = nMesh.current?.material;
     if (nm) {
-      if (showNeutral) nm.emissiveIntensity = 0.08 + Math.abs(iN) * 1.1;
+      if (neutralOn) nm.emissiveIntensity = 0.08 + Math.abs(iN) * 1.1;
       else nm.emissiveIntensity = 0.05;
+    }
+
+    placeFlowOnLeg(fDotPU.current, PRI_C, PRI_TIPS[0], nU);
+    placeFlowOnLeg(fDotPV.current, PRI_C, PRI_TIPS[1], nV);
+    placeFlowOnLeg(fDotPW.current, PRI_C, PRI_TIPS[2], nW);
+    placeFlowOnLeg(fDotSU.current, SEC_C, SEC_TIPS[0], nU);
+    placeFlowOnLeg(fDotSV.current, SEC_C, SEC_TIPS[1], nV);
+    placeFlowOnLeg(fDotSW.current, SEC_C, SEC_TIPS[2], nW);
+
+    orientFlowCone(fConePU.current, PRI_C, PRI_TIPS[0], iU);
+    orientFlowCone(fConePV.current, PRI_C, PRI_TIPS[1], iV);
+    orientFlowCone(fConePW.current, PRI_C, PRI_TIPS[2], iW);
+    orientFlowCone(fConeSU.current, SEC_C, SEC_TIPS[0], iU);
+    orientFlowCone(fConeSV.current, SEC_C, SEC_TIPS[1], iV);
+    orientFlowCone(fConeSW.current, SEC_C, SEC_TIPS[2], iW);
+
+    if (neutralOn && fDotN.current) {
+      const nNorm = THREE.MathUtils.clamp(iN / I_NORM, -1, 1);
+      placeFlowOnLeg(fDotN.current, PRI_C, SEC_C, nNorm);
+      orientFlowCone(fConeN.current, PRI_C, SEC_C, iN);
+    } else if (fDotN.current) {
+      fDotN.current.scale.setScalar(0.001);
+      if (fConeN.current) fConeN.current.scale.setScalar(0.001);
     }
   });
 
@@ -164,6 +242,74 @@ function YYScene3D({ timeRef, flagsRef, showNeutral }) {
         <YStar3D cx={-1.38} suffix="1" refs={[pU, pV, pW]} />
         <YStar3D cx={1.38} suffix="2" refs={[sU, sV, sW]} />
         {showNeutral && <NeonCylinder ref={nMesh} from={fromN} to={toN} color={COL.N} />}
+
+        {/* 순시 전류 방향·크기: 구 + 콘 (중성점↔단자) */}
+        <mesh ref={fDotPU}>
+          <sphereGeometry args={[0.1, 14, 14]} />
+          <meshStandardMaterial
+            color={COL.U}
+            emissive={COL.U}
+            emissiveIntensity={1.2}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh ref={fConePU}>
+          <coneGeometry args={[0.07, 0.2, 10]} />
+          <meshStandardMaterial
+            color={COL.U}
+            emissive={COL.U}
+            emissiveIntensity={1}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh ref={fDotPV}>
+          <sphereGeometry args={[0.1, 14, 14]} />
+          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1.2} toneMapped={false} />
+        </mesh>
+        <mesh ref={fConePV}>
+          <coneGeometry args={[0.07, 0.2, 10]} />
+          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
+        <mesh ref={fDotPW}>
+          <sphereGeometry args={[0.1, 14, 14]} />
+          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1.2} toneMapped={false} />
+        </mesh>
+        <mesh ref={fConePW}>
+          <coneGeometry args={[0.07, 0.2, 10]} />
+          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
+        <mesh ref={fDotSU}>
+          <sphereGeometry args={[0.1, 14, 14]} />
+          <meshStandardMaterial color={COL.U} emissive={COL.U} emissiveIntensity={1.2} toneMapped={false} />
+        </mesh>
+        <mesh ref={fConeSU}>
+          <coneGeometry args={[0.07, 0.2, 10]} />
+          <meshStandardMaterial color={COL.U} emissive={COL.U} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
+        <mesh ref={fDotSV}>
+          <sphereGeometry args={[0.1, 14, 14]} />
+          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1.2} toneMapped={false} />
+        </mesh>
+        <mesh ref={fConeSV}>
+          <coneGeometry args={[0.07, 0.2, 10]} />
+          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
+        <mesh ref={fDotSW}>
+          <sphereGeometry args={[0.1, 14, 14]} />
+          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1.2} toneMapped={false} />
+        </mesh>
+        <mesh ref={fConeSW}>
+          <coneGeometry args={[0.07, 0.2, 10]} />
+          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
+        <mesh ref={fDotN}>
+          <sphereGeometry args={[0.11, 14, 14]} />
+          <meshStandardMaterial color={COL.N} emissive={COL.N} emissiveIntensity={1.1} toneMapped={false} />
+        </mesh>
+        <mesh ref={fConeN}>
+          <coneGeometry args={[0.08, 0.22, 10]} />
+          <meshStandardMaterial color={COL.N} emissive={COL.N} emissiveIntensity={1} toneMapped={false} />
+        </mesh>
       </group>
 
       <OrbitControls makeDefault enablePan minDistance={2.8} maxDistance={9} target={[0, 0, 0]} />
@@ -320,7 +466,7 @@ export default function NeonYYTransformerWidget() {
           </Suspense>
         </Canvas>
         <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-center text-[10px] text-slate-400 backdrop-blur-sm">
-          드래그로 회전 · 스크롤로 확대
+          드래그로 회전 · 스크롤로 확대 · 구·콘 = 각 상·중성선 순시 전류(크기·방향)
         </p>
       </div>
 
