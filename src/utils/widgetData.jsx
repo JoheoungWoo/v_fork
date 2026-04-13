@@ -179,11 +179,9 @@ const WIDGET_MAP = {
   ],
   /** Supabase 등 별칭 */
   transformer_yy_delta: [
-    lazy(
-      () =>
-        import("@/components/animations/machines/TransformerConnectionWidget"),
-    ),
+    lazy(() => import("@/components/animations/machines/MachineWidgetPage")),
   ],
+
   /** Supabase: homopolar_motor — 말굽자석·도체 원판 회전(호모폴라·플레밍 연계 설명용) */
   homopolar_motor: [
     lazy(
