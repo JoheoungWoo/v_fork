@@ -33,9 +33,14 @@ function WireSegment({ from, to, radius = 0.022, color = "#94a3b8" }) {
   );
 }
 
-function RotatingLoop() {
+function RotatingLoop({ emfRef }) {
+  const p1Ref = useRef(null);
+  const p2Ref = useRef(null);
+  const p3Ref = useRef(null);
+  const phaseRef = useRef(0);
   const w = 0.9;
   const h = 1.15;
+  const perimeter = useMemo(() => 2 * (w + h), [w, h]);
   const pts = useMemo(
     () => ({
       lt: new THREE.Vector3(-w / 2, h / 2, 0),
@@ -46,12 +51,53 @@ function RotatingLoop() {
     [w, h],
   );
 
+  const pointOnLoop = (u) => {
+    const d = ((u % 1) + 1) % 1;
+    const L = d * perimeter;
+    if (L < w) return new THREE.Vector3(-w / 2 + L, h / 2, 0);
+    if (L < w + h) return new THREE.Vector3(w / 2, h / 2 - (L - w), 0);
+    if (L < w + h + w) return new THREE.Vector3(w / 2 - (L - w - h), -h / 2, 0);
+    return new THREE.Vector3(-w / 2, -h / 2 + (L - w - h - w), 0);
+  };
+
+  useFrame((_, delta) => {
+    const emf = emfRef.current;
+    const absE = Math.abs(emf);
+    const dir = Math.sign(emf) || 1;
+    phaseRef.current = (phaseRef.current + delta * (0.25 + absE * 1.8) * dir + 10) % 1;
+    const pulses = [p1Ref.current, p2Ref.current, p3Ref.current];
+    const offsets = [0, 0.33, 0.66];
+    pulses.forEach((p, i) => {
+      if (!p) return;
+      if (absE < 0.03) {
+        p.visible = false;
+        return;
+      }
+      p.visible = true;
+      p.position.copy(pointOnLoop(phaseRef.current + offsets[i]));
+      p.scale.setScalar(0.045 + absE * 0.05);
+      if (p.material) p.material.emissiveIntensity = 0.9 + absE * 1.2;
+    });
+  });
+
   return (
     <group>
       <WireSegment from={pts.lt} to={pts.rt} color="#a16207" />
       <WireSegment from={pts.rt} to={pts.rb} color="#e879f9" />
       <WireSegment from={pts.rb} to={pts.lb} color="#a16207" />
       <WireSegment from={pts.lb} to={pts.lt} color="#e879f9" />
+      <mesh ref={p1Ref}>
+        <sphereGeometry args={[1, 10, 10]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
+      <mesh ref={p2Ref}>
+        <sphereGeometry args={[1, 10, 10]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
+      <mesh ref={p3Ref}>
+        <sphereGeometry args={[1, 10, 10]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -264,7 +310,7 @@ function RightHandScene({ vMag, vDir, bDir }) {
           <cylinderGeometry args={[0.08, 0.08, 1.6, 20]} />
           <meshStandardMaterial color={COL.rod} metalness={0.65} roughness={0.32} />
         </mesh>
-        <RotatingLoop />
+        <RotatingLoop emfRef={emfRef} />
         <RotatingCommutator angleRef={rotAngleRef} emfRef={emfRef} />
       </group>
       <Text
