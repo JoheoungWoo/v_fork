@@ -12,6 +12,58 @@ const COL = {
   rod: "#94a3b8",
 };
 
+function WireSegment({ from, to, radius = 0.022, color = "#94a3b8" }) {
+  const mid = useMemo(
+    () => new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5),
+    [from, to],
+  );
+  const len = useMemo(() => from.distanceTo(to), [from, to]);
+  const quat = useMemo(() => {
+    const dir = new THREE.Vector3().subVectors(to, from).normalize();
+    const q = new THREE.Quaternion();
+    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    return q;
+  }, [from, to]);
+
+  return (
+    <mesh position={mid} quaternion={quat} castShadow>
+      <cylinderGeometry args={[radius, radius, len, 12]} />
+      <meshStandardMaterial color={color} metalness={0.25} roughness={0.45} />
+    </mesh>
+  );
+}
+
+function RotatingLoop({ vMag, vDir }) {
+  const groupRef = useRef(null);
+  const w = 0.9;
+  const h = 1.15;
+  const pts = useMemo(
+    () => ({
+      lt: new THREE.Vector3(-w / 2, h / 2, 0),
+      rt: new THREE.Vector3(w / 2, h / 2, 0),
+      rb: new THREE.Vector3(w / 2, -h / 2, 0),
+      lb: new THREE.Vector3(-w / 2, -h / 2, 0),
+    }),
+    [w, h],
+  );
+
+  useFrame((_, delta) => {
+    const g = groupRef.current;
+    if (!g) return;
+    const omega = (0.3 + vMag * 2.2) * vDir;
+    g.rotation.y += omega * delta;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <WireSegment from={pts.lt} to={pts.rt} color="#a16207" />
+      <WireSegment from={pts.rt} to={pts.rb} color="#e879f9" />
+      <WireSegment from={pts.rb} to={pts.lb} color="#a16207" />
+      <WireSegment from={pts.lb} to={pts.lt} color="#e879f9" />
+    </group>
+  );
+}
+
 function Arrow3D({
   origin = [0, 0, 0],
   dir = [0, 1, 0],
@@ -178,13 +230,14 @@ function RightHandScene({ vMag, vDir, bDir }) {
           roughness={0.32}
         />
       </mesh>
+      <RotatingLoop vMag={vMag} vDir={vDir} />
       <Text
         position={[0.17, 0.95, 0]}
         fontSize={0.08}
         color="#e2e8f0"
         anchorX="left"
       >
-        도체
+        회전 도체 루프
       </Text>
 
       <mesh ref={pulseRef}>
