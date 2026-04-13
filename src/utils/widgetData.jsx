@@ -14,6 +14,19 @@ const WIDGET_MAP = {
   // ==========================================
   // ⚡ 회로이론 (Circuit Theory)
   // ==========================================
+  /** Y–Δ 결선도 3D — 백엔드 handler `machine_y_delta_wiring` (wiring_diagram_3d) */
+  /** 전위 다양체(지형) + 전류 입자 — lecture_id: voltage_manifold 또는 machine_voltage_manifold */
+  voltage_manifold: [
+    lazy(() =>
+      import("@/components/animations/machines/MachineWidgetPage").then(
+        (m) => ({
+          default: function VoltageManifoldWidgetPage() {
+            return <m.default widgetHandlerId="voltage_manifold" />;
+          },
+        }),
+      ),
+    ),
+  ],
   "6_ohms_law": [
     lazy(() => import("@/components/animations/ParallelResistanceWidget")),
   ],
@@ -167,34 +180,28 @@ const WIDGET_MAP = {
   "2_induction_motor": [
     lazy(() => import("@/components/animations/machines/EMInductionWidget")),
   ],
-  /** Y–Δ 결선도 3D — 백엔드 handler `machine_y_delta_wiring` (wiring_diagram_3d) */
-  /** 전위 다양체(지형) + 전류 입자 — lecture_id: voltage_manifold 또는 machine_voltage_manifold */
-  voltage_manifold: [
-    lazy(() =>
-      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
-        default: function VoltageManifoldWidgetPage() {
-          return <m.default widgetHandlerId="voltage_manifold" />;
-        },
-      })),
-    ),
-  ],
+
   /** 백엔드 @RegisterQuiz id와 동일할 때 */
   machine_voltage_manifold: [
     lazy(() =>
-      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
-        default: function MachineVoltageManifoldPage() {
-          return <m.default widgetHandlerId="machine_voltage_manifold" />;
-        },
-      })),
+      import("@/components/animations/machines/MachineWidgetPage").then(
+        (m) => ({
+          default: function MachineVoltageManifoldPage() {
+            return <m.default widgetHandlerId="machine_voltage_manifold" />;
+          },
+        }),
+      ),
     ),
   ],
   machine_y_delta_wiring: [
     lazy(() =>
-      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
-        default: function MachineYDeltaWiringPage() {
-          return <m.default widgetHandlerId="machine_y_delta_wiring" />;
-        },
-      })),
+      import("@/components/animations/machines/MachineWidgetPage").then(
+        (m) => ({
+          default: function MachineYDeltaWiringPage() {
+            return <m.default widgetHandlerId="machine_y_delta_wiring" />;
+          },
+        }),
+      ),
     ),
   ],
   /** 변압기: 정적 결선도 + Y-Y 3D 네온 시뮬 — DB lecture_id 예: transformer_connection_types */
