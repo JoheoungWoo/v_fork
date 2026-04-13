@@ -167,8 +167,15 @@ const WIDGET_MAP = {
   "2_induction_motor": [
     lazy(() => import("@/components/animations/machines/EMInductionWidget")),
   ],
+  /** Y–Δ 결선도 3D — 백엔드 handler `machine_y_delta_wiring` (wiring_diagram_3d) */
   machine_y_delta_wiring: [
-    lazy(() => import("@/components/animations/machines/MachineLearningPage")),
+    lazy(() =>
+      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
+        default: function MachineYDeltaWiringPage() {
+          return <m.default widgetHandlerId="machine_y_delta_wiring" />;
+        },
+      })),
+    ),
   ],
   /** 변압기: 정적 결선도 + Y-Y 3D 네온 시뮬 — DB lecture_id 예: transformer_connection_types */
   transformer_connection_types: [

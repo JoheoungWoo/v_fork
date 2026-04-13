@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import apiClient from "@/api/core/apiClient";
 import Transformer3DWidget from "./Transformer3DWidget";
+import Wiring3DViewer from "./Wiring3DViewer";
 
-/** Fetches Python-computed scene_data: GET /api/machine/widget/{handlerId} */
+/** Fetches Python-computed JSON: GET /api/machine/widget/{handlerId} */
 export default function MachineWidgetPage({
   widgetHandlerId = "transformer_yy_delta",
 }) {
@@ -43,6 +44,9 @@ export default function MachineWidgetPage({
 
   if (!widgetData) return <div>파이썬 백엔드에서 3D 벡터 좌표 연산 중...</div>;
 
-  // 연산이 완료되면 Three.js 바보 뷰어에 데이터를 던져줌
+  if (widgetData.type === "wiring_diagram_3d" && widgetData.scene_data) {
+    return <Wiring3DViewer widgetData={widgetData} />;
+  }
+
   return <Transformer3DWidget data={widgetData} />;
 }
