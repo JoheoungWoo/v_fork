@@ -33,7 +33,7 @@ function WireSegment({ from, to, radius = 0.022, color = "#94a3b8" }) {
   );
 }
 
-function RotatingLoop({ emfRef }) {
+function RotatingLoop({ emfRef, iSign }) {
   const p1Ref = useRef(null);
   const p2Ref = useRef(null);
   const p3Ref = useRef(null);
@@ -63,7 +63,7 @@ function RotatingLoop({ emfRef }) {
   useFrame((_, delta) => {
     const emf = emfRef.current;
     const absE = Math.abs(emf);
-    phaseRef.current = (phaseRef.current + delta * (0.25 + absE * 1.8) + 10) % 1;
+    phaseRef.current = (phaseRef.current + delta * (0.25 + absE * 1.8) * iSign + 10) % 1;
     const pulses = [p1Ref.current, p2Ref.current, p3Ref.current];
     const offsets = [0, 0.33, 0.66];
     pulses.forEach((p, i) => {
@@ -101,7 +101,7 @@ function RotatingLoop({ emfRef }) {
   );
 }
 
-function RotatingCommutator({ angleRef, emfRef }) {
+function RotatingCommutator({ angleRef, emfRef, iSign }) {
   const groupRef = useRef(null);
   const pulseRef = useRef(null);
   const phaseRef = useRef(0);
@@ -114,7 +114,7 @@ function RotatingCommutator({ angleRef, emfRef }) {
     g.rotation.y = angleRef.current;
     const emf = emfRef.current;
     const absE = Math.abs(emf);
-    phaseRef.current = (phaseRef.current + delta * (0.5 + absE * 2.5) + 20) % (Math.PI * 2);
+    phaseRef.current = (phaseRef.current + delta * (0.5 + absE * 2.5) * iSign + 20) % (Math.PI * 2);
     const a = phaseRef.current;
     pulse.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
     pulse.scale.setScalar(absE < 0.03 ? 0.001 : 0.05 + absE * 0.06);
@@ -211,13 +211,18 @@ function RightHandScene({ vMag, vDir, bDir }) {
   const rotAngleRef = useRef(0);
   const emfRef = useRef(0);
 
+  const iSign = Math.sign(vDir * bDir) || 1;
   const vecB = useMemo(() => new THREE.Vector3(bDir, 0, 0), [bDir]);
   const vecV = useMemo(() => new THREE.Vector3(0, 0, vDir * vMag), [vDir, vMag]);
   const vecI = useMemo(() => new THREE.Vector3().crossVectors(vecV, vecB), [vecV, vecB]);
   const iNorm = useMemo(
-    () => new THREE.Vector3(0, Math.max(0.05, Math.min(1, Math.abs(vecI.y))), 0),
-    [vecI],
+    () => new THREE.Vector3(0, iSign * Math.max(0.05, Math.min(1, Math.abs(vecI.y))), 0),
+    [vecI, iSign],
   );
+  const leftPole = bDir > 0 ? "N" : "S";
+  const rightPole = bDir > 0 ? "S" : "N";
+  const leftColor = bDir > 0 ? COL.N : COL.S;
+  const rightColor = bDir > 0 ? COL.S : COL.N;
 
   useFrame((_, delta) => {
     const rotor = rotorGroupRef.current;
@@ -252,7 +257,7 @@ function RightHandScene({ vMag, vDir, bDir }) {
 
       <mesh castShadow position={[-1.3, 0, 0]}>
         <boxGeometry args={[0.42, 1.55, 0.72]} />
-        <meshStandardMaterial color={COL.N} metalness={0.25} roughness={0.4} />
+        <meshStandardMaterial color={leftColor} metalness={0.25} roughness={0.4} />
       </mesh>
       <Text
         position={[-1.52, 0.78, 0.42]}
@@ -260,11 +265,11 @@ function RightHandScene({ vMag, vDir, bDir }) {
         color="#fecaca"
         anchorX="center"
       >
-        N
+        {leftPole}
       </Text>
       <mesh castShadow position={[1.3, 0, 0]}>
         <boxGeometry args={[0.42, 1.55, 0.72]} />
-        <meshStandardMaterial color={COL.S} metalness={0.25} roughness={0.4} />
+        <meshStandardMaterial color={rightColor} metalness={0.25} roughness={0.4} />
       </mesh>
       <Text
         position={[1.52, 0.78, 0.42]}
@@ -272,7 +277,7 @@ function RightHandScene({ vMag, vDir, bDir }) {
         color="#bfdbfe"
         anchorX="center"
       >
-        S
+        {rightPole}
       </Text>
 
       {[0.25, 0, -0.25].map((y) => (
@@ -288,8 +293,8 @@ function RightHandScene({ vMag, vDir, bDir }) {
       ))}
 
       <group ref={rotorGroupRef}>
-        <RotatingLoop emfRef={emfRef} />
-        <RotatingCommutator angleRef={rotAngleRef} emfRef={emfRef} />
+        <RotatingLoop emfRef={emfRef} iSign={iSign} />
+        <RotatingCommutator angleRef={rotAngleRef} emfRef={emfRef} iSign={iSign} />
       </group>
       <Text
         position={[0.17, 0.95, 0]}
@@ -336,7 +341,7 @@ export default function FlemingRightHandWidget() {
   const [vMag, setVMag] = useState(0.8);
   const [vDir, setVDir] = useState(1);
   const [bDir, setBDir] = useState(1);
-  const iDir = vMag < 0.01 ? 0 : 1;
+  const iDir = vMag < 0.01 ? 0 : vDir * bDir;
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] p-5 font-sans shadow-2xl md:p-8">
@@ -391,7 +396,7 @@ export default function FlemingRightHandWidget() {
       <div className="mb-4 text-xs text-slate-400">
         현재 유도전류 방향 I:{" "}
         <span className="font-mono text-emerald-300">
-          {iDir === 0 ? "0" : "+Y (위, 단방향)"}
+          {iDir === 0 ? "0" : iDir > 0 ? "+Y (위)" : "-Y (아래)"}
         </span>
       </div>
 
