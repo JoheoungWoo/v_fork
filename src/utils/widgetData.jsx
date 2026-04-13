@@ -142,6 +142,20 @@ const WIDGET_MAP = {
   "1_induction_motor": [
     lazy(() => import("@/components/animations/machines/InductionMotorWidget")),
   ],
+  /** 변압기 결선: Y–Y, Δ–Δ, Y–Δ, V결선 — DB lecture_id 예: transformer_connection_types */
+  transformer_connection_types: [
+    lazy(
+      () =>
+        import("@/components/animations/machines/TransformerConnectionWidget"),
+    ),
+  ],
+  /** Supabase 등 별칭 */
+  transformer_yy_delta: [
+    lazy(
+      () =>
+        import("@/components/animations/machines/TransformerConnectionWidget"),
+    ),
+  ],
   /** Supabase: homopolar_motor — 말굽자석·도체 원판 회전(호모폴라·플레밍 연계 설명용) */
   homopolar_motor: [
     lazy(
