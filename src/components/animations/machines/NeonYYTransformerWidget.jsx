@@ -2,26 +2,26 @@ import { Environment, OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import "katex/dist/katex.min.css";
 import {
-  forwardRef,
   Suspense,
+  forwardRef,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import { BlockMath, InlineMath } from "react-katex";
+import { InlineMath } from "react-katex";
 import * as THREE from "three";
 
 /**
- * 전기기기 - Y-Y 결선 3D 네온 시뮬레이터 (@react-three/fiber)
+ * 전기기기 - Y-Y 결선 3D 네온 시뮬레이터 (+ 페이저 전류 흐름도)
  * DB lecture_id: 'transformer_connection_types'
  */
 
 const COL = {
-  U: "#ec4899",
-  V: "#06b6d4",
-  W: "#eab308",
-  N: "#f8fafc",
+  U: "#ec4899", // Pink
+  V: "#06b6d4", // Cyan
+  W: "#eab308", // Yellow
+  N: "#f8fafc", // White
 };
 
 const R = 0.82;
@@ -31,7 +31,6 @@ const TIP_W = new THREE.Vector3((R * Math.sqrt(3)) / 2, -R * 0.5, 0);
 
 const Y_UP = new THREE.Vector3(0, 1, 0);
 
-/** Y-Y 기하: 중심·끝점 (전류 흐름 입자용) */
 const PRI_C = new THREE.Vector3(-1.38, 0, 0);
 const SEC_C = new THREE.Vector3(1.38, 0, 0);
 const PRI_TIPS = [TIP_U, TIP_V, TIP_W].map((t) => PRI_C.clone().add(t));
@@ -64,10 +63,15 @@ function orientFlowCone(cone, from, to, currentVal) {
   q.setFromUnitVectors(Y_UP, axis);
   cone.quaternion.copy(q);
   const show = Math.abs(currentVal) > 0.04;
-  cone.scale.setScalar(show ? 0.22 + Math.min(1, Math.abs(currentVal) / I_NORM) * 0.18 : 0.001);
+  cone.scale.setScalar(
+    show ? 0.22 + Math.min(1, Math.abs(currentVal) / I_NORM) * 0.18 : 0.001,
+  );
 }
 
-const NeonCylinder = forwardRef(function NeonCylinder({ from, to, color }, ref) {
+const NeonCylinder = forwardRef(function NeonCylinder(
+  { from, to, color },
+  ref,
+) {
   const groupRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -139,34 +143,39 @@ function YStar3D({ cx, suffix, refs }) {
       })}
       <mesh position={[cx, 0, 0]}>
         <sphereGeometry args={[0.09, 20, 20]} />
-        <meshStandardMaterial color="#94a3b8" emissive="#475569" emissiveIntensity={0.3} roughness={0.45} />
+        <meshStandardMaterial
+          color="#94a3b8"
+          emissive="#475569"
+          emissiveIntensity={0.3}
+          roughness={0.45}
+        />
       </mesh>
     </group>
   );
 }
 
 function YYScene3D({ timeRef, flagsRef, showNeutral }) {
-  const pU = useRef(null);
-  const pV = useRef(null);
-  const pW = useRef(null);
-  const sU = useRef(null);
-  const sV = useRef(null);
-  const sW = useRef(null);
+  const pU = useRef(null),
+    pV = useRef(null),
+    pW = useRef(null);
+  const sU = useRef(null),
+    sV = useRef(null),
+    sW = useRef(null);
   const nMesh = useRef(null);
 
-  const fDotPU = useRef(null);
-  const fDotPV = useRef(null);
-  const fDotPW = useRef(null);
-  const fDotSU = useRef(null);
-  const fDotSV = useRef(null);
-  const fDotSW = useRef(null);
+  const fDotPU = useRef(null),
+    fDotPV = useRef(null),
+    fDotPW = useRef(null);
+  const fDotSU = useRef(null),
+    fDotSV = useRef(null),
+    fDotSW = useRef(null);
   const fDotN = useRef(null);
-  const fConePU = useRef(null);
-  const fConePV = useRef(null);
-  const fConePW = useRef(null);
-  const fConeSU = useRef(null);
-  const fConeSV = useRef(null);
-  const fConeSW = useRef(null);
+  const fConePU = useRef(null),
+    fConePV = useRef(null),
+    fConePW = useRef(null);
+  const fConeSU = useRef(null),
+    fConeSV = useRef(null),
+    fConeSW = useRef(null);
   const fConeN = useRef(null);
 
   useFrame(() => {
@@ -178,13 +187,13 @@ function YYScene3D({ timeRef, flagsRef, showNeutral }) {
     const iW = Math.sin(t - (4 * Math.PI) / 3);
     const iN = iU + iV + iW;
 
-    const nU = iU / I_NORM;
-    const nV = iV / I_NORM;
-    const nW = iW / I_NORM;
+    const nU = iU / I_NORM,
+      nV = iV / I_NORM,
+      nW = iW / I_NORM;
 
     const glow = (obj, i) => {
-      const m = obj?.material;
-      if (m) m.emissiveIntensity = 0.12 + Math.abs(i) * 0.95;
+      if (obj?.material)
+        obj.material.emissiveIntensity = 0.12 + Math.abs(i) * 0.95;
     };
 
     glow(pU.current, iU);
@@ -194,10 +203,10 @@ function YYScene3D({ timeRef, flagsRef, showNeutral }) {
     glow(sV.current, iV);
     glow(sW.current, iW);
 
-    const nm = nMesh.current?.material;
-    if (nm) {
-      if (neutralOn) nm.emissiveIntensity = 0.08 + Math.abs(iN) * 1.1;
-      else nm.emissiveIntensity = 0.05;
+    if (nMesh.current?.material) {
+      nMesh.current.material.emissiveIntensity = neutralOn
+        ? 0.08 + Math.abs(iN) * 1.1
+        : 0.05;
     }
 
     placeFlowOnLeg(fDotPU.current, PRI_C, PRI_TIPS[0], nU);
@@ -233,7 +242,6 @@ function YYScene3D({ timeRef, flagsRef, showNeutral }) {
       <ambientLight intensity={0.28} />
       <directionalLight position={[4, 6, 3]} intensity={0.4} color="#93c5fd" />
       <pointLight position={[0, 2.2, 2]} intensity={0.18} color="#a78bfa" />
-
       <Suspense fallback={null}>
         <Environment preset="city" />
       </Suspense>
@@ -241,78 +249,51 @@ function YYScene3D({ timeRef, flagsRef, showNeutral }) {
       <group position={[0, 0.06, 0]}>
         <YStar3D cx={-1.38} suffix="1" refs={[pU, pV, pW]} />
         <YStar3D cx={1.38} suffix="2" refs={[sU, sV, sW]} />
-        {showNeutral && <NeonCylinder ref={nMesh} from={fromN} to={toN} color={COL.N} />}
+        {showNeutral && (
+          <NeonCylinder ref={nMesh} from={fromN} to={toN} color={COL.N} />
+        )}
 
-        {/* 순시 전류 방향·크기: 구 + 콘 (중성점↔단자) */}
-        <mesh ref={fDotPU}>
-          <sphereGeometry args={[0.1, 14, 14]} />
-          <meshStandardMaterial
-            color={COL.U}
-            emissive={COL.U}
-            emissiveIntensity={1.2}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh ref={fConePU}>
-          <coneGeometry args={[0.07, 0.2, 10]} />
-          <meshStandardMaterial
-            color={COL.U}
-            emissive={COL.U}
-            emissiveIntensity={1}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh ref={fDotPV}>
-          <sphereGeometry args={[0.1, 14, 14]} />
-          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1.2} toneMapped={false} />
-        </mesh>
-        <mesh ref={fConePV}>
-          <coneGeometry args={[0.07, 0.2, 10]} />
-          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1} toneMapped={false} />
-        </mesh>
-        <mesh ref={fDotPW}>
-          <sphereGeometry args={[0.1, 14, 14]} />
-          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1.2} toneMapped={false} />
-        </mesh>
-        <mesh ref={fConePW}>
-          <coneGeometry args={[0.07, 0.2, 10]} />
-          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1} toneMapped={false} />
-        </mesh>
-        <mesh ref={fDotSU}>
-          <sphereGeometry args={[0.1, 14, 14]} />
-          <meshStandardMaterial color={COL.U} emissive={COL.U} emissiveIntensity={1.2} toneMapped={false} />
-        </mesh>
-        <mesh ref={fConeSU}>
-          <coneGeometry args={[0.07, 0.2, 10]} />
-          <meshStandardMaterial color={COL.U} emissive={COL.U} emissiveIntensity={1} toneMapped={false} />
-        </mesh>
-        <mesh ref={fDotSV}>
-          <sphereGeometry args={[0.1, 14, 14]} />
-          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1.2} toneMapped={false} />
-        </mesh>
-        <mesh ref={fConeSV}>
-          <coneGeometry args={[0.07, 0.2, 10]} />
-          <meshStandardMaterial color={COL.V} emissive={COL.V} emissiveIntensity={1} toneMapped={false} />
-        </mesh>
-        <mesh ref={fDotSW}>
-          <sphereGeometry args={[0.1, 14, 14]} />
-          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1.2} toneMapped={false} />
-        </mesh>
-        <mesh ref={fConeSW}>
-          <coneGeometry args={[0.07, 0.2, 10]} />
-          <meshStandardMaterial color={COL.W} emissive={COL.W} emissiveIntensity={1} toneMapped={false} />
-        </mesh>
-        <mesh ref={fDotN}>
-          <sphereGeometry args={[0.11, 14, 14]} />
-          <meshStandardMaterial color={COL.N} emissive={COL.N} emissiveIntensity={1.1} toneMapped={false} />
-        </mesh>
-        <mesh ref={fConeN}>
-          <coneGeometry args={[0.08, 0.22, 10]} />
-          <meshStandardMaterial color={COL.N} emissive={COL.N} emissiveIntensity={1} toneMapped={false} />
-        </mesh>
+        {/* 입자들 */}
+        {[
+          { rD: fDotPU, rC: fConePU, c: COL.U },
+          { rD: fDotPV, rC: fConePV, c: COL.V },
+          { rD: fDotPW, rC: fConePW, c: COL.W },
+          { rD: fDotSU, rC: fConeSU, c: COL.U },
+          { rD: fDotSV, rC: fConeSV, c: COL.V },
+          { rD: fDotSW, rC: fConeSW, c: COL.W },
+          { rD: fDotN, rC: fConeN, c: COL.N, big: true },
+        ].map((item, idx) => (
+          <group key={idx}>
+            <mesh ref={item.rD}>
+              <sphereGeometry args={[item.big ? 0.11 : 0.1, 14, 14]} />
+              <meshStandardMaterial
+                color={item.c}
+                emissive={item.c}
+                emissiveIntensity={1.2}
+                toneMapped={false}
+              />
+            </mesh>
+            <mesh ref={item.rC}>
+              <coneGeometry
+                args={[item.big ? 0.08 : 0.07, item.big ? 0.22 : 0.2, 10]}
+              />
+              <meshStandardMaterial
+                color={item.c}
+                emissive={item.c}
+                emissiveIntensity={1}
+                toneMapped={false}
+              />
+            </mesh>
+          </group>
+        ))}
       </group>
-
-      <OrbitControls makeDefault enablePan minDistance={2.8} maxDistance={9} target={[0, 0, 0]} />
+      <OrbitControls
+        makeDefault
+        enablePan
+        minDistance={2.8}
+        maxDistance={9}
+        target={[0, 0, 0]}
+      />
       <CameraSetup />
     </>
   );
@@ -358,6 +339,7 @@ export default function NeonYYTransformerWidget() {
   const ampU = isUnbalanced ? 1.8 : 1.0;
   const ampV = 1.0;
   const ampW = 1.0;
+
   const iU = ampU * Math.sin(phaseU);
   const iV = ampV * Math.sin(phaseV);
   const iW = ampW * Math.sin(phaseW);
@@ -365,20 +347,30 @@ export default function NeonYYTransformerWidget() {
 
   const colors = COL;
 
+  // 파형 그리기 함수
   const generateWavePath = (phaseOffset, amplitude) => {
     let d = "";
-    const steps = 100;
-    const width = 600;
-    const centerY = 50;
-    for (let i = 0; i <= steps; i++) {
-      const x = (i / steps) * width;
-      const waveX = (i / steps) * 4 * Math.PI;
-      const y = centerY - amplitude * Math.sin(waveX - time + phaseOffset) * 25;
+    for (let i = 0; i <= 100; i++) {
+      const x = (i / 100) * 400;
+      const waveX = (i / 100) * 4 * Math.PI;
+      const y = 60 - amplitude * Math.sin(waveX - time + phaseOffset) * 25;
       if (i === 0) d += `M ${x} ${y} `;
       else d += `L ${x} ${y} `;
     }
     return d;
   };
+
+  // 페이저(벡터) 다이어그램 좌표 계산
+  // 시간(time)에 따라 반시계 방향으로 회전하는 벡터를 X, Y 평면에 투영합니다.
+  const rScale = 40; // 벡터 길이 스케일
+  const uX = ampU * Math.cos(phaseU) * rScale;
+  const uY = -ampU * Math.sin(phaseU) * rScale; // SVG는 Y축이 아래로 증가하므로 뒤집음
+  const vX = ampV * Math.cos(phaseV) * rScale;
+  const vY = -ampV * Math.sin(phaseV) * rScale;
+  const wX = ampW * Math.cos(phaseW) * rScale;
+  const wY = -ampW * Math.sin(phaseW) * rScale;
+  const nX = uX + vX + wX;
+  const nY = uY + vY + wY;
 
   const neonFilterDef = (id) => (
     <filter id={id} x="-50%" y="-50%" width="200%" height="200%">
@@ -394,7 +386,6 @@ export default function NeonYYTransformerWidget() {
   return (
     <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] p-5 font-sans shadow-2xl md:p-8">
       <div className="pointer-events-none absolute left-1/4 top-0 h-96 w-96 rounded-full bg-blue-600/10 blur-[120px]" />
-      <div className="pointer-events-none absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-purple-600/10 blur-[120px]" />
 
       <div className="relative z-10 mb-6 border-b border-slate-800 pb-4">
         <h3 className="text-2xl font-black tracking-tight text-white drop-shadow-md">
@@ -409,7 +400,8 @@ export default function NeonYYTransformerWidget() {
           )·중성선(
           <InlineMath math="N" />
           )를 <strong className="text-sky-400">3D</strong>로 보며,{" "}
-          <strong className="text-orange-400">불평형</strong>일 때 중성선 전류가 커지는 것을 확인하세요.
+          <strong className="text-orange-400">불평형</strong>일 때 중성선 전류가
+          커지는 것을 페이저(벡터) 흐름도로 직접 확인하세요.
         </p>
       </div>
 
@@ -432,29 +424,21 @@ export default function NeonYYTransformerWidget() {
           <button
             type="button"
             onClick={() => setShowNeutral((v) => !v)}
-            className={`rounded-lg px-4 py-2 text-sm font-bold transition-all ${
-              showNeutral
-                ? "bg-slate-700 text-white shadow-[0_0_10px_rgba(255,255,255,0.2)]"
-                : "border border-slate-700 bg-transparent text-slate-500"
-            }`}
+            className={`rounded-lg px-4 py-2 text-sm font-bold transition-all ${showNeutral ? "bg-slate-700 text-white shadow-[0_0_10px_rgba(255,255,255,0.2)]" : "border border-slate-700 bg-transparent text-slate-500"}`}
           >
             중성선 {showNeutral ? "켜짐" : "꺼짐"}
           </button>
           <button
             type="button"
             onClick={() => setIsUnbalanced((v) => !v)}
-            className={`rounded-lg px-4 py-2 text-sm font-bold transition-all ${
-              isUnbalanced
-                ? "border border-orange-500/50 bg-orange-500/20 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
-                : "border border-slate-700 bg-transparent text-slate-500 hover:text-slate-300"
-            }`}
+            className={`rounded-lg px-4 py-2 text-sm font-bold transition-all ${isUnbalanced ? "border border-orange-500/50 bg-orange-500/20 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]" : "border border-slate-700 bg-transparent text-slate-500 hover:text-slate-300"}`}
           >
             부하 불평형 {isUnbalanced ? "ON" : "OFF"}
           </button>
         </div>
       </div>
 
-      <div className="relative z-10 mb-6 h-[min(52vh,420px)] min-h-[280px] w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0b1120]/90 shadow-inner backdrop-blur-xl md:min-h-[360px]">
+      <div className="relative z-10 mb-6 h-[min(45vh,360px)] min-h-[260px] w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0b1120]/90 shadow-inner backdrop-blur-xl">
         <Canvas
           shadows
           frameloop="always"
@@ -462,107 +446,235 @@ export default function NeonYYTransformerWidget() {
           className="h-full w-full touch-none"
         >
           <Suspense fallback={null}>
-            <YYScene3D timeRef={timeRef} flagsRef={flagsRef} showNeutral={showNeutral} />
+            <YYScene3D
+              timeRef={timeRef}
+              flagsRef={flagsRef}
+              showNeutral={showNeutral}
+            />
           </Suspense>
         </Canvas>
-        <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-center text-[10px] text-slate-400 backdrop-blur-sm">
-          드래그로 회전 · 스크롤로 확대 · 구·콘 = 각 상·중성선 순시 전류(크기·방향)
-        </p>
       </div>
 
-      <div className="relative z-10 mb-6 rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-inner">
-        <div className="mb-2 flex items-center justify-between px-2">
-          <span className="text-xs font-bold text-slate-400">LIVE OSCILLOSCOPE (Current)</span>
-          <div className="flex flex-wrap gap-3 text-xs font-bold">
-            <span className="text-pink-500">■ U</span>
-            <span className="text-cyan-500">■ V</span>
-            <span className="text-yellow-500">■ W</span>
-            {showNeutral && <span className="text-white">■ N</span>}
+      {/* 하단 패널: 파형 + 벡터 페이저도 */}
+      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        {/* 오실로스코프 (좌측) */}
+        <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-inner">
+          <div className="mb-2 flex items-center justify-between px-2">
+            <span className="text-xs font-bold text-slate-400">
+              LIVE OSCILLOSCOPE (Time Domain)
+            </span>
+            <div className="flex flex-wrap gap-3 text-xs font-bold">
+              <span className="text-pink-500">■ U</span>{" "}
+              <span className="text-cyan-500">■ V</span>{" "}
+              <span className="text-yellow-500">■ W</span>
+              {showNeutral && <span className="text-white">■ N</span>}
+            </div>
           </div>
-        </div>
-        <svg viewBox="0 0 600 100" className="h-auto w-full opacity-90">
-          <defs>
-            {neonFilterDef("scope-neon-U")}
-            {neonFilterDef("scope-neon-V")}
-            {neonFilterDef("scope-neon-W")}
-            {neonFilterDef("scope-neon-N")}
-          </defs>
-          <line x1="0" y1="50" x2="600" y2="50" stroke="#334155" strokeWidth="1" />
-          <path
-            d={generateWavePath(0, ampU)}
-            fill="none"
-            stroke={colors.U}
-            strokeWidth="2"
-            filter="url(#scope-neon-U)"
-          />
-          <path
-            d={generateWavePath((2 * Math.PI) / 3, ampV)}
-            fill="none"
-            stroke={colors.V}
-            strokeWidth="2"
-            filter="url(#scope-neon-V)"
-          />
-          <path
-            d={generateWavePath((4 * Math.PI) / 3, ampW)}
-            fill="none"
-            stroke={colors.W}
-            strokeWidth="2"
-            filter="url(#scope-neon-W)"
-          />
-          {showNeutral && (
-            <path
-              d={(() => {
-                let dPath = "";
-                for (let i = 0; i <= 100; i++) {
-                  const x = (i / 100) * 600;
-                  const waveX = (i / 100) * 4 * Math.PI;
-                  const yVal =
-                    ampU * Math.sin(waveX - time) +
-                    ampV * Math.sin(waveX - time + (2 * Math.PI) / 3) +
-                    ampW * Math.sin(waveX - time + (4 * Math.PI) / 3);
-                  const y = 50 - yVal * 25;
-                  if (i === 0) dPath += `M ${x} ${y} `;
-                  else dPath += `L ${x} ${y} `;
-                }
-                return dPath;
-              })()}
-              fill="none"
-              stroke={colors.N}
-              strokeWidth="3"
-              strokeDasharray="4 4"
-              filter="url(#scope-neon-N)"
+          <svg viewBox="0 0 400 120" className="h-auto w-full opacity-90">
+            <defs>
+              {neonFilterDef("scope-U")} {neonFilterDef("scope-V")}{" "}
+              {neonFilterDef("scope-W")} {neonFilterDef("scope-N")}
+            </defs>
+            <line
+              x1="0"
+              y1="60"
+              x2="400"
+              y2="60"
+              stroke="#334155"
+              strokeWidth="1"
             />
-          )}
-        </svg>
-      </div>
-
-      <div className="relative z-10 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-700 bg-white/5 p-4 backdrop-blur-md">
-          <div className="mb-2 text-sm font-bold text-slate-400">3상 평형 상태 (기본)</div>
-          <div className="text-sm text-slate-300">
-            각 상의 크기가 같고 120° 위상차이면 벡터 합은 0에 가깝습니다.
-            <div className="mt-2 text-base text-blue-400">
-              <BlockMath math="I_U + I_V + I_W = 0" />
-            </div>
-            중성선 <InlineMath math="I_N" /> 는 평형이면 거의 0입니다.
-          </div>
+            <path
+              d={generateWavePath(0, ampU)}
+              fill="none"
+              stroke={colors.U}
+              strokeWidth="2"
+              filter="url(#scope-U)"
+            />
+            <path
+              d={generateWavePath((2 * Math.PI) / 3, ampV)}
+              fill="none"
+              stroke={colors.V}
+              strokeWidth="2"
+              filter="url(#scope-V)"
+            />
+            <path
+              d={generateWavePath((4 * Math.PI) / 3, ampW)}
+              fill="none"
+              stroke={colors.W}
+              strokeWidth="2"
+              filter="url(#scope-W)"
+            />
+            {showNeutral && (
+              <path
+                d={(() => {
+                  let dPath = "";
+                  for (let i = 0; i <= 100; i++) {
+                    const x = (i / 100) * 400;
+                    const waveX = (i / 100) * 4 * Math.PI;
+                    const yVal =
+                      ampU * Math.sin(waveX - time) +
+                      ampV * Math.sin(waveX - time + (2 * Math.PI) / 3) +
+                      ampW * Math.sin(waveX - time + (4 * Math.PI) / 3);
+                    const y = 60 - yVal * 25;
+                    if (i === 0) dPath += `M ${x} ${y} `;
+                    else dPath += `L ${x} ${y} `;
+                  }
+                  return dPath;
+                })()}
+                fill="none"
+                stroke={colors.N}
+                strokeWidth="3"
+                strokeDasharray="4 4"
+                filter="url(#scope-N)"
+              />
+            )}
+          </svg>
         </div>
-        <div
-          className={`rounded-xl border p-4 backdrop-blur-md transition-all ${
-            isUnbalanced ? "border-orange-500/50 bg-orange-950/20" : "border-slate-700 bg-white/5"
-          }`}
-        >
-          <div
-            className={`mb-2 text-sm font-bold ${isUnbalanced ? "text-orange-400" : "text-slate-400"}`}
-          >
-            부하 불평형 (U상 진폭 ↑)
+
+        {/* 페이저 다이어그램 (우측) */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-inner flex flex-col">
+          <div className="mb-2 px-2 text-center">
+            <span className="text-xs font-bold text-slate-400">
+              LIVE PHASOR (벡터 흐름도)
+            </span>
           </div>
-          <div className="text-sm text-slate-300">
-            한 상 전류가 달라지면 중성점 전류가 생깁니다.
-            <div className="mt-2 text-base text-orange-400">
-              <BlockMath math="I_N = I_U + I_V + I_W \neq 0" />
-            </div>
-            잔류 전류가 중성선·접지 경로로 흐를 수 있어 설계·보호가 중요합니다.
+          <div className="flex-1 flex items-center justify-center relative">
+            <svg
+              viewBox="-100 -100 200 200"
+              className="h-full w-full max-h-[160px] opacity-90 overflow-visible"
+            >
+              <defs>
+                <marker
+                  id="arrowU"
+                  viewBox="0 0 10 10"
+                  refX="7"
+                  refY="5"
+                  markerWidth="5"
+                  markerHeight="5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={colors.U} />
+                </marker>
+                <marker
+                  id="arrowV"
+                  viewBox="0 0 10 10"
+                  refX="7"
+                  refY="5"
+                  markerWidth="5"
+                  markerHeight="5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={colors.V} />
+                </marker>
+                <marker
+                  id="arrowW"
+                  viewBox="0 0 10 10"
+                  refX="7"
+                  refY="5"
+                  markerWidth="5"
+                  markerHeight="5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={colors.W} />
+                </marker>
+                <marker
+                  id="arrowN"
+                  viewBox="0 0 10 10"
+                  refX="7"
+                  refY="5"
+                  markerWidth="5"
+                  markerHeight="5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={colors.N} />
+                </marker>
+              </defs>
+
+              {/* 가이드라인 원 & 축 */}
+              <circle
+                cx="0"
+                cy="0"
+                r={rScale}
+                fill="none"
+                stroke="#1e293b"
+                strokeWidth="1"
+                strokeDasharray="2 4"
+              />
+              {isUnbalanced && (
+                <circle
+                  cx="0"
+                  cy="0"
+                  r={rScale * 1.8}
+                  fill="none"
+                  stroke="#1e293b"
+                  strokeWidth="1"
+                  strokeDasharray="2 4"
+                />
+              )}
+              <line
+                x1="-100"
+                y1="0"
+                x2="100"
+                y2="0"
+                stroke="#1e293b"
+                strokeWidth="1"
+              />
+              <line
+                x1="0"
+                y1="-100"
+                x2="0"
+                y2="100"
+                stroke="#1e293b"
+                strokeWidth="1"
+              />
+
+              {/* 회전하는 전류 벡터들 */}
+              <line
+                x1="0"
+                y1="0"
+                x2={uX}
+                y2={uY}
+                stroke={colors.U}
+                strokeWidth="3"
+                markerEnd="url(#arrowU)"
+                filter="url(#scope-U)"
+              />
+              <line
+                x1="0"
+                y1="0"
+                x2={vX}
+                y2={vY}
+                stroke={colors.V}
+                strokeWidth="3"
+                markerEnd="url(#arrowV)"
+                filter="url(#scope-V)"
+              />
+              <line
+                x1="0"
+                y1="0"
+                x2={wX}
+                y2={wY}
+                stroke={colors.W}
+                strokeWidth="3"
+                markerEnd="url(#arrowW)"
+                filter="url(#scope-W)"
+              />
+
+              {/* 중성선 전류 벡터 (3벡터의 합) */}
+              {showNeutral && isUnbalanced && (
+                <line
+                  x1="0"
+                  y1="0"
+                  x2={nX}
+                  y2={nY}
+                  stroke={colors.N}
+                  strokeWidth="4"
+                  strokeDasharray="3 3"
+                  markerEnd="url(#arrowN)"
+                  filter="url(#scope-N)"
+                />
+              )}
+            </svg>
           </div>
         </div>
       </div>
