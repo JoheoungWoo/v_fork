@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import apiClient from "@/api/core/apiClient";
+import VoltageLandscapeViewer from "@/components/animations/circuits/VoltageLandscapeViewer";
 import Transformer3DWidget from "./Transformer3DWidget";
 import Wiring3DViewer from "./Wiring3DViewer";
 
@@ -46,6 +47,16 @@ export default function MachineWidgetPage({
 
   if (widgetData.type === "wiring_diagram_3d" && widgetData.scene_data) {
     return <Wiring3DViewer widgetData={widgetData} />;
+  }
+
+  const sd = widgetData.scene_data;
+  if (
+    sd?.terrain?.z_values &&
+    Array.isArray(sd.particles) &&
+    sd.terrain.width &&
+    sd.terrain.depth
+  ) {
+    return <VoltageLandscapeViewer widgetData={widgetData} />;
   }
 
   return <Transformer3DWidget data={widgetData} />;

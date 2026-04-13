@@ -168,6 +168,26 @@ const WIDGET_MAP = {
     lazy(() => import("@/components/animations/machines/EMInductionWidget")),
   ],
   /** Y–Δ 결선도 3D — 백엔드 handler `machine_y_delta_wiring` (wiring_diagram_3d) */
+  /** 전위 다양체(지형) + 전류 입자 — lecture_id: voltage_manifold 또는 machine_voltage_manifold */
+  voltage_manifold: [
+    lazy(() =>
+      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
+        default: function VoltageManifoldWidgetPage() {
+          return <m.default widgetHandlerId="voltage_manifold" />;
+        },
+      })),
+    ),
+  ],
+  /** 백엔드 @RegisterQuiz id와 동일할 때 */
+  machine_voltage_manifold: [
+    lazy(() =>
+      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
+        default: function MachineVoltageManifoldPage() {
+          return <m.default widgetHandlerId="machine_voltage_manifold" />;
+        },
+      })),
+    ),
+  ],
   machine_y_delta_wiring: [
     lazy(() =>
       import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
