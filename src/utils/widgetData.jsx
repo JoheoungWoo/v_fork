@@ -188,6 +188,11 @@ const WIDGET_MAP = {
         import("@/components/animations/magnetics/IronCoreMagneticGapWidget"),
     ),
   ],
+  "9_flemming_right_hand_3d": [
+    lazy(
+      () => import("@/components/animations/magnetics/FlemingRightHandWidget"),
+    ),
+  ],
 };
 
 export default WIDGET_MAP;

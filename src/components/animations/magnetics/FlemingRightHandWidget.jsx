@@ -12,7 +12,13 @@ const COL = {
   rod: "#94a3b8",
 };
 
-function Arrow3D({ origin = [0, 0, 0], dir = [0, 1, 0], length = 1, color = "#fff", label }) {
+function Arrow3D({
+  origin = [0, 0, 0],
+  dir = [0, 1, 0],
+  length = 1,
+  color = "#fff",
+  label,
+}) {
   const groupRef = useRef(null);
   const matRef = useRef(null);
 
@@ -28,10 +34,14 @@ function Arrow3D({ origin = [0, 0, 0], dir = [0, 1, 0], length = 1, color = "#ff
     g.visible = true;
     const n = d.normalize();
     g.position.set(...origin);
-    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      n,
+    );
     g.quaternion.copy(q);
     g.scale.set(1, length * len, 1);
-    if (matRef.current) matRef.current.emissiveIntensity = 0.8 + Math.min(1.2, len) * 0.8;
+    if (matRef.current)
+      matRef.current.emissiveIntensity = 0.8 + Math.min(1.2, len) * 0.8;
   });
 
   return (
@@ -50,9 +60,19 @@ function Arrow3D({ origin = [0, 0, 0], dir = [0, 1, 0], length = 1, color = "#ff
       </mesh>
       <mesh position={[0, 0.7, 0]}>
         <coneGeometry args={[0.06, 0.2, 16]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} toneMapped={false} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={1}
+          toneMapped={false}
+        />
       </mesh>
-      <Text position={[0.1, 0.88, 0]} fontSize={0.1} color={color} anchorX="left">
+      <Text
+        position={[0.1, 0.88, 0]}
+        fontSize={0.1}
+        color={color}
+        anchorX="left"
+      >
         {label}
       </Text>
     </group>
@@ -64,9 +84,18 @@ function RightHandScene({ vMag, vDir, bDir }) {
   const phaseRef = useRef(0);
 
   const vecB = useMemo(() => new THREE.Vector3(bDir, 0, 0), [bDir]);
-  const vecV = useMemo(() => new THREE.Vector3(0, 0, vDir * vMag), [vDir, vMag]);
-  const vecI = useMemo(() => new THREE.Vector3().crossVectors(vecV, vecB), [vecV, vecB]);
-  const iNorm = vecI.length() > 1e-6 ? vecI.clone().normalize().multiplyScalar(Math.min(1, vMag)) : new THREE.Vector3();
+  const vecV = useMemo(
+    () => new THREE.Vector3(0, 0, vDir * vMag),
+    [vDir, vMag],
+  );
+  const vecI = useMemo(
+    () => new THREE.Vector3().crossVectors(vecV, vecB),
+    [vecV, vecB],
+  );
+  const iNorm =
+    vecI.length() > 1e-6
+      ? vecI.clone().normalize().multiplyScalar(Math.min(1, vMag))
+      : new THREE.Vector3();
 
   useFrame((_, delta) => {
     const pulse = pulseRef.current;
@@ -91,51 +120,111 @@ function RightHandScene({ vMag, vDir, bDir }) {
       <directionalLight position={[-3, 2, -2]} intensity={0.25} />
       <Environment preset="city" />
 
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.05, 0]}>
+      <mesh
+        receiveShadow
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -1.05, 0]}
+      >
         <planeGeometry args={[5, 3.4]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.08} roughness={0.92} />
+        <meshStandardMaterial
+          color="#0f172a"
+          metalness={0.08}
+          roughness={0.92}
+        />
       </mesh>
 
       <mesh castShadow position={[-1.3, 0, 0]}>
         <boxGeometry args={[0.42, 1.55, 0.72]} />
         <meshStandardMaterial color={COL.N} metalness={0.25} roughness={0.4} />
       </mesh>
-      <Text position={[-1.52, 0.78, 0.42]} fontSize={0.15} color="#fecaca" anchorX="center">
+      <Text
+        position={[-1.52, 0.78, 0.42]}
+        fontSize={0.15}
+        color="#fecaca"
+        anchorX="center"
+      >
         N
       </Text>
       <mesh castShadow position={[1.3, 0, 0]}>
         <boxGeometry args={[0.42, 1.55, 0.72]} />
         <meshStandardMaterial color={COL.S} metalness={0.25} roughness={0.4} />
       </mesh>
-      <Text position={[1.52, 0.78, 0.42]} fontSize={0.15} color="#bfdbfe" anchorX="center">
+      <Text
+        position={[1.52, 0.78, 0.42]}
+        fontSize={0.15}
+        color="#bfdbfe"
+        anchorX="center"
+      >
         S
       </Text>
 
       {[0.25, 0, -0.25].map((y) => (
         <mesh key={y} position={[0, y, 0]}>
           <boxGeometry args={[2.2, 0.015, 0.03]} />
-          <meshStandardMaterial color={COL.B} emissive={COL.B} emissiveIntensity={0.7} toneMapped={false} />
+          <meshStandardMaterial
+            color={COL.B}
+            emissive={COL.B}
+            emissiveIntensity={0.7}
+            toneMapped={false}
+          />
         </mesh>
       ))}
 
       <mesh castShadow position={[0, 0, 0]}>
         <cylinderGeometry args={[0.08, 0.08, 1.6, 20]} />
-        <meshStandardMaterial color={COL.rod} metalness={0.65} roughness={0.32} />
+        <meshStandardMaterial
+          color={COL.rod}
+          metalness={0.65}
+          roughness={0.32}
+        />
       </mesh>
-      <Text position={[0.17, 0.95, 0]} fontSize={0.08} color="#e2e8f0" anchorX="left">
+      <Text
+        position={[0.17, 0.95, 0]}
+        fontSize={0.08}
+        color="#e2e8f0"
+        anchorX="left"
+      >
         도체
       </Text>
 
       <mesh ref={pulseRef}>
         <sphereGeometry args={[1, 12, 12]} />
-        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1.1} toneMapped={false} />
+        <meshStandardMaterial
+          color={COL.I}
+          emissive={COL.I}
+          emissiveIntensity={1.1}
+          toneMapped={false}
+        />
       </mesh>
 
-      <Arrow3D origin={[-0.05, 0.8, 0.62]} dir={[bDir, 0, 0]} length={0.95} color={COL.B} label="B" />
-      <Arrow3D origin={[0, -0.75, 0]} dir={[0, 0, vDir * vMag]} length={0.9} color={COL.V} label="v" />
-      <Arrow3D origin={[0.45, 0, 0]} dir={[0, iNorm.y, 0]} length={0.95} color={COL.I} label="I" />
+      <Arrow3D
+        origin={[-0.05, 0.8, 0.62]}
+        dir={[bDir, 0, 0]}
+        length={0.95}
+        color={COL.B}
+        label="B"
+      />
+      <Arrow3D
+        origin={[0, -0.75, 0]}
+        dir={[0, 0, vDir * vMag]}
+        length={0.9}
+        color={COL.V}
+        label="v"
+      />
+      <Arrow3D
+        origin={[0.45, 0, 0]}
+        dir={[0, iNorm.y, 0]}
+        length={0.95}
+        color={COL.I}
+        label="I"
+      />
 
-      <OrbitControls enablePan={false} minDistance={2.5} maxDistance={6} target={[0, 0, 0]} />
+      <OrbitControls
+        enablePan={false}
+        minDistance={2.5}
+        maxDistance={6}
+        target={[0, 0, 0]}
+      />
     </>
   );
 }
@@ -157,10 +246,11 @@ export default function FlemingRightHandWidget() {
           3D
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-slate-400">
-          검지 = 자기장 <strong className="text-pink-300">B</strong>, 엄지 = 도체 운동{" "}
-          <strong className="text-amber-300">v</strong>, 중지 = 유도전류{" "}
-          <strong className="text-emerald-300">I</strong>. 여기서는{" "}
-          <code className="rounded bg-slate-800 px-1 py-0.5">I ∝ v × B</code> 로 계산합니다.
+          검지 = 자기장 <strong className="text-pink-300">B</strong>, 엄지 =
+          도체 운동 <strong className="text-amber-300">v</strong>, 중지 =
+          유도전류 <strong className="text-emerald-300">I</strong>. 여기서는{" "}
+          <code className="rounded bg-slate-800 px-1 py-0.5">I ∝ v × B</code> 로
+          계산합니다.
         </p>
       </div>
 
@@ -218,4 +308,3 @@ export default function FlemingRightHandWidget() {
     </div>
   );
 }
-
