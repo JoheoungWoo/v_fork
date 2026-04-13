@@ -1,4 +1,4 @@
-import apiClient from "@/api/apiClient"; // 주신 apiClient 적용
+import apiClient from "@/api/core/apiClient";
 import { useEffect, useState } from "react";
 import Wiring3DViewer from "./Wiring3DViewer";
 
