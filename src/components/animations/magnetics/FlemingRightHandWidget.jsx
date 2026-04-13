@@ -206,7 +206,7 @@ function Arrow3D({
   );
 }
 
-function RightHandScene({ vMag, vDir, bDir }) {
+function RightHandScene({ vMag, vDir, bDir, onCurrentChange }) {
   const rotorGroupRef = useRef(null);
   const rotAngleRef = useRef(0);
   const emfRef = useRef(0);
@@ -233,6 +233,7 @@ function RightHandScene({ vMag, vDir, bDir }) {
 
     const emf = vMag * Math.sin(rotAngleRef.current) * bDir * Math.sign(vDir || 1);
     emfRef.current = emf;
+    if (onCurrentChange) onCurrentChange(emf * 120);
   });
 
   return (
@@ -255,8 +256,9 @@ function RightHandScene({ vMag, vDir, bDir }) {
         />
       </mesh>
 
+      <group scale={[0.78, 0.78, 0.78]}>
       <mesh castShadow position={[-1.3, 0, 0]}>
-        <boxGeometry args={[0.42, 1.55, 0.72]} />
+        <boxGeometry args={[0.4, 1.4, 0.62]} />
         <meshStandardMaterial color={leftColor} metalness={0.25} roughness={0.4} />
       </mesh>
       <Text
@@ -268,7 +270,7 @@ function RightHandScene({ vMag, vDir, bDir }) {
         {leftPole}
       </Text>
       <mesh castShadow position={[1.3, 0, 0]}>
-        <boxGeometry args={[0.42, 1.55, 0.72]} />
+        <boxGeometry args={[0.4, 1.4, 0.62]} />
         <meshStandardMaterial color={rightColor} metalness={0.25} roughness={0.4} />
       </mesh>
       <Text
@@ -329,10 +331,11 @@ function RightHandScene({ vMag, vDir, bDir }) {
 
       <OrbitControls
         enablePan={false}
-        minDistance={2.5}
-        maxDistance={6}
+        minDistance={2.2}
+        maxDistance={5.6}
         target={[0, 0, 0]}
       />
+      </group>
     </>
   );
 }
@@ -341,7 +344,10 @@ export default function FlemingRightHandWidget() {
   const [vMag, setVMag] = useState(0.8);
   const [vDir, setVDir] = useState(1);
   const [bDir, setBDir] = useState(1);
+  const [currentMa, setCurrentMa] = useState(0);
   const iDir = vMag < 0.01 ? 0 : vDir * bDir;
+  const meterPct = Math.min(100, Math.abs(currentMa) / 120 * 100);
+  const meterColor = currentMa >= 0 ? "#22c55e" : "#f87171";
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] p-5 font-sans shadow-2xl md:p-8">
@@ -399,17 +405,34 @@ export default function FlemingRightHandWidget() {
           {iDir === 0 ? "0" : iDir > 0 ? "+Y (위)" : "-Y (아래)"}
         </span>
       </div>
+      <div className="mb-4 rounded-xl border border-slate-700 bg-slate-900/70 p-3">
+        <div className="mb-1 text-xs font-bold text-slate-300">검류계 (유도 전류)</div>
+        <div className="mb-2 font-mono text-lg" style={{ color: meterColor }}>
+          {currentMa.toFixed(1)} mA
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded bg-slate-800">
+          <div
+            className="h-full rounded"
+            style={{ width: `${meterPct}%`, background: meterColor, transition: "width 120ms linear" }}
+          />
+        </div>
+      </div>
 
       <div className="relative z-10 h-[min(52vh,430px)] min-h-[280px] w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0b1120] shadow-inner md:min-h-[360px]">
         <Canvas
           shadows
           frameloop="always"
-          camera={{ position: [0.5, 1.25, 3.3], fov: 42 }}
+          camera={{ position: [0.4, 1.05, 3.7], fov: 43 }}
           gl={{ antialias: true, alpha: false }}
           className="h-full w-full touch-none"
         >
           <Suspense fallback={null}>
-            <RightHandScene vMag={vMag} vDir={vDir} bDir={bDir} />
+            <RightHandScene
+              vMag={vMag}
+              vDir={vDir}
+              bDir={bDir}
+              onCurrentChange={(ma) => setCurrentMa(ma)}
+            />
           </Suspense>
         </Canvas>
       </div>
