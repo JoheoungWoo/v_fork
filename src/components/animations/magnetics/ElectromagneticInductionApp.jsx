@@ -3,7 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useRef, useState } from "react";
 
 // 1. 자석 컴포넌트
-const Magnet = ({ speed, strength, currentRef }) => {
+const Magnet = ({ speed, strength, currentTextRef, currentValueRef }) => {
   const groupRef = useRef();
 
   useFrame((state) => {
@@ -20,9 +20,8 @@ const Magnet = ({ speed, strength, currentRef }) => {
     const inducedCurrent = velocity * strength * proximityWeight * 10;
 
     // 부모 컴포넌트의 상태를 업데이트 (계기판 표시용)
-    if (currentRef.current) {
-      currentRef.current.innerText = inducedCurrent.toFixed(2);
-    }
+    currentValueRef.current = inducedCurrent;
+    if (currentTextRef.current) currentTextRef.current.innerText = inducedCurrent.toFixed(2);
   });
 
   return (
@@ -36,6 +35,41 @@ const Magnet = ({ speed, strength, currentRef }) => {
       <mesh position={[0, 0, 1]}>
         <boxGeometry args={[0.8, 0.8, 2]} />
         <meshStandardMaterial color="blue" />
+      </mesh>
+    </group>
+  );
+};
+
+// 3. 3D 검류계 (바늘 포함)
+const Galvanometer3D = ({ currentValueRef }) => {
+  const needleRef = useRef();
+  const MAX_CURRENT = 30; // mA 스케일
+
+  useFrame(() => {
+    if (!needleRef.current) return;
+    const i = currentValueRef.current || 0;
+    const n = Math.max(-1, Math.min(1, i / MAX_CURRENT));
+    // 좌(-)~우(+) 흔들림
+    needleRef.current.rotation.z = -n * 0.85;
+  });
+
+  return (
+    <group position={[3.6, 0.15, -2.6]} rotation={[0, -0.5, 0]}>
+      <mesh>
+        <boxGeometry args={[1.8, 0.2, 1.2]} />
+        <meshStandardMaterial color="#334155" />
+      </mesh>
+      <mesh position={[0, 0.12, 0]}>
+        <cylinderGeometry args={[0.42, 0.42, 0.05, 36]} />
+        <meshStandardMaterial color="#e2e8f0" />
+      </mesh>
+      <mesh ref={needleRef} position={[0, 0.16, 0]}>
+        <boxGeometry args={[0.02, 0.02, 0.5]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.35} />
+      </mesh>
+      <mesh position={[0, 0.16, 0]}>
+        <sphereGeometry args={[0.03, 12, 12]} />
+        <meshStandardMaterial color="#111827" />
       </mesh>
     </group>
   );
@@ -69,8 +103,9 @@ export default function ElectromagneticInductionApp() {
   const [turns, setTurns] = useState(5);
   const [strength, setStrength] = useState(3);
 
-  // 렌더링 최적화를 위해 전류값은 ref로 직접 DOM을 조작합니다.
+  // 렌더링 최적화를 위해 텍스트/전류값 ref 사용
   const currentMeterRef = useRef(null);
+  const currentValueRef = useRef(0);
 
   return (
     <div
@@ -163,8 +198,12 @@ export default function ElectromagneticInductionApp() {
         <Magnet
           speed={speed}
           strength={strength}
-          currentRef={currentMeterRef}
+          currentTextRef={currentMeterRef}
+          currentValueRef={currentValueRef}
         />
+
+        {/* 3D 검류계 */}
+        <Galvanometer3D currentValueRef={currentValueRef} />
 
         {/* 바닥 그리드 및 마우스 컨트롤 */}
         <gridHelper args={[20, 20]} />
