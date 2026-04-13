@@ -1,6 +1,16 @@
-import { Environment, Line, OrbitControls, Text } from "@react-three/drei";
+import { Environment, Line as DreiLine, OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import * as THREE from "three";
 
 const DISK_Y = 0.15;
@@ -125,9 +135,153 @@ function WireHarness({ batteryPos }) {
 
   return (
     <group>
-      <Line points={plusPath} color="#ef4444" lineWidth={2.5} />
-      <Line points={minusPath} color="#64748b" lineWidth={2.5} />
+      <DreiLine points={plusPath} color="#ef4444" lineWidth={2.5} />
+      <DreiLine points={minusPath} color="#64748b" lineWidth={2.5} />
     </group>
+  );
+}
+
+/** 균형 3상 정현파 u,v,w (120° 위상차). 유도기 급전 참고용 — 호모폴라는 DC. */
+function ThreePhaseWaveformPanel({ isRunning, voltage }) {
+  const [phase, setPhase] = useState(0);
+  const speedRef = useRef(0.045);
+  speedRef.current = isRunning ? 0.1 * (voltage / 10) + 0.028 : 0.04;
+
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    const loop = (now) => {
+      raf = requestAnimationFrame(loop);
+      if (now - last < 36) return;
+      last = now;
+      setPhase((p) => p + speedRef.current);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const data = useMemo(() => {
+    const pts = [];
+    for (let deg = 0; deg <= 360; deg += 3) {
+      const rad = (deg * Math.PI) / 180 + phase;
+      pts.push({
+        theta: deg,
+        u: Math.sin(rad),
+        v: Math.sin(rad - (2 * Math.PI) / 3),
+        w: Math.sin(rad + (2 * Math.PI) / 3),
+      });
+    }
+    return pts;
+  }, [phase]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 14,
+        right: 14,
+        zIndex: 2,
+        width: "min(340px, calc(100% - 28px))",
+        padding: "12px 12px 10px",
+        borderRadius: 12,
+        background: "rgba(15, 23, 42, 0.94)",
+        border: "1px solid rgba(148, 163, 184, 0.32)",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+          color: "#94a3b8",
+          marginBottom: 4,
+        }}
+      >
+        3상 교류 파형 (참고)
+      </div>
+      <div style={{ height: 172, width: "100%" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 2, right: 4, left: -12, bottom: 0 }}>
+            <CartesianGrid stroke="#334155" strokeDasharray="4 4" />
+            <XAxis
+              dataKey="theta"
+              type="number"
+              domain={[0, 360]}
+              tick={{ fill: "#64748b", fontSize: 9 }}
+              ticks={[0, 90, 180, 270, 360]}
+              label={{
+                value: "전기각 θ (°)",
+                position: "insideBottomRight",
+                offset: -4,
+                fill: "#64748b",
+                fontSize: 10,
+              }}
+            />
+            <YAxis
+              domain={[-1.15, 1.15]}
+              tick={{ fill: "#64748b", fontSize: 9 }}
+              width={34}
+              tickCount={5}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "#0f172a",
+                border: "1px solid #475569",
+                borderRadius: 8,
+                fontSize: 11,
+                color: "#e2e8f0",
+              }}
+              labelFormatter={(v) => `θ = ${v}°`}
+              formatter={(value) => [Number(value).toFixed(3), ""]}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 10, color: "#cbd5e1", paddingTop: 4 }}
+              iconType="line"
+            />
+            <Line
+              name="U상"
+              type="monotone"
+              dataKey="u"
+              stroke="#f87171"
+              dot={false}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+            <Line
+              name="V상"
+              type="monotone"
+              dataKey="v"
+              stroke="#4ade80"
+              dot={false}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+            <Line
+              name="W상"
+              type="monotone"
+              dataKey="w"
+              stroke="#60a5fa"
+              dot={false}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <p
+        style={{
+          margin: "6px 0 0",
+          fontSize: 10,
+          color: "#64748b",
+          lineHeight: 1.45,
+        }}
+      >
+        3개 상은 120° 위상차·동일 크기입니다. 유도전동기 등 3상 급전 예시이며, 위 실험대는 DC(배터리)입니다.
+        전원 On이면 파형이 조금 더 빠르게 이동합니다.
+      </p>
+    </div>
   );
 }
 
@@ -324,6 +478,8 @@ export default function HorseshoeMagnetDiskWidget() {
           <span style={{ color: "#64748b", fontSize: 11 }}> · 원판 위 색 띠가 돌아가면 정상입니다.</span>
         </div>
       </div>
+
+      <ThreePhaseWaveformPanel isRunning={isRunning} voltage={voltage} />
 
       <Canvas
         shadows
