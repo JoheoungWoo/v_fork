@@ -166,8 +166,14 @@ const WIDGET_MAP = {
         import("@/components/animations/magnetics/HorseshoeMagnetDiskWidget"),
     ),
   ],
-  /** N–S 극 간극의 사각 철심 + 권선, 전류에 따른 철심 이동 3D */
+  /** 단순 직류 전동기 3D: N–S, 직사각 권선, 정류자·브러시, 배터리, 풀리·전류 입자 */
   iron_core_magnetic_gap: [
+    lazy(
+      () =>
+        import("@/components/animations/magnetics/IronCoreMagneticGapWidget"),
+    ),
+  ],
+  simple_dc_motor: [
     lazy(
       () =>
         import("@/components/animations/magnetics/IronCoreMagneticGapWidget"),
