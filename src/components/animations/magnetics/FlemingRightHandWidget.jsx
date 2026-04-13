@@ -306,10 +306,6 @@ function RightHandScene({ vMag, vDir, bDir }) {
       ))}
 
       <group ref={rotorGroupRef}>
-        <mesh castShadow position={[0, 0, 0]}>
-          <cylinderGeometry args={[0.08, 0.08, 1.6, 20]} />
-          <meshStandardMaterial color={COL.rod} metalness={0.65} roughness={0.32} />
-        </mesh>
         <RotatingLoop emfRef={emfRef} />
         <RotatingCommutator angleRef={rotAngleRef} emfRef={emfRef} />
       </group>
