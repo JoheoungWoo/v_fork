@@ -23,6 +23,15 @@ const DIR_F = new THREE.Vector3(0, 0, 1);
 
 const ARROW_ORIGIN = Object.freeze([0.06, 0.02, 0]);
 
+const panel = {
+  borderRadius: 12,
+  background: "rgba(15, 23, 42, 0.92)",
+  border: "1px solid rgba(148, 163, 184, 0.32)",
+  color: "#e2e8f0",
+  fontFamily: "system-ui, sans-serif",
+  boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
+};
+
 function AxisArrow({ direction, length, color, origin }) {
   const arrow = useMemo(() => {
     const o = new THREE.Vector3(...origin);
@@ -66,12 +75,27 @@ class GltfErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-300">
+        <div
+          style={{
+            display: "flex",
+            height: "100%",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            textAlign: "center",
+            fontSize: 13,
+            color: "#cbd5e1",
+          }}
+        >
           <p>
-            <code className="rounded bg-slate-800 px-1">public/models/LeftHand.glb</code>를 불러오지
-            못했습니다. Blender에서{" "}
-            <code className="rounded bg-slate-800 px-1">scripts/blender_left_hand.py</code>를 실행해
-            GLB를 만든 뒤 다시 시도하세요.
+            <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>
+              public/models/LeftHand.glb
+            </code>
+            를 불러오지 못했습니다. Blender에서{" "}
+            <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>
+              scripts/blender_left_hand.py
+            </code>
+            를 실행해 GLB를 만든 뒤 다시 시도하세요.
           </p>
         </div>
       );
@@ -94,7 +118,9 @@ function FlemingScene({ bField, current, length, fingerValues, handTexture }) {
       <directionalLight position={[-3.5, 1.2, -2]} intensity={0.35} color="#93c5fd" />
       <directionalLight position={[0, -2, 1]} intensity={0.22} color="#fcd34d" />
 
-      <Environment preset="city" />
+      <Suspense fallback={null}>
+        <Environment preset="city" />
+      </Suspense>
 
       <group position={[0, -0.02, 0]}>
         <AxisArrow direction={DIR_I} length={lenI} color={COL.I} origin={ARROW_ORIGIN} />
@@ -130,11 +156,24 @@ function FlemingScene({ bField, current, length, fingerValues, handTexture }) {
   );
 }
 
+const labelStyle = { display: "block", fontSize: 11, fontWeight: 600, marginBottom: 6 };
+const listStyle = { margin: 0, paddingLeft: 16, fontSize: 11, color: "#94a3b8", lineHeight: 1.5 };
+
 /**
- * 플레밍 왼손 법칙: 검지 B · 중지 I · 엄지 F.
- * `flemingHandAssets.js`에 손 이미지 URL이 있고 파일이 로드되면 GLB 대신 평면에 표시합니다.
+ * 플레밍 왼손 법칙 3D: 데스크톱은 캔버스 위 오버레이, 모바일은 캔버스·설명·조작 세로 분리.
  */
 export default function FlemingLeftHand3DWidget() {
+  const [layoutWide, setLayoutWide] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : true,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    setLayoutWide(mq.matches);
+    const onChange = () => setLayoutWide(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   const [bField, setBField] = useState(1.5);
   const [current, setCurrent] = useState(2.0);
   const [length, setLength] = useState(0.5);
@@ -180,20 +219,239 @@ export default function FlemingLeftHand3DWidget() {
 
   const force = (bField * current * length).toFixed(2);
 
-  const card =
-    "rounded-xl border border-slate-600/50 bg-slate-900/92 backdrop-blur-sm text-slate-100 shadow-lg";
+  const introInner = (
+    <>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          color: "#94a3b8",
+          marginBottom: 8,
+        }}
+      >
+        플레밍의 왼손 법칙
+      </div>
+      <p style={{ margin: "0 0 10px", fontSize: 12, lineHeight: 1.55, color: "#cbd5e1" }}>
+        왼손을 펴서 <strong style={{ color: "#4ade80" }}>검지</strong>는 자기장{" "}
+        <span style={{ color: "#4ade80" }}>B</span>, <strong style={{ color: "#60a5fa" }}>중지</strong>
+        는 전류 <span style={{ color: "#60a5fa" }}>I</span>,{" "}
+        <strong style={{ color: "#f87171" }}>엄지</strong>는 도체가 받는 힘{" "}
+        <span style={{ color: "#f87171" }}>F</span> 방향에 놓습니다. 세 방향은 서로 직각입니다.
+      </p>
+      <ul style={listStyle}>
+        <li>
+          <span style={{ color: "#60a5fa" }}>●</span> 파랑: 전류 I (+X)
+        </li>
+        <li>
+          <span style={{ color: "#4ade80" }}>●</span> 초록: 자기장 B (+Y)
+        </li>
+        <li>
+          <span style={{ color: "#f87171" }}>●</span> 빨강: 힘 F (+Z), 화살표 길이는 F = BIℓ에 비례
+        </li>
+      </ul>
+    </>
+  );
+
+  const formulaInner = (
+    <>
+      <div
+        style={{
+          marginBottom: 10,
+          paddingBottom: 10,
+          borderBottom: "1px solid rgba(71, 85, 105, 0.6)",
+          fontSize: 18,
+          fontFamily: "Georgia, serif",
+          color: "#f8fafc",
+          textAlign: "center",
+        }}
+      >
+        <span style={{ fontWeight: 700, color: "#f87171" }}>F</span>
+        <span style={{ margin: "0 4px" }}>=</span>
+        <span style={{ color: "#4ade80" }}>B</span>
+        <span style={{ color: "#60a5fa" }}> I</span>
+        <span style={{ color: "#cbd5e1" }}> ℓ</span>
+      </div>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          color: "#64748b",
+          textAlign: "center",
+        }}
+      >
+        힘 (N)
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 36,
+          fontWeight: 900,
+          fontVariantNumeric: "tabular-nums",
+          color: "#ffffff",
+          textAlign: "center",
+        }}
+      >
+        {force}
+      </div>
+    </>
+  );
+
+  const slidersInner = (
+    <>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", marginBottom: 10 }}>
+        도체 길이 방향과 자기장이 직각일 때
+      </div>
+      <label style={{ ...labelStyle, color: "#93c5fd" }}>
+        전류 I (A): {current.toFixed(1)}
+      </label>
+      <input
+        type="range"
+        min={0.5}
+        max={4}
+        step={0.1}
+        value={current}
+        onChange={(e) => setCurrent(Number(e.target.value))}
+        style={{ width: "100%", accentColor: "#3b82f6", marginBottom: 12 }}
+      />
+      <label style={{ ...labelStyle, color: "#6ee7b7" }}>
+        자속밀도 B (T): {bField.toFixed(1)}
+      </label>
+      <input
+        type="range"
+        min={0.5}
+        max={4}
+        step={0.1}
+        value={bField}
+        onChange={(e) => setBField(Number(e.target.value))}
+        style={{ width: "100%", accentColor: "#10b981", marginBottom: 12 }}
+      />
+      <label style={{ ...labelStyle, color: "#cbd5e1" }}>
+        도체 길이 ℓ (m): {length.toFixed(1)}
+      </label>
+      <input
+        type="range"
+        min={0.1}
+        max={2}
+        step={0.1}
+        value={length}
+        onChange={(e) => setLength(Number(e.target.value))}
+        style={{ width: "100%", accentColor: "#94a3b8" }}
+      />
+    </>
+  );
+
+  const hintText = handTexture
+    ? "드래그로 회전 · 손은 이미지(평면)로 표시됩니다"
+    : "드래그로 회전 · 아래에서 손가락 각도 조절";
+
+  const overlayIntro = {
+    ...panel,
+    position: "absolute",
+    top: 12,
+    left: 12,
+    zIndex: 2,
+    maxWidth: "min(280px, calc(100% - 24px))",
+    padding: "12px 14px",
+    pointerEvents: "none",
+  };
+
+  const overlayFormula = {
+    ...panel,
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 2,
+    width: "min(220px, calc(100% - 24px))",
+    padding: "14px 16px",
+    pointerEvents: "none",
+  };
+
+  const overlaySliders = {
+    ...panel,
+    position: "absolute",
+    bottom: 12,
+    left: 12,
+    zIndex: 2,
+    width: "min(300px, calc(100% - 24px))",
+    padding: "12px 14px",
+    pointerEvents: "auto",
+  };
+
+  const overlayHint = {
+    position: "absolute",
+    bottom: 12,
+    left: "50%",
+    transform: "translateX(-50%)",
+    zIndex: 2,
+    maxWidth: "90%",
+    padding: "6px 12px",
+    borderRadius: 9999,
+    background: "rgba(0,0,0,0.45)",
+    backdropFilter: "blur(6px)",
+    fontSize: 10,
+    color: "#cbd5e1",
+    pointerEvents: "none",
+  };
+
+  const stackedCard = {
+    ...panel,
+    position: "relative",
+    width: "100%",
+    maxWidth: "100%",
+    padding: "12px 14px",
+    boxSizing: "border-box",
+    boxShadow: "none",
+  };
+
+  const mobileStack = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    padding: 12,
+    background: "rgba(2, 6, 23, 0.55)",
+    borderTop: "1px solid rgba(51, 65, 85, 0.65)",
+    flex: "0 0 auto",
+  };
 
   return (
     <div
-      className="flex h-[640px] w-full flex-col overflow-hidden rounded-[14px] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 font-sans"
+      style={{
+        position: "relative",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        borderRadius: 14,
+        overflow: "hidden",
+        background: "linear-gradient(165deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
+        border: "1px solid rgba(51, 65, 85, 0.55)",
+        ...(layoutWide ? { height: "min(640px, 88vh)", minHeight: 560 } : { minHeight: 0 }),
+      }}
     >
-      <div className="relative min-h-0 flex-1">
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          flexShrink: 0,
+          overflow: "hidden",
+          ...(layoutWide
+            ? { flex: 1, minHeight: 400, height: "100%" }
+            : { height: "min(52vh, 420px)", minHeight: 280 }),
+        }}
+      >
         <GltfErrorBoundary>
           <Canvas
             shadows
+            frameloop="always"
             camera={{ position: [0.55, 0.38, 0.72], fov: 42, near: 0.02, far: 80 }}
             gl={{ antialias: true, alpha: false }}
-            className="absolute inset-0 h-full w-full"
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "block",
+              touchAction: "none",
+            }}
           >
             <Suspense fallback={null}>
               <FlemingScene
@@ -207,102 +465,42 @@ export default function FlemingLeftHand3DWidget() {
           </Canvas>
         </GltfErrorBoundary>
 
-        <div
-          className={`pointer-events-none absolute left-3 top-3 z-10 max-w-[min(100%-24px,280px)] space-y-2 p-3 text-xs leading-relaxed ${card}`}
-        >
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            플레밍의 왼손 법칙
-          </div>
-          <p className="text-slate-300">
-            왼손을 펴서 <span className="font-semibold text-emerald-400">검지</span>는 자기장{" "}
-            <span className="text-emerald-400">B</span>,{" "}
-            <span className="font-semibold text-blue-400">중지</span>는 전류{" "}
-            <span className="text-blue-400">I</span>,{" "}
-            <span className="font-semibold text-red-400">엄지</span>는 전도체가 받는 힘{" "}
-            <span className="text-red-400">F</span> 방향에 놓입니다. 세량은 서로 직각입니다.
-          </p>
-          <ul className="grid grid-cols-1 gap-1 text-[11px] text-slate-400">
-            <li>
-              <span className="text-blue-400">●</span> 파랑: 전류 I (+X)
-            </li>
-            <li>
-              <span className="text-emerald-400">●</span> 초록: 자기장 B (+Y)
-            </li>
-            <li>
-              <span className="text-red-400">●</span> 빨강: 힘 F (+Z), 길이는 F=BIℓ에 비례해 변함
-            </li>
-          </ul>
-        </div>
-
-        <div
-          className={`pointer-events-auto absolute bottom-3 left-3 z-10 w-[min(calc(100%-24px),300px)] space-y-3 p-3 ${card}`}
-        >
-          <div className="text-[11px] font-semibold text-slate-400">
-            도체 길이 방향과 자기장이 직각일 때
-          </div>
-          <label className="block text-[11px] font-semibold text-blue-300">
-            전류 I (A): {current.toFixed(1)}
-          </label>
-          <input
-            type="range"
-            min={0.5}
-            max={4}
-            step={0.1}
-            value={current}
-            onChange={(e) => setCurrent(Number(e.target.value))}
-            className="w-full accent-blue-500"
-          />
-          <label className="block text-[11px] font-semibold text-emerald-300">
-            자속밀도 B (T): {bField.toFixed(1)}
-          </label>
-          <input
-            type="range"
-            min={0.5}
-            max={4}
-            step={0.1}
-            value={bField}
-            onChange={(e) => setBField(Number(e.target.value))}
-            className="w-full accent-emerald-500"
-          />
-          <label className="block text-[11px] font-semibold text-slate-300">
-            도체 길이 ℓ (m): {length.toFixed(1)}
-          </label>
-          <input
-            type="range"
-            min={0.1}
-            max={2}
-            step={0.1}
-            value={length}
-            onChange={(e) => setLength(Number(e.target.value))}
-            className="w-full accent-slate-400"
-          />
-        </div>
-
-        <div
-          className={`pointer-events-none absolute right-3 top-3 z-10 w-[min(calc(100%-24px),220px)] p-4 text-center ${card}`}
-        >
-          <div className="mb-2 border-b border-slate-600 pb-3 font-serif text-lg text-slate-100">
-            <span className="font-bold text-red-400">F</span>
-            <span className="mx-1">=</span>
-            <span className="text-emerald-400">B</span>
-            <span className="text-blue-400"> I</span>
-            <span className="text-slate-300"> ℓ</span>
-          </div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">힘 (N)</div>
-          <div className="mt-1 text-4xl font-black tabular-nums text-white">{force}</div>
-        </div>
-
-        <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-center text-[10px] text-slate-300 backdrop-blur-sm">
-          {handTexture
-            ? "드래그로 회전 · 손은 이미지(평면)로 표시됩니다"
-            : "드래그로 회전 · 아래 슬라이더로 손가락 굽힘"}
-        </div>
+        {layoutWide && (
+          <>
+            <div style={overlayIntro}>{introInner}</div>
+            <div style={overlayFormula}>{formulaInner}</div>
+            <div style={overlaySliders}>{slidersInner}</div>
+            <div style={overlayHint}>{hintText}</div>
+          </>
+        )}
       </div>
 
+      {!layoutWide && (
+        <div style={mobileStack}>
+          <div style={stackedCard}>{introInner}</div>
+          <div style={stackedCard}>{formulaInner}</div>
+          <div style={{ ...stackedCard, pointerEvents: "auto" }}>{slidersInner}</div>
+          <div style={{ textAlign: "center", fontSize: 10, color: "#94a3b8", lineHeight: 1.4 }}>
+            {hintText}
+          </div>
+        </div>
+      )}
+
       {handTexture ? (
-        <div className="shrink-0 border-t border-slate-700/80 bg-slate-950/90 px-3 py-2 text-center text-[10px] text-slate-500">
-          손 그림: <code className="text-slate-400">{FLEMING_LEFT_HAND_IMAGE_URL || "(미설정)"}</code>
-          — 크기·방향은 <code className="text-slate-400">flemingHandAssets.js</code>에서 조정
+        <div
+          style={{
+            flexShrink: 0,
+            borderTop: "1px solid rgba(51, 65, 85, 0.6)",
+            background: "rgba(15, 23, 42, 0.95)",
+            padding: "8px 12px",
+            textAlign: "center",
+            fontSize: 10,
+            color: "#64748b",
+          }}
+        >
+          손 그림:{" "}
+          <code style={{ color: "#94a3b8" }}>{FLEMING_LEFT_HAND_IMAGE_URL || "(미설정)"}</code> —{" "}
+          <code style={{ color: "#94a3b8" }}>flemingHandAssets.js</code>에서 크기·방향 조정
         </div>
       ) : (
         <FingerSliders
