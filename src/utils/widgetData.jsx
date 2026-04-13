@@ -80,6 +80,12 @@ const WIDGET_MAP = {
       () => import("@/components/animations/magnetics/VectorCalculus3DWidget"),
     ),
   ],
+  "5_electro_magnetic": [
+    lazy(
+      () =>
+        import("@/components/animations/magnetics/ElectromagneticInductionApp"),
+    ),
+  ],
   /** 말굽 자석 + 원판만 (플레밍 퀴즈 없이) — Supabase `lecture_id`와 동일하게 맞추세요. */
   horseshoe_magnet_disk: [
     lazy(
