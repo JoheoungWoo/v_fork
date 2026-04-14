@@ -26,19 +26,6 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(__dirname, "..", "public", "models");
 
-function addEdgeCylinder(group, p0, p1, radius, mat) {
-  const v0 = new THREE.Vector3(...p0);
-  const v1 = new THREE.Vector3(...p1);
-  const d = new THREE.Vector3().subVectors(v1, v0);
-  const len = Math.max(d.length(), 1e-6);
-  const mid = new THREE.Vector3().addVectors(v0, v1).multiplyScalar(0.5);
-  const g = new THREE.CylinderGeometry(radius, radius, len, 20);
-  const m = new THREE.Mesh(g, mat);
-  m.position.copy(mid);
-  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d.clone().normalize());
-  group.add(m);
-}
-
 async function exportScene(scene, filename) {
   const exporter = new GLTFExporter();
   const buffer = await exporter.parseAsync(scene, { binary: true });
@@ -50,20 +37,38 @@ async function exportScene(scene, filename) {
 
 function buildCoilScene() {
   const scene = new THREE.Scene();
-  const matCu = new THREE.MeshStandardMaterial({ color: "#8c8980", metalness: 0.65, roughness: 0.35 });
+  const matCu = new THREE.MeshStandardMaterial({ color: "#b87333", metalness: 0.85, roughness: 0.22 });
+  const matShaft = new THREE.MeshStandardMaterial({ color: "#a7a7a7", metalness: 0.95, roughness: 0.2 });
   const root = new THREE.Group();
   root.name = "Motor_Coil_Root";
-  const wy = 0.52;
-  const wz = 0.36;
-  const corners = [
-    [0, -wy / 2, -wz / 2],
-    [0, wy / 2, -wz / 2],
-    [0, wy / 2, wz / 2],
-    [0, -wy / 2, wz / 2],
-  ];
-  for (let i = 0; i < 4; i += 1) {
-    addEdgeCylinder(root, corners[i], corners[(i + 1) % 4], 0.028, matCu);
-  }
+
+  // Make a clearly visible rectangular coil frame in YZ plane.
+  const outerY = 1.35;
+  const outerZ = 1.05;
+  const bar = 0.12;
+  const frameDepth = 0.12;
+
+  const top = new THREE.Mesh(new THREE.BoxGeometry(frameDepth, outerY, bar), matCu);
+  top.position.set(0, 0, outerZ / 2);
+  root.add(top);
+
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(frameDepth, outerY, bar), matCu);
+  bottom.position.set(0, 0, -outerZ / 2);
+  root.add(bottom);
+
+  const left = new THREE.Mesh(new THREE.BoxGeometry(frameDepth, bar, outerZ), matCu);
+  left.position.set(0, -outerY / 2, 0);
+  root.add(left);
+
+  const right = new THREE.Mesh(new THREE.BoxGeometry(frameDepth, bar, outerZ), matCu);
+  right.position.set(0, outerY / 2, 0);
+  root.add(right);
+
+  // Center shaft to make the motor axis explicit.
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 2.1, 20), matShaft);
+  shaft.rotation.x = Math.PI / 2;
+  root.add(shaft);
+
   scene.add(root);
   return scene;
 }
