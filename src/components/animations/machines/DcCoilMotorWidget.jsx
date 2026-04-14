@@ -12,13 +12,13 @@ const C = {
 };
 
 function GlbMotor({
-  modelUrl,
+  glbUrl,
   omegaRad,
   rotDir,
   coilObjectName,
   rotAxis = "y",
 }) {
-  const { scene } = useGLTF(modelUrl);
+  const { scene } = useGLTF(glbUrl);
   const targetRef = useRef(null);
   const angleRef = useRef(0);
 
@@ -81,7 +81,7 @@ export default function DcCoilMotorWidget({ apiData }) {
   const rpm = omegaData.omega_rpm ?? 0;
   const torque = omegaData.torque_scale_n_m ?? 0;
   const rotDir = omegaData.rotation_direction ?? 1;
-  const modelUrl = apiData?.model_url;
+  const glbUrl = apiData?.model_url;
 
   return (
     <div
@@ -114,9 +114,9 @@ export default function DcCoilMotorWidget({ apiData }) {
           <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
           <OrbitControls target={[0, 0, 0]} minDistance={4} maxDistance={20} />
           <Suspense fallback={null}>
-            {modelUrl ? (
+            {glbUrl ? (
               <GlbMotor
-                modelUrl={modelUrl}
+                glbUrl={glbUrl}
                 omegaRad={omega}
                 rotDir={rotDir}
                 coilObjectName={apiData?.coil_object_name}
