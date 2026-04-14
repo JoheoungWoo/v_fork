@@ -156,7 +156,20 @@ function SceneRig(props) {
       <pointLight position={[-3, 0, 0]} intensity={0.35 + fieldStrength * 0.35} color="#3b8bd4" distance={8} />
       <Environment preset="city" />
       <FluxFieldLines visible={showFieldLines} fieldStrength={fieldStrength} />
-      <Suspense fallback={null}>{canLoadModel ? <DcMotorGLB {...props} /> : null}</Suspense>
+      <Suspense fallback={null}>
+        {canLoadModel ? (
+          <DcMotorGLB
+            url={modelUrl}
+            coilName={props.coilName}
+            spinAxis={props.spinAxis}
+            angle={props.angle}
+            currentStrength={props.currentStrength}
+            fieldStrength={props.fieldStrength}
+            northPoleNames={props.northPoleNames}
+            southPoleNames={props.southPoleNames}
+          />
+        ) : null}
+      </Suspense>
       <ForceVectors angle={props.angle} currentStrength={props.currentStrength} fieldStrength={props.fieldStrength} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow>
         <planeGeometry args={[30, 30]} />
