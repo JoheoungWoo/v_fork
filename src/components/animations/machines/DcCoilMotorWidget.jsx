@@ -28,6 +28,7 @@ import {
   useState,
 } from "react";
 import * as THREE from "three";
+import MagneticFieldLines from "./MagneticFieldLines";
 
 // ─── 색상 ─────────────────────────────────────────────────────────────────
 const C = {
@@ -305,12 +306,19 @@ function GlbMotorModel({
     coilRef.current = scene.getObjectByName(coilObjectName) ?? null;
   }, [scene, coilObjectName]);
 
-  useFrame((_, dt) => {
-    angleRef.current += omegaRad * rotDir * dt;
-    if (!coilRef.current) return;
-    if (rotAxis === "x") coilRef.current.rotation.x = angleRef.current;
-    else if (rotAxis === "z") coilRef.current.rotation.z = angleRef.current;
-    else coilRef.current.rotation.y = angleRef.current;
+  // DcCoilMotorWidget.jsx 내부
+  useFrame((state, delta) => {
+    if (!coilRef.current || !apiData?.computed_reference) return;
+
+    const speedRpm = apiData.computed_reference.at_2A_0p35T_rpm;
+    const direction = apiData.computed_reference.at_2A_0p35T_direction || 1;
+    const axis = apiData.rotation_axis || "y"; // 파이썬에서 넘겨준 "y" 축 사용
+
+    // RPM을 초당 라디안(rad/s)으로 변환하여 delta(프레임 시간차)와 곱함
+    const speedRadPerSec = (speedRpm * 2 * Math.PI) / 60;
+
+    // 지정된 축을 기준으로 회전 (이전 프레임 회전값에 누적)
+    coilRef.current.rotation[axis] += speedRadPerSec * direction * delta;
   });
 
   return <primitive object={scene} />;
@@ -604,6 +612,7 @@ export default function DcCoilMotorWidget({ apiData }) {
           gl={{ antialias: true }}
         >
           <MotorScene omegaRad={omega} rotDir={rotDir} apiData={apiData} />
+          <MagneticFieldLines b_tesla={apiData.defaults.b_tesla} />
         </Canvas>
       </div>
 
