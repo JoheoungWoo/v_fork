@@ -175,7 +175,8 @@ export default function DcCoilMotorWidget({ apiData }) {
   });
 
   // 💡 기존의 단일 코일 GLB 파일 경로만 유지합니다. (위치에 맞게 경로를 수정해주세요)
-  const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
+  const coilGlbUrl =
+    apiData?.coil_model_url ?? "/models/dc_coil_motor_assembly.glb";
   const rotAxis = "y";
 
   useEffect(() => {
