@@ -125,7 +125,7 @@ function ProceduralMotor({ omegaRad, rotDir }) {
   useFrame((_, dt) => {
     angleRef.current += omegaRad * rotDir * dt;
     if (coilRef.current) {
-      coilRef.current.rotation.x = angleRef.current;
+      coilRef.current.rotation.y = angleRef.current;
     }
   });
 
@@ -296,29 +296,24 @@ function GlbMotorModel({
   rotDir,
   coilObjectName,
   rotAxis = "y",
+  onTargetResolved,
 }) {
   const { scene } = useGLTF(modelUrl);
   const coilRef = useRef(null);
   const angleRef = useRef(0);
 
   useEffect(() => {
-    if (!scene || !coilObjectName) return;
-    coilRef.current = scene.getObjectByName(coilObjectName) ?? null;
-  }, [scene, coilObjectName]);
+    if (!scene) return;
+    // Named coil object first, fallback to whole scene root.
+    coilRef.current = (coilObjectName && scene.getObjectByName(coilObjectName)) || scene;
+    onTargetResolved?.(coilRef.current?.name || "(scene-root)");
+  }, [scene, coilObjectName, onTargetResolved]);
 
-  // DcCoilMotorWidget.jsx 내부
-  useFrame((state, delta) => {
-    if (!coilRef.current || !apiData?.computed_reference) return;
-
-    const speedRpm = apiData.computed_reference.at_2A_0p35T_rpm;
-    const direction = apiData.computed_reference.at_2A_0p35T_direction || 1;
-    const axis = apiData.rotation_axis || "y"; // 파이썬에서 넘겨준 "y" 축 사용
-
-    // RPM을 초당 라디안(rad/s)으로 변환하여 delta(프레임 시간차)와 곱함
-    const speedRadPerSec = (speedRpm * 2 * Math.PI) / 60;
-
-    // 지정된 축을 기준으로 회전 (이전 프레임 회전값에 누적)
-    coilRef.current.rotation[axis] += speedRadPerSec * direction * delta;
+  useFrame((_, delta) => {
+    if (!coilRef.current) return;
+    const axis = ["x", "y", "z"].includes(rotAxis) ? rotAxis : "y";
+    angleRef.current += omegaRad * rotDir * delta;
+    coilRef.current.rotation[axis] = angleRef.current;
   });
 
   return <primitive object={scene} />;
@@ -340,9 +335,13 @@ class GlbErrorBoundary extends Component {
 }
 
 // ─── 씬 루트 ─────────────────────────────────────────────────────────────
-function MotorScene({ omegaRad, rotDir, apiData }) {
+function MotorScene({ omegaRad, rotDir, apiData, onRenderMode, onTargetResolved }) {
   const [glbFailed, setGlbFailed] = useState(!apiData?.model_url);
   const fallback = <ProceduralMotor omegaRad={omegaRad} rotDir={rotDir} />;
+
+  useEffect(() => {
+    onRenderMode?.(apiData?.model_url && !glbFailed ? "GLB" : "Procedural");
+  }, [apiData?.model_url, glbFailed, onRenderMode]);
 
   return (
     <>
@@ -379,6 +378,7 @@ function MotorScene({ omegaRad, rotDir, apiData }) {
               rotDir={rotDir}
               coilObjectName={apiData.coil_object_name}
               rotAxis={apiData.rotation_axis ?? "y"}
+              onTargetResolved={onTargetResolved}
             />
           </GlbErrorBoundary>
         </Suspense>
@@ -480,6 +480,8 @@ export default function DcCoilMotorWidget({ apiData }) {
   const [bTesla, setBTesla] = useState(def.b_tesla ?? 0.35);
   const [omegaData, setOmegaData] = useState(null);
   const [fetching, setFetching] = useState(false);
+  const [renderMode, setRenderMode] = useState("Procedural");
+  const [targetName, setTargetName] = useState("-");
 
   const calcLocal = useCallback(
     (i, b) => {
@@ -600,6 +602,18 @@ export default function DcCoilMotorWidget({ apiData }) {
               연산 중…
             </span>
           )}
+          <span
+            style={{
+              fontSize: 11,
+              color: C.muted,
+              padding: "3px 10px",
+              background: C.surface,
+              borderRadius: 6,
+              border: `0.5px solid ${C.border}`,
+            }}
+          >
+            mode: {renderMode} / target: {targetName}
+          </span>
         </div>
       </div>
 
@@ -611,8 +625,14 @@ export default function DcCoilMotorWidget({ apiData }) {
           style={{ height: "100%", width: "100%" }}
           gl={{ antialias: true }}
         >
-          <MotorScene omegaRad={omega} rotDir={rotDir} apiData={apiData} />
-          <MagneticFieldLines b_tesla={apiData.defaults.b_tesla} />
+          <MotorScene
+            omegaRad={omega}
+            rotDir={rotDir}
+            apiData={apiData}
+            onRenderMode={setRenderMode}
+            onTargetResolved={setTargetName}
+          />
+          <MagneticFieldLines b_tesla={bTesla} />
         </Canvas>
       </div>
 
