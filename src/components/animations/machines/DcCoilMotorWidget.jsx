@@ -1,23 +1,27 @@
 /**
- * DcCoilMotorWidget.jsx
+ * DcCoilMotorWidget.jsx  (수정판 v3)
  *
- * DC 사각형 코일 모터 — 플레밍의 왼손 법칙 3D 시뮬레이터
- *
- * 아키텍처:
- *  - MachineWidgetPage → apiData (type: "dc_coil_motor_3d") → DcCoilMotorWidget
- *  - 슬라이더(I, B) 변경 → GET /api/machine/dc_coil_motor/omega → omega_rad_s → Three.js 코일 회전
- *  - GLB 모델(model_url) 우선 로드, 실패 시 절차적 Three.js 폴백(fallback) 렌더
- *
- * 의존: @react-three/fiber, @react-three/drei, three, axios(apiClient)
+ * 수정사항:
+ *  1. 회전 방향 → 백엔드 omegaData.rotation_direction (+1/-1) 으로 결정
+ *     angleRef.current += omegaRad * rotation_direction * dt
+ *  2. 자기장선(전기력선/전속) → 밝은 하늘색 #00d4ff, opacity 0.85, linewidth 증가
+ *  3. 자기장 화살촉 추가 → N→S 방향을 시각적으로 명확히 표시
  */
 
 import apiClient from "@/api/core/apiClient";
 import { OrbitControls, Text, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Component,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import * as THREE from "three";
 
-// ─── 상수 ─────────────────────────────────────────────────────────────────
+// ─── 색상 상수 ────────────────────────────────────────────────────────────
 const DARK = {
   bg: "#0f1117",
   surface: "#1a1d27",
@@ -28,71 +32,99 @@ const DARK = {
   sBlue: "#3b8bd4",
   coil: "#d4900a",
   force: "#4caf50",
-  field: "#4488cc",
+  // ★ 자기장선: 검정에서 밝은 하늘색으로
+  field: "#00d4ff",
 };
 
-// ─── 절차적 코일 모터 씬 (GLB 폴백) ───────────────────────────────────────
+// ─── 자석 치수 ────────────────────────────────────────────────────────────
+const MAGNET_X = 2.4;
+const MAGNET_THICK = 0.7;
+const INNER_X = MAGNET_X - MAGNET_THICK / 2; // ≈ 2.05
+
+// ─── 코일 치수 ────────────────────────────────────────────────────────────
+const W = 2.2;
+const H = 1.8;
+const R = 0.07;
+
+// ─── 원통 전선 헬퍼 ───────────────────────────────────────────────────────
+function Wire({ from, to, radius = R, color = DARK.coil }) {
+  const f = new THREE.Vector3(...from);
+  const t = new THREE.Vector3(...to);
+  const dir = new THREE.Vector3().subVectors(t, f);
+  const len = dir.length();
+  const mid = f.clone().addScaledVector(dir.clone().normalize(), len / 2);
+  const q = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    dir.clone().normalize(),
+  );
+  return (
+    <mesh position={mid.toArray()} quaternion={q} castShadow>
+      <cylinderGeometry args={[radius, radius, len, 12]} />
+      <meshStandardMaterial color={color} metalness={0.95} roughness={0.1} />
+    </mesh>
+  );
+}
+
+// ─── 자기장선 1개 (선 + 화살촉) ──────────────────────────────────────────
 /**
- * 사각형 코일: 상/하 변(active) + 좌/우 변(passive)
- * pivot(coilRoot) 이 Y축 회전 → coilObjectName 이 있으면 GLB 오브젝트만 회전
+ * N극(+X) → S극(−X) 방향으로 그려지는 자기장선.
+ * lineBasicMaterial은 linewidth가 WebGL에서 항상 1px이므로
+ * 화살촉(cone)을 추가해 시각적 강조.
  */
-function ProceduralMotor({ omegaRad, apiData }) {
-  const coilRef = useRef();
-  const arrow1Ref = useRef();
-  const arrow2Ref = useRef();
-  const angleRef = useRef(0);
-
-  const rotationAxis = apiData?.rotation_axis ?? "z";
-  const W = 1.8,
-    H = 2.0,
-    R = 0.07;
-
-  useFrame((_, dt) => {
-    angleRef.current += omegaRad * dt;
-    if (coilRef.current) {
-      if (rotationAxis === "z") coilRef.current.rotation.z = angleRef.current;
-      else if (rotationAxis === "x")
-        coilRef.current.rotation.x = angleRef.current;
-      else coilRef.current.rotation.y = angleRef.current;
-    }
-
-    // 힘 벡터 화살표: sin(θ)에 비례하는 크기
-    const s = Math.abs(Math.sin(angleRef.current));
-    [arrow1Ref, arrow2Ref].forEach((r) => {
-      if (r.current) r.current.scale.setScalar(0.3 + s * 0.9);
-    });
-  });
-
-  // 원통 wire 헬퍼
-  const Wire = ({ from, to, r = R }) => {
-    const dir = new THREE.Vector3(...to).sub(new THREE.Vector3(...from));
-    const len = dir.length();
-    const mid = new THREE.Vector3(...from).addScaledVector(
-      dir.normalize(),
-      len / 2,
-    );
-    const q = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      dir.clone().normalize(),
-    );
-    return (
-      <mesh position={mid.toArray()} quaternion={q} castShadow>
-        <cylinderGeometry args={[r, r, len, 12]} />
-        <meshStandardMaterial
-          color={DARK.coil}
-          metalness={0.95}
-          roughness={0.1}
-        />
-      </mesh>
-    );
-  };
+function FieldLine({ y, z }) {
+  // 선 포인트: N쪽 내면 → S쪽 내면
+  const pts = new Float32Array([INNER_X, y, z, -INNER_X, y, z]);
 
   return (
     <group>
-      {/* ── N극 자석 (오른쪽 +X) ── */}
-      <group position={[3.4, 0, 0]}>
+      {/* 선 */}
+      <line>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            array={pts}
+            itemSize={3}
+            count={2}
+          />
+        </bufferGeometry>
+        {/* ★ 밝은 하늘색, opacity 높임 */}
+        <lineBasicMaterial color={DARK.field} transparent opacity={0.85} />
+      </line>
+
+      {/* 화살촉 — S쪽(−X) 방향 */}
+      <mesh position={[-INNER_X * 0.4, y, z]} rotation={[0, 0, Math.PI / 2]}>
+        <coneGeometry args={[0.055, 0.18, 8]} />
+        <meshBasicMaterial color={DARK.field} transparent opacity={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+// ─── 절차적 모터 씬 ───────────────────────────────────────────────────────
+/**
+ * rotationDirection: 백엔드가 준 +1(CCW) / -1(CW).
+ * useFrame 내부에서 angleRef += omegaRad * rotationDirection * dt
+ */
+function ProceduralMotor({ omegaRad, rotationDirection, apiData }) {
+  const coilRef = useRef();
+  const angleRef = useRef(0);
+  const rotAxis = apiData?.rotation_axis ?? "z";
+
+  useFrame((_, dt) => {
+    // ★ 회전 방향은 백엔드 rotation_direction 이 결정
+    angleRef.current += omegaRad * rotationDirection * dt;
+    if (!coilRef.current) return;
+    if (rotAxis === "z") coilRef.current.rotation.z = angleRef.current;
+    else if (rotAxis === "x") coilRef.current.rotation.x = angleRef.current;
+    else coilRef.current.rotation.y = angleRef.current;
+  });
+
+  return (
+    <group>
+      {/* ══ N극 자석 (오른쪽 +X) ══ */}
+      <group position={[MAGNET_X, 0, 0]}>
         <mesh castShadow>
-          <boxGeometry args={[1.2, 2.2, 3.0]} />
+          <boxGeometry args={[MAGNET_THICK, 2.4, 3.2]} />
           <meshStandardMaterial
             color={DARK.nRed}
             metalness={0.4}
@@ -100,76 +132,70 @@ function ProceduralMotor({ omegaRad, apiData }) {
           />
         </mesh>
         {/* 극면 발광 */}
-        <mesh position={[-0.62, 0, 0]}>
-          <boxGeometry args={[0.08, 2.0, 2.8]} />
+        <mesh position={[-(MAGNET_THICK / 2 + 0.04), 0, 0]}>
+          <boxGeometry args={[0.06, 2.2, 3.0]} />
           <meshStandardMaterial
             color="#ff6644"
             emissive="#ff2200"
-            emissiveIntensity={0.45}
+            emissiveIntensity={0.55}
             metalness={0.6}
-            roughness={0.15}
+            roughness={0.1}
           />
         </mesh>
         <Text
-          position={[0.7, 0, 0]}
+          position={[MAGNET_THICK / 2 + 0.1, 0, 0]}
           rotation={[0, -Math.PI / 2, 0]}
-          fontSize={0.7}
+          fontSize={0.75}
           color="#fff"
+          anchorX="center"
+          anchorY="middle"
         >
           N
         </Text>
       </group>
 
-      {/* ── S극 자석 (왼쪽 −X) ── */}
-      <group position={[-3.4, 0, 0]}>
+      {/* ══ S극 자석 (왼쪽 −X) ══ */}
+      <group position={[-MAGNET_X, 0, 0]}>
         <mesh castShadow>
-          <boxGeometry args={[1.2, 2.2, 3.0]} />
+          <boxGeometry args={[MAGNET_THICK, 2.4, 3.2]} />
           <meshStandardMaterial
             color={DARK.sBlue}
             metalness={0.4}
             roughness={0.3}
           />
         </mesh>
-        <mesh position={[0.62, 0, 0]}>
-          <boxGeometry args={[0.08, 2.0, 2.8]} />
+        <mesh position={[MAGNET_THICK / 2 + 0.04, 0, 0]}>
+          <boxGeometry args={[0.06, 2.2, 3.0]} />
           <meshStandardMaterial
             color="#5599ff"
             emissive="#1144cc"
-            emissiveIntensity={0.45}
+            emissiveIntensity={0.55}
             metalness={0.6}
-            roughness={0.15}
+            roughness={0.1}
           />
         </mesh>
         <Text
-          position={[-0.7, 0, 0]}
+          position={[-(MAGNET_THICK / 2 + 0.1), 0, 0]}
           rotation={[0, Math.PI / 2, 0]}
-          fontSize={0.7}
+          fontSize={0.75}
           color="#fff"
+          anchorX="center"
+          anchorY="middle"
         >
           S
         </Text>
       </group>
 
-      {/* ── 자기장선 (N→S, X축) ── */}
-      {[-0.7, 0, 0.7].map((z) =>
-        [-0.6, 0, 0.6].map((y) => (
-          <line key={`fl-${z}-${y}`}>
-            <bufferGeometry>
-              <bufferAttribute
-                attach="attributes-position"
-                array={new Float32Array([2.78, y, z, -2.78, y, z])}
-                itemSize={3}
-                count={2}
-              />
-            </bufferGeometry>
-            <lineBasicMaterial color={DARK.field} transparent opacity={0.35} />
-          </line>
+      {/* ══ 자기장선 (N→S) — ★ 밝은 하늘색, 화살촉 포함 ══ */}
+      {[-0.6, 0, 0.6].map((z) =>
+        [-0.55, 0, 0.55].map((y) => (
+          <FieldLine key={`fl-${z}-${y}`} y={y} z={z} />
         )),
       )}
 
-      {/* ── 사각형 코일 (회전 피벗) ── */}
+      {/* ══ 사각형 코일 피벗 ══ */}
       <group ref={coilRef}>
-        {/* 4변 */}
+        {/* 4변 전선 */}
         <Wire from={[-W / 2, H / 2, 0]} to={[W / 2, H / 2, 0]} />
         <Wire from={[-W / 2, -H / 2, 0]} to={[W / 2, -H / 2, 0]} />
         <Wire from={[-W / 2, -H / 2, 0]} to={[-W / 2, H / 2, 0]} />
@@ -183,7 +209,7 @@ function ProceduralMotor({ omegaRad, apiData }) {
           [W / 2, -H / 2],
         ].map(([x, y], i) => (
           <mesh key={i} position={[x, y, 0]}>
-            <sphereGeometry args={[R * 1.15, 10, 10]} />
+            <sphereGeometry args={[R * 1.2, 10, 10]} />
             <meshStandardMaterial
               color={DARK.coil}
               metalness={0.95}
@@ -192,18 +218,18 @@ function ProceduralMotor({ omegaRad, apiData }) {
           </mesh>
         ))}
 
-        {/* 회전축 */}
-        <mesh rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.055, 0.055, 5.0, 12]} />
-          <meshStandardMaterial color="#888" metalness={0.9} roughness={0.2} />
+        {/* 회전축 (Z 방향) */}
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.055, 0.055, 5.5, 12]} />
+          <meshStandardMaterial color="#aaa" metalness={0.9} roughness={0.2} />
         </mesh>
 
         {/* 정류자 반환 */}
         {[0, Math.PI].map((rot, i) => (
-          <group key={i} position={[0, H / 2 + 0.28, 0]} rotation={[0, rot, 0]}>
+          <group key={i} position={[0, H / 2 + 0.25, 0]} rotation={[0, rot, 0]}>
             <mesh>
               <cylinderGeometry
-                args={[0.22, 0.22, 0.3, 16, 1, false, 0, Math.PI]}
+                args={[0.22, 0.22, 0.28, 16, 1, false, 0, Math.PI]}
               />
               <meshStandardMaterial
                 color="#d4a800"
@@ -215,114 +241,72 @@ function ProceduralMotor({ omegaRad, apiData }) {
         ))}
 
         {/* 전류 방향 화살표 (상변) */}
-        <group ref={arrow1Ref} position={[(W / 2) * 0.3, H / 2, 0]}>
-          <mesh rotation={[0, 0, -Math.PI / 2]}>
-            <coneGeometry args={[0.1, 0.28, 8]} />
-            <meshBasicMaterial color={DARK.force} />
-          </mesh>
-        </group>
-        {/* 전류 방향 화살표 (하변) */}
-        <group ref={arrow2Ref} position={[(-W / 2) * 0.3, -H / 2, 0]}>
-          <mesh rotation={[0, 0, Math.PI / 2]}>
-            <coneGeometry args={[0.1, 0.28, 8]} />
-            <meshBasicMaterial color={DARK.force} />
-          </mesh>
-        </group>
+        <mesh position={[W * 0.18, H / 2, 0]} rotation={[0, 0, -Math.PI / 2]}>
+          <coneGeometry args={[0.09, 0.25, 8]} />
+          <meshBasicMaterial color={DARK.force} />
+        </mesh>
+        {/* 전류 방향 화살표 (하변, 반대) */}
+        <mesh position={[-W * 0.18, -H / 2, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <coneGeometry args={[0.09, 0.25, 8]} />
+          <meshBasicMaterial color={DARK.force} />
+        </mesh>
       </group>
 
-      {/* ── 브러시 ── */}
-      {[-0.26, 0.26].map((x, i) => (
-        <mesh key={i} position={[x, H / 2 + 0.28, 0]}>
+      {/* ══ 브러시 ══ */}
+      {[-0.27, 0.27].map((x, i) => (
+        <mesh key={i} position={[x, H / 2 + 0.25, 0]}>
           <boxGeometry args={[0.1, 0.18, 0.14]} />
           <meshStandardMaterial color="#333" metalness={0.3} roughness={0.7} />
         </mesh>
       ))}
+
+      {/* 바닥 그리드 */}
+      <gridHelper
+        args={[12, 24, "#1e2235", "#1a1d2a"]}
+        position={[0, -2.0, 0]}
+      />
     </group>
   );
 }
 
-// ─── GLB 모델 로더 (model_url 있을 때) ─────────────────────────────────────
+// ─── GLB 모델 로더 ────────────────────────────────────────────────────────
 function GlbMotorModel({
   modelUrl,
   omegaRad,
+  rotationDirection,
   coilObjectName,
   rotationAxis = "z",
 }) {
   const { scene } = useGLTF(modelUrl);
-  const coilRef = useRef();
+  const coilRef = useRef(null);
   const angleRef = useRef(0);
 
-  // coilObjectName 에 해당하는 오브젝트 찾기
   useEffect(() => {
     if (!scene || !coilObjectName) return;
-    const obj = scene.getObjectByName(coilObjectName);
-    coilRef.current = obj ?? null;
+    coilRef.current = scene.getObjectByName(coilObjectName) ?? null;
   }, [scene, coilObjectName]);
 
   useFrame((_, dt) => {
-    angleRef.current += omegaRad * dt;
-    if (coilRef.current) {
-      if (rotationAxis === "z") coilRef.current.rotation.z = angleRef.current;
-      else if (rotationAxis === "x")
-        coilRef.current.rotation.x = angleRef.current;
-      else coilRef.current.rotation.y = angleRef.current;
-    }
+    // ★ 백엔드 rotation_direction 적용
+    angleRef.current += omegaRad * rotationDirection * dt;
+    if (!coilRef.current) return;
+    if (rotationAxis === "z") coilRef.current.rotation.z = angleRef.current;
+    else if (rotationAxis === "x")
+      coilRef.current.rotation.x = angleRef.current;
+    else coilRef.current.rotation.y = angleRef.current;
   });
 
   return <primitive object={scene} />;
 }
 
-// ─── 씬 루트 (GLB 우선, 오류 시 절차적) ───────────────────────────────────
-function MotorScene({ omegaRad, apiData }) {
-  const [glbFailed, setGlbFailed] = useState(!apiData?.model_url);
-
-  return (
-    <>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[6, 8, 5]} intensity={1.4} castShadow />
-      <pointLight
-        position={[3, 0, 0]}
-        color={DARK.nRed}
-        intensity={0.9}
-        distance={10}
-      />
-      <pointLight
-        position={[-3, 0, 0]}
-        color={DARK.sBlue}
-        intensity={0.9}
-        distance={10}
-      />
-
-      <OrbitControls enablePan enableZoom enableRotate />
-
-      {apiData?.model_url && !glbFailed ? (
-        <Suspense
-          fallback={<ProceduralMotor omegaRad={omegaRad} apiData={apiData} />}
-        >
-          <GlbErrorBoundary onFail={() => setGlbFailed(true)}>
-            <GlbMotorModel
-              modelUrl={apiData.model_url}
-              omegaRad={omegaRad}
-              coilObjectName={apiData.coil_object_name}
-              rotationAxis={apiData.rotation_axis}
-            />
-          </GlbErrorBoundary>
-        </Suspense>
-      ) : (
-        <ProceduralMotor omegaRad={omegaRad} apiData={apiData} />
-      )}
-    </>
-  );
-}
-
-// ─── GLB 오류 경계 (클래스 컴포넌트) ──────────────────────────────────────
-import { Component } from "react";
+// ─── GLB 오류 경계 ────────────────────────────────────────────────────────
 class GlbErrorBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
   }
-  componentDidCatch() {
+  componentDidCatch(err) {
+    console.warn("GLB 로드 실패 → 절차적 폴백:", err?.message ?? err);
     this.props.onFail?.();
   }
   render() {
@@ -331,7 +315,68 @@ class GlbErrorBoundary extends Component {
   }
 }
 
-// ─── 슬라이더 + 수치 패널 ──────────────────────────────────────────────────
+// ─── 씬 루트 ─────────────────────────────────────────────────────────────
+function MotorScene({ omegaRad, rotationDirection, apiData }) {
+  const [glbFailed, setGlbFailed] = useState(!apiData?.model_url);
+
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[5, 8, 6]} intensity={1.4} castShadow />
+      <pointLight
+        position={[MAGNET_X, 0, 0]}
+        color={DARK.nRed}
+        intensity={1.0}
+        distance={10}
+      />
+      <pointLight
+        position={[-MAGNET_X, 0, 0]}
+        color={DARK.sBlue}
+        intensity={1.0}
+        distance={10}
+      />
+
+      <OrbitControls
+        enablePan
+        enableZoom
+        enableRotate
+        target={[0, 0, 0]}
+        minDistance={4}
+        maxDistance={18}
+      />
+
+      {apiData?.model_url && !glbFailed ? (
+        <Suspense
+          fallback={
+            <ProceduralMotor
+              omegaRad={omegaRad}
+              rotationDirection={rotationDirection}
+              apiData={apiData}
+            />
+          }
+        >
+          <GlbErrorBoundary onFail={() => setGlbFailed(true)}>
+            <GlbMotorModel
+              modelUrl={apiData.model_url}
+              omegaRad={omegaRad}
+              rotationDirection={rotationDirection}
+              coilObjectName={apiData.coil_object_name}
+              rotationAxis={apiData.rotation_axis}
+            />
+          </GlbErrorBoundary>
+        </Suspense>
+      ) : (
+        <ProceduralMotor
+          omegaRad={omegaRad}
+          rotationDirection={rotationDirection}
+          apiData={apiData}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── UI: 슬라이더 ─────────────────────────────────────────────────────────
 function SliderRow({
   label,
   unit,
@@ -340,7 +385,7 @@ function SliderRow({
   max,
   step = 0.05,
   onChange,
-  color = DARK.text,
+  color,
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -355,7 +400,11 @@ function SliderRow({
       >
         <span>{label}</span>
         <span
-          style={{ color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+          style={{
+            color: color ?? DARK.text,
+            fontWeight: 600,
+            fontVariantNumeric: "tabular-nums",
+          }}
         >
           {value.toFixed(2)} {unit}
         </span>
@@ -369,15 +418,15 @@ function SliderRow({
         onChange={(e) => onChange(parseFloat(e.target.value))}
         style={{
           width: "100%",
-          accentColor: color,
+          accentColor: color ?? DARK.text,
           cursor: "pointer",
-          height: 4,
         }}
       />
     </div>
   );
 }
 
+// ─── UI: 수치 카드 ────────────────────────────────────────────────────────
 function MetricCard({ label, value, unit, color }) {
   return (
     <div
@@ -418,10 +467,7 @@ function MetricCard({ label, value, unit, color }) {
   );
 }
 
-// ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────
-/**
- * @param {{ apiData: import("./types").DcCoilMotorApiData }} props
- */
+// ─── 메인 export ─────────────────────────────────────────────────────────
 export default function DcCoilMotorWidget({ apiData }) {
   const def = apiData?.defaults ?? {};
   const phys = apiData?.physics_constants ?? {};
@@ -433,7 +479,30 @@ export default function DcCoilMotorWidget({ apiData }) {
   const [omegaData, setOmegaData] = useState(null);
   const [fetching, setFetching] = useState(false);
 
-  // 백엔드 omega 요청
+  // 로컬 폴백 (네트워크 없을 때) — rotation_direction 포함
+  const calcLocal = useCallback(
+    (i, b) => {
+      const gain = phys.motor_gain ?? 380.0;
+      const nT = phys.n_turns ?? 12;
+      const area = phys.area_m2 ?? 0.012;
+      const damp = phys.damping ?? 0.18;
+      const cap = phys.omega_cap_rad_s ?? 72.0;
+      const iAbs = Math.abs(i);
+      const raw =
+        (gain * nT * area * iAbs * b) /
+        (1 + damp * iAbs * b + 0.05 * iAbs * iAbs);
+      const omega = Math.min(cap, Math.max(0, raw));
+      return {
+        omega_rad_s: omega,
+        omega_rpm: (omega * 30) / Math.PI,
+        torque_scale_n_m: nT * area * iAbs * b,
+        // ★ 로컬에서도 방향 계산
+        rotation_direction: i >= 0 ? 1 : -1,
+      };
+    },
+    [phys],
+  );
+
   const fetchOmega = useCallback(
     async (i, b) => {
       setFetching(true);
@@ -450,27 +519,16 @@ export default function DcCoilMotorWidget({ apiData }) {
           },
         });
         setOmegaData(res.data);
-      } catch (e) {
-        console.error("dc_coil omega fetch failed:", e);
-        // 폴백: 간단 계산
-        const raw =
-          (380.0 * (phys.n_turns ?? 12) * (phys.area_m2 ?? 0.012) * i * b) /
-          (1 + 0.18 * i * b + 0.05 * i * i);
-        const omega = Math.min(phys.omega_cap_rad_s ?? 72, Math.max(0, raw));
-        setOmegaData({
-          omega_rad_s: omega,
-          omega_rpm: (omega * 30) / Math.PI,
-          torque_scale_n_m:
-            (phys.n_turns ?? 12) * (phys.area_m2 ?? 0.012) * i * b,
-        });
+      } catch {
+        // 백엔드 연결 실패 → 로컬 계산
+        setOmegaData(calcLocal(i, b));
       } finally {
         setFetching(false);
       }
     },
-    [omegaApiPath, phys],
+    [omegaApiPath, phys, calcLocal],
   );
 
-  // 슬라이더 변경 시 디바운스 요청
   useEffect(() => {
     const t = setTimeout(() => fetchOmega(currentA, bTesla), 280);
     return () => clearTimeout(t);
@@ -479,6 +537,9 @@ export default function DcCoilMotorWidget({ apiData }) {
   const omega = omegaData?.omega_rad_s ?? 0;
   const rpm = omegaData?.omega_rpm ?? 0;
   const torque = omegaData?.torque_scale_n_m ?? 0;
+  // ★ 백엔드가 준 rotation_direction — 없으면 +1(기본 CCW)
+  const rotDir = omegaData?.rotation_direction ?? 1;
+  const dirLabel = rotDir >= 0 ? "CCW (반시계)" : "CW (시계)";
 
   return (
     <div
@@ -488,12 +549,12 @@ export default function DcCoilMotorWidget({ apiData }) {
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        fontFamily: "var(--font-sans, 'Segoe UI', sans-serif)",
         color: DARK.text,
         border: `0.5px solid ${DARK.border}`,
+        fontFamily: "var(--font-sans, 'Pretendard', 'Segoe UI', sans-serif)",
       }}
     >
-      {/* ── 헤더 ── */}
+      {/* 헤더 */}
       <div
         style={{
           padding: "14px 18px",
@@ -513,35 +574,57 @@ export default function DcCoilMotorWidget({ apiData }) {
             </div>
           )}
         </div>
-        {fetching && (
-          <div
-            style={{
-              fontSize: 11,
-              color: DARK.muted,
-              padding: "3px 8px",
-              background: DARK.surface,
-              borderRadius: 6,
-              border: `0.5px solid ${DARK.border}`,
-            }}
-          >
-            연산 중…
-          </div>
-        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* ★ 회전 방향 배지 */}
+          {omegaData && (
+            <div
+              style={{
+                fontSize: 11,
+                color: rotDir >= 0 ? DARK.force : DARK.nRed,
+                padding: "3px 10px",
+                background: DARK.surface,
+                borderRadius: 6,
+                border: `0.5px solid ${DARK.border}`,
+                fontWeight: 600,
+              }}
+            >
+              {dirLabel}
+            </div>
+          )}
+          {fetching && (
+            <div
+              style={{
+                fontSize: 11,
+                color: DARK.muted,
+                padding: "3px 10px",
+                background: DARK.surface,
+                borderRadius: 6,
+                border: `0.5px solid ${DARK.border}`,
+              }}
+            >
+              연산 중…
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── 3D 캔버스 ── */}
+      {/* 3D 캔버스 */}
       <div style={{ height: 460, background: DARK.bg }}>
         <Canvas
-          camera={{ position: [5.5, 3.5, 7], fov: 45 }}
+          camera={{ position: [0, 2.5, 8], fov: 50 }}
           shadows
           style={{ height: "100%", width: "100%" }}
           gl={{ antialias: true }}
         >
-          <MotorScene omegaRad={omega} apiData={apiData} />
+          <MotorScene
+            omegaRad={omega}
+            rotationDirection={rotDir}
+            apiData={apiData}
+          />
         </Canvas>
       </div>
 
-      {/* ── 하단 패널 ── */}
+      {/* 하단 패널 */}
       <div
         style={{
           padding: "16px 18px",
@@ -662,7 +745,7 @@ export default function DcCoilMotorWidget({ apiData }) {
         )}
       </div>
 
-      {/* ── 노트 ── */}
+      {/* 노트 */}
       {apiData?.notes?.length > 0 && (
         <div
           style={{
