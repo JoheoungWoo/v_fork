@@ -18,13 +18,14 @@ function Magnet({ type, position }) {
   return (
     <group position={position}>
       <mesh>
-        <boxGeometry args={[0.5, 1.6, 1.6]} />
+        {/* 자석의 깊이(Z축)를 코일 길이에 맞춰 4로 길게 늘림 */}
+        <boxGeometry args={[0.6, 1.6, 4]} />
         <meshStandardMaterial color={color} metalness={0.3} roughness={0.5} />
       </mesh>
       <Text
-        position={[isN ? 0.26 : -0.26, 0, 0]}
+        position={[isN ? 0.31 : -0.31, 0, 0]}
         rotation={[0, isN ? Math.PI / 2 : -Math.PI / 2, 0]}
-        fontSize={0.6}
+        fontSize={0.8}
         color="white"
         fontWeight="bold"
       >
@@ -34,36 +35,25 @@ function Magnet({ type, position }) {
   );
 }
 
-// 🟢 수정된 부분: 고정 회전 코드 제거
-function RotatingCoil({
-  url,
-  omegaRad,
-  rotDir,
-  axis = "y",
-  showFlux,
-  currentDir,
-}) {
+function RotatingCoil({ url, omegaRad, rotDir, showFlux, currentDir }) {
   const { scene } = useGLTF(url);
   const groupRef = useRef(null);
   const angleRef = useRef(0);
 
   useFrame((_, dt) => {
-    const ax = ["x", "y", "z"].includes(axis) ? axis : "y";
-    // 전류와 자기장 방향에 따라 회전 각도 업데이트
+    // 💡 이제 회전축은 Z축(Shaft 방향)으로 고정됩니다.
     angleRef.current -= omegaRad * rotDir * dt;
-    if (!groupRef.current) return;
-
-    // ❌ (기존 코드) 고정 회전 제거됨: groupRef.current.rotation.x = Math.PI / 2;
-    // 이제 코일은 원래의 수평 상태에서 시작합니다.
-
-    // 동적 회전만 적용
-    groupRef.current.rotation[ax] = angleRef.current;
+    if (groupRef.current) {
+      groupRef.current.rotation.z = angleRef.current;
+    }
   });
 
   return (
     <group ref={groupRef}>
-      {/* GLB 모델은 원래 수평 상태로 로드됩니다. */}
-      <primitive object={scene} />
+      {/* 💡 핵심 수정: 모델 자체를 X축 기준으로 -90도 눕혀서 확실한 수평(XZ 평면) 상태로 정렬 */}
+      <group rotation={[-Math.PI / 2, 0, 0]}>
+        <primitive object={scene} />
+      </group>
       <CurrentFlux enabled={showFlux} direction={currentDir} />
     </group>
   );
@@ -110,14 +100,16 @@ function PowerSupply({ powerOn }) {
 }
 
 function CurrentFlux({ enabled, direction }) {
+  // 💡 수정된 부분: 눕혀진 코일의 실제 구리선 궤적에 완벽하게 일치하도록 전류 흐름 경로 재설정
   const path = [
-    new THREE.Vector3(0, 0.68, 0.52),
-    new THREE.Vector3(0, 0.68, -0.52),
-    new THREE.Vector3(0, -0.68, -0.52),
-    new THREE.Vector3(0, -0.68, 0.52),
-    new THREE.Vector3(0, 0.68, 0.52),
+    new THREE.Vector3(0.7, 0, 0.5), // 우측 정류자
+    new THREE.Vector3(1.2, 0, 0.5), // 우측 선 앞쪽
+    new THREE.Vector3(1.2, 0, -3.5), // 우측 선 뒤쪽
+    new THREE.Vector3(-1.2, 0, -3.5), // 좌측 선 뒤쪽
+    new THREE.Vector3(-1.2, 0, 0.5), // 좌측 선 앞쪽
+    new THREE.Vector3(-0.7, 0, 0.5), // 좌측 정류자
   ];
-  const particles = 16;
+  const particles = 20; // 입자 수 증가
   const refs = useRef([]);
   const phase = useRef(0);
 
@@ -134,7 +126,7 @@ function CurrentFlux({ enabled, direction }) {
 
   useFrame((_, dt) => {
     if (!enabled) return;
-    phase.current += dt * 0.6 * direction;
+    phase.current += dt * 0.8 * direction;
     for (let i = 0; i < particles; i += 1) {
       const r = refs.current[i];
       if (!r) continue;
@@ -153,7 +145,7 @@ function CurrentFlux({ enabled, direction }) {
             refs.current[i] = el;
           }}
         >
-          <sphereGeometry args={[0.036, 12, 12]} />
+          <sphereGeometry args={[0.04, 12, 12]} />
           <meshBasicMaterial color="#ffe34d" />
         </mesh>
       ))}
@@ -174,7 +166,6 @@ export default function DcCoilMotorWidget({ apiData }) {
   });
 
   const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
-  const rotAxis = "y";
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -212,9 +203,12 @@ export default function DcCoilMotorWidget({ apiData }) {
   const currentDir = currentForward ? 1 : -1;
   const bDir = bForward ? 1 : -1;
   const rotDir = powerOn ? currentDir * bDir : 0;
-  const magnetGap = 1.45;
+
+  // 코일의 물리적 크기에 맞춰 자석 위치 조정
+  const magnetGap = 1.6;
   const nPosX = bDir >= 0 ? -magnetGap : magnetGap;
   const sPosX = -nPosX;
+  const magnetZ = -1.5; // 코일 중심점 깊이에 맞춤
 
   return (
     <div
@@ -234,29 +228,33 @@ export default function DcCoilMotorWidget({ apiData }) {
           fontWeight: 600,
         }}
       >
-        DC 모터 시뮬레이션 (수평 초기 상태)
+        DC 모터 시뮬레이션 (완전한 수평 배열)
       </div>
 
       <div style={{ height: 480 }}>
+        {/* 💡 카메라 앵글을 위에서 약간 내려다보도록 조정하여 수평 사각형이 잘 보이게 함 */}
         <Canvas
-          camera={{ position: [0, 5, 8], fov: 48 }}
+          camera={{ position: [0, 4, 6], fov: 50 }}
           shadows
           gl={{ antialias: true }}
         >
           <ambientLight intensity={0.75} />
           <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
-          <OrbitControls target={[0, 0, 0]} minDistance={3} maxDistance={20} />
+          <OrbitControls
+            target={[0, 0, -1.5]}
+            minDistance={3}
+            maxDistance={20}
+          />
           <Suspense fallback={null}>
             <RotatingCoil
               url={coilGlbUrl}
               omegaRad={omega}
               rotDir={rotDir}
-              axis={rotAxis}
               showFlux={powerOn}
               currentDir={currentDir}
             />
-            <Magnet type="N" position={[nPosX, 0, 0]} />
-            <Magnet type="S" position={[sPosX, 0, 0]} />
+            <Magnet type="N" position={[nPosX, 0, magnetZ]} />
+            <Magnet type="S" position={[sPosX, 0, magnetZ]} />
             <PowerSupply powerOn={powerOn} />
           </Suspense>
         </Canvas>
