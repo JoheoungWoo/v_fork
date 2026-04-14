@@ -1,9 +1,10 @@
 import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
-import { Canvas, useLayoutEffect } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
