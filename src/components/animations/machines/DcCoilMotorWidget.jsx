@@ -171,7 +171,8 @@ export default function DcCoilMotorWidget({ apiData }) {
     rotation_direction: 1,
   });
 
-  const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
+  const coilGlbUrl =
+    apiData?.coil_model_url ?? "/models/dc_coil_motor_assembly.glb";
 
   useEffect(() => {
     const t = setTimeout(async () => {
