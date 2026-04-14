@@ -193,6 +193,16 @@ const WIDGET_MAP = {
       })),
     ),
   ],
+  /** DC rectangular coil + N/S poles — handler machine_dc_coil_motor */
+  dc_coil_motor_3d: [
+    lazy(() =>
+      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
+        default: function DcCoilMotorFromApiPage() {
+          return <m.default widgetHandlerId="machine_dc_coil_motor" />;
+        },
+      })),
+    ),
+  ],
   "2_induction_motor": [
     lazy(() => import("@/components/animations/machines/EMInductionWidget")),
   ],

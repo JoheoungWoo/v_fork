@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import apiClient from "@/api/core/apiClient";
 import VoltageLandscapeViewer from "@/components/animations/circuits/VoltageLandscapeViewer";
+import DcCoilMotorWidget from "./DcCoilMotorWidget";
 import InductionMotorWidget from "./InductionMotorWidget";
 import SkinEffectWidget from "./SkinEffectWidget";
 import Transformer3DWidget from "./Transformer3DWidget";
@@ -57,6 +58,10 @@ export default function MachineWidgetPage({
 
   if (widgetData.type === "skin_effect_3d") {
     return <SkinEffectWidget apiData={widgetData} />;
+  }
+
+  if (widgetData.type === "dc_coil_motor_3d") {
+    return <DcCoilMotorWidget apiData={widgetData} />;
   }
 
   const sd = widgetData.scene_data;
