@@ -11,24 +11,16 @@ const C = {
   muted: "#7a7872",
 };
 
-function GlbPart({ url, position = [0, 0, 0], visible = true }) {
-  const { scene } = useGLTF(url);
-  return <primitive object={scene} position={position} visible={visible} />;
-}
-
-// 💡 추가된 컴포넌트: N극 / S극을 코드로 직접 생성 (GLB 파일 불필요)
 function Magnet({ type, position }) {
   const isN = type === "N";
-  const color = isN ? "#ff3b30" : "#007aff"; // N극: 빨강, S극: 파랑
+  const color = isN ? "#ff3b30" : "#007aff";
 
   return (
     <group position={position}>
       <mesh>
-        {/* 자석의 크기 (폭, 높이, 깊이) */}
         <boxGeometry args={[0.5, 1.6, 1.6]} />
         <meshStandardMaterial color={color} metalness={0.3} roughness={0.5} />
       </mesh>
-      {/* 자석 안쪽 면에 N, S 글자 표시 */}
       <Text
         position={[isN ? 0.26 : -0.26, 0, 0]}
         rotation={[0, isN ? Math.PI / 2 : -Math.PI / 2, 0]}
@@ -42,6 +34,7 @@ function Magnet({ type, position }) {
   );
 }
 
+// 🟢 수정된 부분: 고정 회전 코드 제거
 function RotatingCoil({
   url,
   omegaRad,
@@ -56,14 +49,20 @@ function RotatingCoil({
 
   useFrame((_, dt) => {
     const ax = ["x", "y", "z"].includes(axis) ? axis : "y";
+    // 전류와 자기장 방향에 따라 회전 각도 업데이트
     angleRef.current -= omegaRad * rotDir * dt;
     if (!groupRef.current) return;
-    groupRef.current.rotation.x = Math.PI / 2;
+
+    // ❌ (기존 코드) 고정 회전 제거됨: groupRef.current.rotation.x = Math.PI / 2;
+    // 이제 코일은 원래의 수평 상태에서 시작합니다.
+
+    // 동적 회전만 적용
     groupRef.current.rotation[ax] = angleRef.current;
   });
 
   return (
     <group ref={groupRef}>
+      {/* GLB 모델은 원래 수평 상태로 로드됩니다. */}
       <primitive object={scene} />
       <CurrentFlux enabled={showFlux} direction={currentDir} />
     </group>
@@ -174,9 +173,7 @@ export default function DcCoilMotorWidget({ apiData }) {
     rotation_direction: 1,
   });
 
-  // 💡 기존의 단일 코일 GLB 파일 경로만 유지합니다. (위치에 맞게 경로를 수정해주세요)
-  const coilGlbUrl =
-    apiData?.coil_model_url ?? "/models/dc_coil_motor_assembly.glb";
+  const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
   const rotAxis = "y";
 
   useEffect(() => {
@@ -237,7 +234,7 @@ export default function DcCoilMotorWidget({ apiData }) {
           fontWeight: 600,
         }}
       >
-        DC 모터 시뮬레이션 (코일 GLB + 절차적 자석)
+        DC 모터 시뮬레이션 (수평 초기 상태)
       </div>
 
       <div style={{ height: 480 }}>
@@ -258,7 +255,6 @@ export default function DcCoilMotorWidget({ apiData }) {
               showFlux={powerOn}
               currentDir={currentDir}
             />
-            {/* 💡 수정된 부분: GLB 파일 대신 코드로 생성한 자석 컴포넌트 배치 */}
             <Magnet type="N" position={[nPosX, 0, 0]} />
             <Magnet type="S" position={[sPosX, 0, 0]} />
             <PowerSupply powerOn={powerOn} />
@@ -266,7 +262,6 @@ export default function DcCoilMotorWidget({ apiData }) {
         </Canvas>
       </div>
 
-      {/* --- 이하 UI 컨트롤 패널은 기존과 동일 --- */}
       <div style={{ padding: 12, background: C.surface }}>
         <div style={{ marginBottom: 10, display: "flex", gap: 8 }}>
           <button type="button" onClick={() => setPowerOn((v) => !v)}>
