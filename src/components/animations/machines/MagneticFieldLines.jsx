@@ -6,8 +6,8 @@ import * as THREE from "three";
 const MagneticFieldLines = ({ b_tesla }) => {
   // 밝은 형광 느낌: B가 커질수록 선이 두껍고 선명해짐
   const strength = Math.max(0, Number(b_tesla) || 0);
-  const opacity = Math.min(0.95, 0.45 + strength * 0.4);
-  const radius = 0.045 + Math.min(0.06, strength * 0.03);
+  const opacity = Math.min(1, 0.55 + strength * 0.35);
+  const radius = 0.06 + Math.min(0.08, strength * 0.04);
 
   const lines = useMemo(() => {
     const paths = [];
@@ -24,25 +24,31 @@ const MagneticFieldLines = ({ b_tesla }) => {
   }, []);
 
   return (
-    <group>
+    <group renderOrder={1000}>
       {lines.map((path, idx) => (
         // args: [path, tubularSegments, radius, radialSegments, closed]
         <group key={idx}>
           <Tube args={[path, 24, radius, 10, false]}>
             <meshBasicMaterial
-              color="#3fd6ff"
+              color="#4fe5ff"
               transparent
               opacity={opacity}
               depthWrite={false}
+              depthTest={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
             />
           </Tube>
           {/* 안쪽 코어를 더 밝게 겹쳐서 발광처럼 보이게 */}
           <Tube args={[path, 24, radius * 0.45, 8, false]}>
             <meshBasicMaterial
-              color="#9ff3ff"
+              color="#d8fbff"
               transparent
               opacity={Math.min(1, opacity + 0.1)}
               depthWrite={false}
+              depthTest={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
             />
           </Tube>
         </group>
