@@ -94,7 +94,11 @@ function ProceduralMotor({ omegaRad, rotDir }) {
       <group position={[0, MY, 0]}>
         <mesh castShadow>
           <boxGeometry args={[MW, MT, MD]} />
-          <meshStandardMaterial color={C.nRed} metalness={0.4} roughness={0.3} />
+          <meshStandardMaterial
+            color={C.nRed}
+            metalness={0.4}
+            roughness={0.3}
+          />
         </mesh>
         <Text
           position={[0, MT / 2 + 0.1, 0]}
@@ -108,7 +112,11 @@ function ProceduralMotor({ omegaRad, rotDir }) {
       <group position={[0, -MY, 0]}>
         <mesh castShadow>
           <boxGeometry args={[MW, MT, MD]} />
-          <meshStandardMaterial color={C.sBlue} metalness={0.4} roughness={0.3} />
+          <meshStandardMaterial
+            color={C.sBlue}
+            metalness={0.4}
+            roughness={0.3}
+          />
         </mesh>
         <Text
           position={[0, -(MT / 2 + 0.1), 0]}
@@ -131,18 +139,28 @@ function ProceduralMotor({ omegaRad, rotDir }) {
         <Wire from={[-half, 0, -depth / 2]} to={[-half, 0, depth / 2]} />
       </group>
 
-      <gridHelper args={[20, 30, "#223040", "#1b2330"]} position={[0, -3.2, 0]} />
+      <gridHelper
+        args={[20, 30, "#223040", "#1b2330"]}
+        position={[0, -3.2, 0]}
+      />
     </group>
   );
 }
 
-function GlbMotor({ modelUrl, omegaRad, rotDir, coilObjectName, rotAxis = "y" }) {
+function GlbMotor({
+  modelUrl,
+  omegaRad,
+  rotDir,
+  coilObjectName,
+  rotAxis = "y",
+}) {
   const { scene } = useGLTF(modelUrl);
   const targetRef = useRef(null);
   const angleRef = useRef(0);
 
   useEffect(() => {
-    targetRef.current = (coilObjectName && scene.getObjectByName(coilObjectName)) || scene;
+    targetRef.current =
+      (coilObjectName && scene.getObjectByName(coilObjectName)) || scene;
   }, [scene, coilObjectName]);
 
   useFrame((_, dt) => {
@@ -168,7 +186,10 @@ export default function DcCoilMotorWidget({ apiData }) {
   useEffect(() => {
     const t = setTimeout(async () => {
       try {
-        const u = new URL("/api/machine/dc_coil_motor/omega", window.location.origin);
+        const u = new URL(
+          "/api/machine/dc_coil_motor/omega",
+          window.location.origin,
+        );
         u.searchParams.set("current_a", String(currentA));
         u.searchParams.set("b_t", String(bTesla));
         const res = await fetch(u.toString());
@@ -209,12 +230,22 @@ export default function DcCoilMotorWidget({ apiData }) {
         fontFamily: "Segoe UI,sans-serif",
       }}
     >
-      <div style={{ padding: 12, borderBottom: `1px solid ${C.border}`, fontWeight: 600 }}>
+      <div
+        style={{
+          padding: 12,
+          borderBottom: `1px solid ${C.border}`,
+          fontWeight: 600,
+        }}
+      >
         DC 사각형 코일 모터 (단일 확인용)
       </div>
 
       <div style={{ height: 460 }}>
-        <Canvas camera={{ position: [5, 3, 7], fov: 48 }} shadows gl={{ antialias: true }}>
+        <Canvas
+          camera={{ position: [5, 3, 7], fov: 48 }}
+          shadows
+          gl={{ antialias: true }}
+        >
           <ambientLight intensity={0.7} />
           <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
           <OrbitControls target={[0, 0, 0]} minDistance={4} maxDistance={20} />
