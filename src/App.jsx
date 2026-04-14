@@ -5,8 +5,9 @@ const FALLBACK_DATA = {
   type: "dc_coil_motor_3d",
   title: "DC 사각형 코일 모터",
   subtitle: "백엔드 연동 실패 시 로컬 데이터로 동작합니다.",
-  model_url: "/models/dc_coil_motor.glb",
-  coil_object_name: "Motor_Coil_Root",
+  coil_model_url: "/models/dc_coil_only.glb",
+  n_model_url: "/models/dc_magnet_n.glb",
+  s_model_url: "/models/dc_magnet_s.glb",
   rotation_axis: "y",
 };
 
