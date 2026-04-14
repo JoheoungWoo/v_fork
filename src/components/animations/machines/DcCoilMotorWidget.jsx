@@ -125,7 +125,7 @@ function ProceduralMotor({ omegaRad, rotDir }) {
   useFrame((_, dt) => {
     angleRef.current += omegaRad * rotDir * dt;
     if (coilRef.current) {
-      coilRef.current.rotation.z = angleRef.current;
+      coilRef.current.rotation.x = angleRef.current;
     }
   });
 
