@@ -16,23 +16,31 @@ function GlbPart({ url, position = [0, 0, 0], visible = true }) {
   return <primitive object={scene} position={position} visible={visible} />;
 }
 
-function RotatingCoil({ url, omegaRad, rotDir, axis = "z" }) {
+function RotatingCoil({ url, omegaRad, rotDir, axis = "y", showFlux, currentDir }) {
   const { scene } = useGLTF(url);
+  const groupRef = useRef(null);
   const angleRef = useRef(0);
 
   useFrame((_, dt) => {
     const ax = ["x", "y", "z"].includes(axis) ? axis : "y";
     angleRef.current -= omegaRad * rotDir * dt;
-    scene.rotation[ax] = angleRef.current;
+    if (!groupRef.current) return;
+    groupRef.current.rotation.x = Math.PI / 2;
+    groupRef.current.rotation[ax] = angleRef.current;
   });
 
-  return <primitive object={scene} />;
+  return (
+    <group ref={groupRef}>
+      <primitive object={scene} />
+      <CurrentFlux enabled={showFlux} direction={currentDir} />
+    </group>
+  );
 }
 
 function PowerSupply({ powerOn }) {
   const wireColor = powerOn ? "#ffd84d" : "#5a5a5a";
   return (
-    <group position={[0, -1.35, 0]}>
+    <group position={[0, -0.35, 1.35]}>
       <mesh position={[0, 0, 0]}>
         <boxGeometry args={[0.72, 0.3, 0.26]} />
         <meshStandardMaterial color={powerOn ? "#f1f1f1" : "#8e8e8e"} metalness={0.4} roughness={0.4} />
@@ -45,8 +53,8 @@ function PowerSupply({ powerOn }) {
         <boxGeometry args={[0.06, 0.06, 0.02]} />
         <meshStandardMaterial color="#ff4a4a" />
       </mesh>
-      <Line points={[[-0.15, 0.08, 0.12], [0, 0.95, 0.52]]} color={wireColor} lineWidth={2} />
-      <Line points={[[0.15, 0.08, 0.12], [0, 0.95, -0.52]]} color={wireColor} lineWidth={2} />
+      <Line points={[[-0.15, 0.08, -0.12], [0, 0.38, -0.82]]} color={wireColor} lineWidth={2} />
+      <Line points={[[0.15, 0.08, -0.12], [0, -0.38, -0.82]]} color={wireColor} lineWidth={2} />
     </group>
   );
 }
@@ -113,14 +121,10 @@ export default function DcCoilMotorWidget({ apiData }) {
     torque_scale_n_m: 0,
     rotation_direction: 1,
   });
-  const [showN, setShowN] = useState(true);
-  const [showS, setShowS] = useState(true);
-  const [showCoil, setShowCoil] = useState(true);
-
   const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
   const nGlbUrl = apiData?.n_model_url ?? "/models/dc_magnet_n.glb";
   const sGlbUrl = apiData?.s_model_url ?? "/models/dc_magnet_s.glb";
-  const rotAxis = "z";
+  const rotAxis = "y";
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -168,11 +172,17 @@ export default function DcCoilMotorWidget({ apiData }) {
           <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
           <OrbitControls target={[0, 0, 0]} minDistance={3} maxDistance={20} />
           <Suspense fallback={null}>
-            {showCoil ? <RotatingCoil url={coilGlbUrl} omegaRad={omega} rotDir={rotDir} axis={rotAxis} /> : null}
-            <GlbPart url={nGlbUrl} visible={showN} position={[nPosX, 0, 0]} />
-            <GlbPart url={sGlbUrl} visible={showS} position={[sPosX, 0, 0]} />
+            <RotatingCoil
+              url={coilGlbUrl}
+              omegaRad={omega}
+              rotDir={rotDir}
+              axis={rotAxis}
+              showFlux={powerOn}
+              currentDir={currentDir}
+            />
+            <GlbPart url={nGlbUrl} position={[nPosX, 0, 0]} />
+            <GlbPart url={sGlbUrl} position={[sPosX, 0, 0]} />
             <PowerSupply powerOn={powerOn} />
-            <CurrentFlux enabled={powerOn} direction={currentDir} />
           </Suspense>
         </Canvas>
       </div>
@@ -192,12 +202,6 @@ export default function DcCoilMotorWidget({ apiData }) {
         <input type="range" min={-2} max={2} step={0.01} value={bTesla} onChange={(e) => setBTesla(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
         <div style={{ marginBottom: 8, fontSize: 12, color: "#9cb0c0" }}>
           자석 위치는 자기장 방향에 따라 자동 교대 (N/S 좌우 전환)
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <button type="button" onClick={() => setShowCoil((v) => !v)}>{showCoil ? "코일 숨김" : "코일 표시"}</button>
-          <button type="button" onClick={() => setShowN((v) => !v)}>{showN ? "N 숨김" : "N 표시"}</button>
-          <button type="button" onClick={() => setShowS((v) => !v)}>{showS ? "S 숨김" : "S 표시"}</button>
         </div>
 
         <div style={{ marginTop: 6, fontSize: 13, color: C.muted }}>
