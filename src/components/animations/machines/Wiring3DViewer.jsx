@@ -4,7 +4,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
 /** 백엔드가 준 omega_t + series[].i 만 그림 (계산 없음) */
-function CurrentWaveformChart({ spec }) {
+export function CurrentWaveformChart({ spec }) {
   const { polylines, w, h } = useMemo(() => {
     if (!spec?.omega_t?.length || !spec?.series?.length) {
       return { polylines: [], w: 720, h: 200 };

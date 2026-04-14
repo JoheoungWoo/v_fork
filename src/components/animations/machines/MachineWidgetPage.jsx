@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import apiClient from "@/api/core/apiClient";
 import VoltageLandscapeViewer from "@/components/animations/circuits/VoltageLandscapeViewer";
+import InductionMotorWidget from "./InductionMotorWidget";
 import Transformer3DWidget from "./Transformer3DWidget";
 import Wiring3DViewer from "./Wiring3DViewer";
 
@@ -47,6 +48,10 @@ export default function MachineWidgetPage({
 
   if (widgetData.type === "wiring_diagram_3d" && widgetData.scene_data) {
     return <Wiring3DViewer widgetData={widgetData} />;
+  }
+
+  if (widgetData.type === "induction_motor_3d") {
+    return <InductionMotorWidget apiData={widgetData} />;
   }
 
   const sd = widgetData.scene_data;

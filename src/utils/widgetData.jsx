@@ -175,7 +175,13 @@ const WIDGET_MAP = {
   // ⚙️ 전기기기 (Electrical Machines)
   // ==========================================
   "1_induction_motor": [
-    lazy(() => import("@/components/animations/machines/InductionMotorWidget")),
+    lazy(() =>
+      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
+        default: function InductionMotorFromApiPage() {
+          return <m.default widgetHandlerId="machine_induction_motor" />;
+        },
+      })),
+    ),
   ],
   "2_induction_motor": [
     lazy(() => import("@/components/animations/machines/EMInductionWidget")),
