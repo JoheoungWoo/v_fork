@@ -71,17 +71,17 @@ function FieldTube({ x, z }) {
       new THREE.Vector3(x, 0, z),
       new THREE.Vector3(x, -INNER_Y, z),
     ]);
-    return new THREE.TubeGeometry(curve, 12, 0.022, 6, false);
+    return new THREE.TubeGeometry(curve, 12, 0.04, 8, false);
   }, [x, z]);
 
   return (
     <group>
       <mesh geometry={geo}>
-        <meshBasicMaterial color={C.field} transparent opacity={0.9} />
+        <meshBasicMaterial color={C.field} />
       </mesh>
       {/* 화살촉 — 중간(Y=0)에서 아래(-Y) 방향 */}
       <mesh position={[x, 0, z]} rotation={[Math.PI, 0, 0]}>
-        <coneGeometry args={[0.07, 0.22, 8]} />
+        <coneGeometry args={[0.09, 0.28, 8]} />
         <meshBasicMaterial color={C.field} />
       </mesh>
     </group>
