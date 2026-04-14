@@ -1,5 +1,5 @@
-import { Environment, Line, OrbitControls, useGLTF } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
+import { Canvas } from "@react-three/fiber";
 import {
   Suspense,
   useCallback,
@@ -12,6 +12,10 @@ import {
 import * as THREE from "three";
 
 import apiClient from "@/api/core/apiClient";
+import {
+  ElectromagneticFieldMeshes,
+  fallbackVisualization,
+} from "./SkinEffectFieldMeshes";
 
 const CAM_POS = [2.35, 1.25, 2.15];
 const DEBOUNCE_MS = 150;
@@ -26,216 +30,6 @@ function SkinWireGLB({ url }) {
   const { scene } = useGLTF(url);
   const root = useMemo(() => scene.clone(true), [scene]);
   return <primitive object={root} />;
-}
-
-/** XY plane circle for magnetic flux (B encircles axial current). */
-function circleXYPoints(radius, z, segments = 72) {
-  const pts = [];
-  for (let i = 0; i <= segments; i += 1) {
-    const t = (i / segments) * Math.PI * 2;
-    pts.push(
-      new THREE.Vector3(
-        radius * Math.cos(t),
-        radius * Math.sin(t),
-        z,
-      ),
-    );
-  }
-  return pts;
-}
-
-/** Vertical circle in XZ plane (y=0): eddy loop plane. */
-function circleXZPoints(radius, segments = 64) {
-  const pts = [];
-  for (let i = 0; i <= segments; i += 1) {
-    const t = (i / segments) * Math.PI * 2;
-    pts.push(
-      new THREE.Vector3(radius * Math.cos(t), 0, radius * Math.sin(t)),
-    );
-  }
-  return pts;
-}
-
-/** Vertical circle in YZ plane (x=0). */
-function circleYZPoints(radius, segments = 64) {
-  const pts = [];
-  for (let i = 0; i <= segments; i += 1) {
-    const t = (i / segments) * Math.PI * 2;
-    pts.push(
-      new THREE.Vector3(0, radius * Math.cos(t), radius * Math.sin(t)),
-    );
-  }
-  return pts;
-}
-
-function MainCurrentArrows({ strength }) {
-  const s = Math.max(0.2, Math.min(1, strength));
-  const n = 5;
-  const r = 0.38;
-  return (
-    <group name="main_current_I">
-      {Array.from({ length: n }, (_, i) => {
-        const a = (i / n) * Math.PI * 2;
-        const x = Math.cos(a) * r;
-        const y = Math.sin(a) * r;
-        return (
-          <group key={i} position={[x, y, 0]}>
-            <mesh
-              castShadow
-              position={[0, 0, 0.55]}
-              rotation={[Math.PI / 2, 0, 0]}
-            >
-              <cylinderGeometry args={[0.038, 0.038, 1.05, 8]} />
-              <meshStandardMaterial
-                color="#facc15"
-                emissive="#ca8a04"
-                emissiveIntensity={0.35 + 0.45 * s}
-                metalness={0.2}
-                roughness={0.45}
-              />
-            </mesh>
-            <mesh
-              position={[0, 0, 1.12]}
-              rotation={[Math.PI / 2, 0, 0]}
-            >
-              <coneGeometry args={[0.085, 0.22, 10]} />
-              <meshStandardMaterial
-                color="#facc15"
-                emissive="#eab308"
-                emissiveIntensity={0.5 + 0.5 * s}
-                metalness={0.15}
-                roughness={0.4}
-              />
-            </mesh>
-          </group>
-        );
-      })}
-    </group>
-  );
-}
-
-function FluxRings({ strength }) {
-  const ref = useRef(null);
-  const s = Math.max(0.15, Math.min(1, strength));
-  useFrame((_, dt) => {
-    if (ref.current) ref.current.rotation.z += dt * (0.12 + 0.35 * s);
-  });
-  const radii = [0.52, 0.62, 0.72];
-  const zs = [-0.55, 0, 0.55];
-  const lines = [];
-  for (const z of zs) {
-    for (const rad of radii) {
-      lines.push({ points: circleXYPoints(rad, z), key: `${z}-${rad}` });
-    }
-  }
-  return (
-    <group ref={ref} name="magnetic_flux_phi">
-      {lines.map(({ points, key }) => (
-        <Line
-          key={key}
-          points={points}
-          color="#60a5fa"
-          lineWidth={2}
-          transparent
-          opacity={0.35 + 0.45 * s}
-        />
-      ))}
-    </group>
-  );
-}
-
-function EddyCurrentField({ strength }) {
-  const s = Math.max(0.12, Math.min(1, strength));
-  const rLoop = 0.76;
-  return (
-    <group name="eddy_current">
-      <Line
-        points={circleXZPoints(rLoop)}
-        color="#f87171"
-        lineWidth={2}
-        transparent
-        opacity={0.45 + 0.4 * s}
-      />
-      <Line
-        points={circleYZPoints(rLoop)}
-        color="#f87171"
-        lineWidth={2}
-        transparent
-        opacity={0.35 + 0.35 * s}
-      />
-      {/* Center: induced field opposes main current (-Z) */}
-      <group position={[0, 0, -0.05]}>
-        <mesh rotation={[Math.PI / 2, 0, Math.PI]}>
-          <cylinderGeometry args={[0.028, 0.028, 0.42, 8]} />
-          <meshStandardMaterial
-            color="#ef4444"
-            emissive="#991b1b"
-            emissiveIntensity={0.25 + 0.55 * s}
-          />
-        </mesh>
-        <mesh position={[0, 0, -0.32]} rotation={[Math.PI / 2, 0, Math.PI]}>
-          <coneGeometry args={[0.065, 0.16, 8]} />
-          <meshStandardMaterial
-            color="#ef4444"
-            emissive="#dc2626"
-            emissiveIntensity={0.35 + 0.6 * s}
-          />
-        </mesh>
-      </group>
-      {/* Surface: eddy reinforces +Z (two radial positions) */}
-      {[
-        [0.86, 0, 0.25],
-        [-0.86, 0, 0.25],
-      ].map(([x, y, z], i) => (
-        <group key={i} position={[x, y, z]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.22]}>
-            <cylinderGeometry args={[0.022, 0.022, 0.36, 6]} />
-            <meshStandardMaterial
-              color="#f87171"
-              emissive="#b91c1c"
-              emissiveIntensity={0.2 + 0.45 * s}
-            />
-          </mesh>
-          <mesh position={[0, 0, 0.45]} rotation={[Math.PI / 2, 0, 0]}>
-            <coneGeometry args={[0.055, 0.13, 8]} />
-            <meshStandardMaterial
-              color="#f87171"
-              emissive="#ef4444"
-              emissiveIntensity={0.3 + 0.5 * s}
-            />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
-
-function ElectromagneticOverlay({ frequencyHz, deltaOverRadius }) {
-  const eddyStrength = useMemo(() => {
-    if (deltaOverRadius != null && Number.isFinite(deltaOverRadius)) {
-      return Math.max(0.15, Math.min(1, 2.2 / Math.max(0.06, deltaOverRadius)));
-    }
-    if (frequencyHz < 0.5) return 0.2;
-    return Math.max(0.2, Math.min(1, frequencyHz / 120_000));
-  }, [deltaOverRadius, frequencyHz]);
-
-  const mainStrength = useMemo(() => {
-    if (frequencyHz < 0.5) return 0.85;
-    return Math.max(0.5, 1 - eddyStrength * 0.35);
-  }, [frequencyHz, eddyStrength]);
-
-  const fluxStrength = useMemo(
-    () => Math.max(0.2, Math.min(1, 0.25 + eddyStrength * 0.85)),
-    [eddyStrength],
-  );
-
-  return (
-    <group>
-      <FluxRings strength={fluxStrength} />
-      <MainCurrentArrows strength={mainStrength} />
-      <EddyCurrentField strength={eddyStrength} />
-    </group>
-  );
 }
 
 function CarrierInstances({ particles }) {
@@ -272,7 +66,7 @@ function CarrierInstances({ particles }) {
   );
 }
 
-function SceneRig({ modelUrl, particles, orbitRef, frequencyHz, deltaOverRadius }) {
+function SceneRig({ modelUrl, particles, orbitRef, visualization }) {
   return (
     <>
       <color attach="background" args={["#0b1220"]} />
@@ -298,10 +92,7 @@ function SceneRig({ modelUrl, particles, orbitRef, frequencyHz, deltaOverRadius 
         ) : (
           <FallbackWire />
         )}
-        <ElectromagneticOverlay
-          frequencyHz={frequencyHz}
-          deltaOverRadius={deltaOverRadius}
-        />
+        <ElectromagneticFieldMeshes visualization={visualization} />
         <CarrierInstances particles={particles} />
       </group>
 
@@ -366,6 +157,7 @@ export default function SkinEffectWidget({ apiData }) {
   const [computed, setComputed] = useState(null);
   const [particleError, setParticleError] = useState(null);
   const [loadingParticles, setLoadingParticles] = useState(false);
+  const [serverVisualization, setServerVisualization] = useState(null);
   const orbitRef = useRef(null);
   const debounceRef = useRef(null);
 
@@ -414,12 +206,16 @@ export default function SkinEffectWidget({ apiData }) {
         });
         setParticles(res.data?.particles ?? []);
         setComputed(res.data?.computed ?? null);
+        setServerVisualization(res.data?.visualization ?? null);
       } catch (e) {
         setParticleError(
-          e?.response?.data?.detail || e?.message || "particle request failed",
+          e?.response?.data?.detail ||
+            e?.message ||
+            "\uc694\uccad \uc2e4\ud328 (\ub124\ud2b8\uc6cc\ud06c/\uc11c\ubc84 \ud655\uc778)",
         );
         setParticles([]);
         setComputed(null);
+        setServerVisualization(null);
       } finally {
         setLoadingParticles(false);
       }
@@ -455,6 +251,16 @@ export default function SkinEffectWidget({ apiData }) {
     computed?.delta_over_radius != null
       ? computed.delta_over_radius.toFixed(3)
       : "—";
+
+  const visualization = useMemo(
+    () =>
+      serverVisualization ??
+      fallbackVisualization(
+        frequency,
+        computed?.delta_over_radius ?? null,
+      ),
+    [serverVisualization, frequency, computed?.delta_over_radius],
+  );
 
   const card = {
     padding: "12px 16px",
@@ -534,8 +340,7 @@ export default function SkinEffectWidget({ apiData }) {
                   modelUrl={validatedModelUrl}
                   particles={particles}
                   orbitRef={orbitRef}
-                  frequencyHz={frequency}
-                  deltaOverRadius={computed?.delta_over_radius ?? null}
+                  visualization={visualization}
                 />
               </Suspense>
             </Canvas>
@@ -568,7 +373,7 @@ export default function SkinEffectWidget({ apiData }) {
               <div>
                 <span style={{ color: "#60a5fa", fontWeight: 700 }}>●</span>{" "}
                 <span style={{ color: "#60a5fa" }}>자속</span>{" "}
-                {"(\ub2e8\uba74 \ub0b4 \uace0\ub9ac)"}
+                {"(\ud30c\ub780 \ud1a0\ub7ec\uc2a4, \ub3c4\uccb4 \ubc16)"}
               </div>
               <div>
                 <span style={{ color: "#f87171", fontWeight: 700 }}>●</span>{" "}
@@ -596,7 +401,7 @@ export default function SkinEffectWidget({ apiData }) {
               계산 결과 (Python)
             </div>
             <div>
-              Skin depth{" "}
+              {"\uce68\ud22c \uae4a\uc774 "}
               <span style={{ fontStyle: "italic" }}>&#948;</span>
               {": "}
               <strong style={{ color: "#f8fafc" }}>{skinMm}</strong> mm
@@ -607,8 +412,8 @@ export default function SkinEffectWidget({ apiData }) {
             </div>
             <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
               {loadingParticles
-                ? "Recalculating…"
-                : "Move the slider; the backend resamples the cross-section."}
+                ? "\uc7ac\uacc4\uc0b0 \uc911\u2026"
+                : "\uc2ac\ub77c\uc774\ub354\ub97c \uc6c0\uc9c1\uc774\uba74 \ubc31\uc5d4\ub4dc\uac00 \ub2e8\uba74\uacfc \uc7a5\uc744 \ub2e4\uc2dc \uacc4\uc0b0\ud569\ub2c8\ub2e4."}
             </div>
             {particleError ? (
               <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>
@@ -664,7 +469,7 @@ export default function SkinEffectWidget({ apiData }) {
                   fontSize: 12,
                 }}
               >
-                DC (0 Hz)
+                {"\uc9c1\ub958 (0 Hz)"}
               </button>
               <button
                 type="button"
@@ -724,7 +529,8 @@ export default function SkinEffectWidget({ apiData }) {
               marginBottom: 4,
             }}
           >
-            {apiData?.title || "Skin effect"}
+            {apiData?.title ||
+              "\ud45c\ud53c \ud6a8\uacfc"}
           </div>
           {apiData?.subtitle ? (
             <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
