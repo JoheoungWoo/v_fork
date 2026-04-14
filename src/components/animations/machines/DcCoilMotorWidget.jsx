@@ -41,7 +41,7 @@ const C = {
   sBlue: "#3b8bd4",
   coil: "#d4900a",
   force: "#4caf50",
-  field: "#00d4ff", // 밝은 하늘색
+  field: "#7ef3ff", // 강한 네온 시안
 };
 
 // ─── 자석 치수 ────────────────────────────────────────────────────────────
@@ -71,18 +71,45 @@ function FieldTube({ x, z }) {
       new THREE.Vector3(x, 0, z),
       new THREE.Vector3(x, -INNER_Y, z),
     ]);
-    return new THREE.TubeGeometry(curve, 12, 0.04, 8, false);
+    return new THREE.TubeGeometry(curve, 24, 0.065, 10, false);
   }, [x, z]);
 
   return (
-    <group>
+    <group renderOrder={900}>
       <mesh geometry={geo}>
-        <meshBasicMaterial color={C.field} />
+        <meshBasicMaterial
+          color={C.field}
+          transparent
+          opacity={0.98}
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh geometry={geo}>
+        <meshBasicMaterial
+          color="#dfffff"
+          transparent
+          opacity={0.85}
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
       </mesh>
       {/* 화살촉 — 중간(Y=0)에서 아래(-Y) 방향 */}
       <mesh position={[x, 0, z]} rotation={[Math.PI, 0, 0]}>
         <coneGeometry args={[0.09, 0.28, 8]} />
-        <meshBasicMaterial color={C.field} />
+        <meshBasicMaterial
+          color={C.field}
+          transparent
+          opacity={1}
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
       </mesh>
     </group>
   );
