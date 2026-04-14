@@ -21,7 +21,7 @@ function RotatingCoil({ url, omegaRad, rotDir, axis = "y" }) {
 
   useFrame((_, dt) => {
     const ax = ["x", "y", "z"].includes(axis) ? axis : "y";
-    angleRef.current += omegaRad * rotDir * dt;
+    angleRef.current -= omegaRad * rotDir * dt;
     scene.rotation[ax] = angleRef.current;
   });
 
@@ -40,8 +40,8 @@ export default function DcCoilMotorWidget({ apiData }) {
   const [showN, setShowN] = useState(true);
   const [showS, setShowS] = useState(true);
   const [showCoil, setShowCoil] = useState(true);
-  const [nX, setNX] = useState(0.72);
-  const [sX, setSX] = useState(-0.72);
+  const [nX, setNX] = useState(1.35);
+  const [sX, setSX] = useState(-1.35);
 
   const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
   const nGlbUrl = apiData?.n_model_url ?? "/models/dc_magnet_n.glb";

@@ -37,7 +37,13 @@ async function exportScene(scene, filename) {
 
 function buildCoilScene() {
   const scene = new THREE.Scene();
-  const matCu = new THREE.MeshStandardMaterial({ color: "#b87333", metalness: 0.85, roughness: 0.22 });
+  const matCu = new THREE.MeshStandardMaterial({
+    color: "#f2b567",
+    metalness: 0.78,
+    roughness: 0.18,
+    emissive: "#6a3d12",
+    emissiveIntensity: 0.45,
+  });
   const matShaft = new THREE.MeshStandardMaterial({ color: "#a7a7a7", metalness: 0.95, roughness: 0.2 });
   const root = new THREE.Group();
   root.name = "Motor_Coil_Root";
