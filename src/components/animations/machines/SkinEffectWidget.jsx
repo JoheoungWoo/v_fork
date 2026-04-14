@@ -1,5 +1,5 @@
-import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Environment, Line, OrbitControls, useGLTF } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
 import {
   Suspense,
   useCallback,
@@ -26,6 +26,216 @@ function SkinWireGLB({ url }) {
   const { scene } = useGLTF(url);
   const root = useMemo(() => scene.clone(true), [scene]);
   return <primitive object={root} />;
+}
+
+/** XY plane circle for magnetic flux (B encircles axial current). */
+function circleXYPoints(radius, z, segments = 72) {
+  const pts = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = (i / segments) * Math.PI * 2;
+    pts.push(
+      new THREE.Vector3(
+        radius * Math.cos(t),
+        radius * Math.sin(t),
+        z,
+      ),
+    );
+  }
+  return pts;
+}
+
+/** Vertical circle in XZ plane (y=0): eddy loop plane. */
+function circleXZPoints(radius, segments = 64) {
+  const pts = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = (i / segments) * Math.PI * 2;
+    pts.push(
+      new THREE.Vector3(radius * Math.cos(t), 0, radius * Math.sin(t)),
+    );
+  }
+  return pts;
+}
+
+/** Vertical circle in YZ plane (x=0). */
+function circleYZPoints(radius, segments = 64) {
+  const pts = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = (i / segments) * Math.PI * 2;
+    pts.push(
+      new THREE.Vector3(0, radius * Math.cos(t), radius * Math.sin(t)),
+    );
+  }
+  return pts;
+}
+
+function MainCurrentArrows({ strength }) {
+  const s = Math.max(0.2, Math.min(1, strength));
+  const n = 5;
+  const r = 0.38;
+  return (
+    <group name="main_current_I">
+      {Array.from({ length: n }, (_, i) => {
+        const a = (i / n) * Math.PI * 2;
+        const x = Math.cos(a) * r;
+        const y = Math.sin(a) * r;
+        return (
+          <group key={i} position={[x, y, 0]}>
+            <mesh
+              castShadow
+              position={[0, 0, 0.55]}
+              rotation={[Math.PI / 2, 0, 0]}
+            >
+              <cylinderGeometry args={[0.038, 0.038, 1.05, 8]} />
+              <meshStandardMaterial
+                color="#facc15"
+                emissive="#ca8a04"
+                emissiveIntensity={0.35 + 0.45 * s}
+                metalness={0.2}
+                roughness={0.45}
+              />
+            </mesh>
+            <mesh
+              position={[0, 0, 1.12]}
+              rotation={[Math.PI / 2, 0, 0]}
+            >
+              <coneGeometry args={[0.085, 0.22, 10]} />
+              <meshStandardMaterial
+                color="#facc15"
+                emissive="#eab308"
+                emissiveIntensity={0.5 + 0.5 * s}
+                metalness={0.15}
+                roughness={0.4}
+              />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function FluxRings({ strength }) {
+  const ref = useRef(null);
+  const s = Math.max(0.15, Math.min(1, strength));
+  useFrame((_, dt) => {
+    if (ref.current) ref.current.rotation.z += dt * (0.12 + 0.35 * s);
+  });
+  const radii = [0.52, 0.62, 0.72];
+  const zs = [-0.55, 0, 0.55];
+  const lines = [];
+  for (const z of zs) {
+    for (const rad of radii) {
+      lines.push({ points: circleXYPoints(rad, z), key: `${z}-${rad}` });
+    }
+  }
+  return (
+    <group ref={ref} name="magnetic_flux_phi">
+      {lines.map(({ points, key }) => (
+        <Line
+          key={key}
+          points={points}
+          color="#60a5fa"
+          lineWidth={2}
+          transparent
+          opacity={0.35 + 0.45 * s}
+        />
+      ))}
+    </group>
+  );
+}
+
+function EddyCurrentField({ strength }) {
+  const s = Math.max(0.12, Math.min(1, strength));
+  const rLoop = 0.76;
+  return (
+    <group name="eddy_current">
+      <Line
+        points={circleXZPoints(rLoop)}
+        color="#f87171"
+        lineWidth={2}
+        transparent
+        opacity={0.45 + 0.4 * s}
+      />
+      <Line
+        points={circleYZPoints(rLoop)}
+        color="#f87171"
+        lineWidth={2}
+        transparent
+        opacity={0.35 + 0.35 * s}
+      />
+      {/* Center: induced field opposes main current (-Z) */}
+      <group position={[0, 0, -0.05]}>
+        <mesh rotation={[Math.PI / 2, 0, Math.PI]}>
+          <cylinderGeometry args={[0.028, 0.028, 0.42, 8]} />
+          <meshStandardMaterial
+            color="#ef4444"
+            emissive="#991b1b"
+            emissiveIntensity={0.25 + 0.55 * s}
+          />
+        </mesh>
+        <mesh position={[0, 0, -0.32]} rotation={[Math.PI / 2, 0, Math.PI]}>
+          <coneGeometry args={[0.065, 0.16, 8]} />
+          <meshStandardMaterial
+            color="#ef4444"
+            emissive="#dc2626"
+            emissiveIntensity={0.35 + 0.6 * s}
+          />
+        </mesh>
+      </group>
+      {/* Surface: eddy reinforces +Z (two radial positions) */}
+      {[
+        [0.86, 0, 0.25],
+        [-0.86, 0, 0.25],
+      ].map(([x, y, z], i) => (
+        <group key={i} position={[x, y, z]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.22]}>
+            <cylinderGeometry args={[0.022, 0.022, 0.36, 6]} />
+            <meshStandardMaterial
+              color="#f87171"
+              emissive="#b91c1c"
+              emissiveIntensity={0.2 + 0.45 * s}
+            />
+          </mesh>
+          <mesh position={[0, 0, 0.45]} rotation={[Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.055, 0.13, 8]} />
+            <meshStandardMaterial
+              color="#f87171"
+              emissive="#ef4444"
+              emissiveIntensity={0.3 + 0.5 * s}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function ElectromagneticOverlay({ frequencyHz, deltaOverRadius }) {
+  const eddyStrength = useMemo(() => {
+    if (deltaOverRadius != null && Number.isFinite(deltaOverRadius)) {
+      return Math.max(0.15, Math.min(1, 2.2 / Math.max(0.06, deltaOverRadius)));
+    }
+    if (frequencyHz < 0.5) return 0.2;
+    return Math.max(0.2, Math.min(1, frequencyHz / 120_000));
+  }, [deltaOverRadius, frequencyHz]);
+
+  const mainStrength = useMemo(() => {
+    if (frequencyHz < 0.5) return 0.85;
+    return Math.max(0.5, 1 - eddyStrength * 0.35);
+  }, [frequencyHz, eddyStrength]);
+
+  const fluxStrength = useMemo(
+    () => Math.max(0.2, Math.min(1, 0.25 + eddyStrength * 0.85)),
+    [eddyStrength],
+  );
+
+  return (
+    <group>
+      <FluxRings strength={fluxStrength} />
+      <MainCurrentArrows strength={mainStrength} />
+      <EddyCurrentField strength={eddyStrength} />
+    </group>
+  );
 }
 
 function CarrierInstances({ particles }) {
@@ -62,7 +272,7 @@ function CarrierInstances({ particles }) {
   );
 }
 
-function SceneRig({ modelUrl, particles, orbitRef }) {
+function SceneRig({ modelUrl, particles, orbitRef, frequencyHz, deltaOverRadius }) {
   return (
     <>
       <color attach="background" args={["#0b1220"]} />
@@ -88,6 +298,10 @@ function SceneRig({ modelUrl, particles, orbitRef }) {
         ) : (
           <FallbackWire />
         )}
+        <ElectromagneticOverlay
+          frequencyHz={frequencyHz}
+          deltaOverRadius={deltaOverRadius}
+        />
         <CarrierInstances particles={particles} />
       </group>
 
@@ -301,6 +515,7 @@ export default function SkinEffectWidget({ apiData }) {
         >
           <div
             style={{
+              position: "relative",
               width: "100%",
               height: 400,
               minHeight: 320,
@@ -319,9 +534,53 @@ export default function SkinEffectWidget({ apiData }) {
                   modelUrl={validatedModelUrl}
                   particles={particles}
                   orbitRef={orbitRef}
+                  frequencyHz={frequency}
+                  deltaOverRadius={computed?.delta_over_radius ?? null}
                 />
               </Suspense>
             </Canvas>
+            <div
+              style={{
+                position: "absolute",
+                top: 10,
+                right: 10,
+                zIndex: 2,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(15, 23, 42, 0.88)",
+                border: "1px solid rgba(148, 163, 184, 0.35)",
+                fontSize: 11,
+                lineHeight: 1.55,
+                color: "#e2e8f0",
+                fontFamily: "system-ui, sans-serif",
+                maxWidth: 200,
+                pointerEvents: "none",
+              }}
+            >
+              <div style={{ fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>
+                3D 표시
+              </div>
+              <div>
+                <span style={{ color: "#facc15", fontWeight: 700 }}>●</span>{" "}
+                <span style={{ color: "#facc15" }}>전류</span> (+Z{" "}
+                {"\ucd95 \ubc29\ud5a5"})
+              </div>
+              <div>
+                <span style={{ color: "#60a5fa", fontWeight: 700 }}>●</span>{" "}
+                <span style={{ color: "#60a5fa" }}>자속</span>{" "}
+                {"(\ub2e8\uba74 \ub0b4 \uace0\ub9ac)"}
+              </div>
+              <div>
+                <span style={{ color: "#f87171", fontWeight: 700 }}>●</span>{" "}
+                <span style={{ color: "#f87171" }}>와전류</span>{" "}
+                {"(\uc911\uc2ec \u2212Z, \ud45c\uba74 +Z)"}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: "#64748b" }}>
+                {
+                  "\uc785\uc790 \ubc00\ub3c4\ub294 \uc0d8\ud50c(\ubc31\uc5d4\ub4dc)\uc785\ub2c8\ub2e4."
+                }
+              </div>
+            </div>
           </div>
 
           <div style={card}>
