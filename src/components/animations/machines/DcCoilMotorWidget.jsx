@@ -145,6 +145,7 @@ function DcMotorGLB({ url, coilName, spinAxis, angle, currentStrength, fieldStre
 
 function SceneRig(props) {
   const { modelUrl, showFieldLines, fieldStrength, orbitRef } = props;
+  const canLoadModel = typeof modelUrl === "string" && modelUrl.length > 0;
   return (
     <>
       <color attach="background" args={["#0d0f14"]} />
@@ -155,7 +156,7 @@ function SceneRig(props) {
       <pointLight position={[-3, 0, 0]} intensity={0.35 + fieldStrength * 0.35} color="#3b8bd4" distance={8} />
       <Environment preset="city" />
       <FluxFieldLines visible={showFieldLines} fieldStrength={fieldStrength} />
-      <Suspense fallback={null}>{modelUrl ? <DcMotorGLB {...props} /> : null}</Suspense>
+      <Suspense fallback={null}>{canLoadModel ? <DcMotorGLB {...props} /> : null}</Suspense>
       <ForceVectors angle={props.angle} currentStrength={props.currentStrength} fieldStrength={props.fieldStrength} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow>
         <planeGeometry args={[30, 30]} />
@@ -170,6 +171,10 @@ export default function DcCoilMotorWidget({ apiData }) {
   const defaults = apiData?.defaults ?? {};
   const pc = apiData?.physics_constants ?? {};
   const modelUrlRaw = apiData?.model_url ?? "/models/dc_coil_motor.glb";
+  const modelUrlSafe =
+    typeof modelUrlRaw === "string" && modelUrlRaw.length > 0
+      ? modelUrlRaw
+      : "/models/dc_coil_motor.glb";
   const coilName = apiData?.coil_object_name ?? "Motor_Coil_Root";
   const spinAxis = apiData?.rotation_axis ?? "z";
   const omegaPath = apiData?.omega_api_path ?? "/api/machine/dc_coil_motor/omega";
@@ -198,13 +203,16 @@ export default function DcCoilMotorWidget({ apiData }) {
 
   useEffect(() => {
     let cancelled = false;
-    const base = modelUrlRaw.startsWith("http") ? modelUrlRaw : `${window.location.origin}${modelUrlRaw}`;
+    const base = modelUrlSafe.startsWith("http")
+      ? modelUrlSafe
+      : `${window.location.origin}${modelUrlSafe}`;
     (async () => {
       try {
         const res = await fetch(base);
+        if (!res.ok) throw new Error(`model fetch failed: ${res.status}`);
         const buf = await res.arrayBuffer();
         if (!isBinaryGlb(buf)) throw new Error("not glb");
-        if (!cancelled) setValidatedModelUrl(modelUrlRaw);
+        if (!cancelled) setValidatedModelUrl(modelUrlSafe);
       } catch {
         if (!cancelled) setValidatedModelUrl(null);
       }
@@ -212,10 +220,12 @@ export default function DcCoilMotorWidget({ apiData }) {
     return () => {
       cancelled = true;
     };
-  }, [modelUrlRaw]);
+  }, [modelUrlSafe]);
 
   useEffect(() => {
-    if (validatedModelUrl) useGLTF.preload(validatedModelUrl);
+    if (typeof validatedModelUrl === "string" && validatedModelUrl.length > 0) {
+      useGLTF.preload(validatedModelUrl);
+    }
   }, [validatedModelUrl]);
 
   const fetchOmega = useCallback(async () => {
