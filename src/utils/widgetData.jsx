@@ -183,6 +183,16 @@ const WIDGET_MAP = {
       })),
     ),
   ],
+  /** Skin effect 3D — backend handler machine_skin_effect */
+  skin_effect_ac: [
+    lazy(() =>
+      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
+        default: function SkinEffectFromApiPage() {
+          return <m.default widgetHandlerId="machine_skin_effect" />;
+        },
+      })),
+    ),
+  ],
   "2_induction_motor": [
     lazy(() => import("@/components/animations/machines/EMInductionWidget")),
   ],
