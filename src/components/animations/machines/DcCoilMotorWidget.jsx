@@ -1,24 +1,29 @@
 /**
- * DcCoilMotorWidget.jsx  v4
+ * DcCoilMotorWidget.jsx  v5
  *
  * 핵심 수정:
- *  1. 자기력선: <line> primitive → @react-three/drei <Line> 컴포넌트
- *     (lineBasicMaterial은 WebGL에서 두께/색상이 무시되는 경우 있음)
- *     → Line color="#00d4ff" lineWidth={2} 로 밝은 하늘색 확실히 표시
- *  2. Wire 컴포넌트: THREE.Vector3 생성 방식 수정
- *     (스프레드 연산자 대신 명시적 인자)
- *  3. 회전 방향: omegaData.rotation_direction (백엔드) 적용
- *  4. 화살촉: 자기력선 중간에 cone으로 N→S 방향 표시
+ *  1. 자기력선 → drei <Line> 대신 TubeGeometry 사용
+ *     (Vercel/WebGL 환경에서 lineWidth가 무시되는 문제 완전 해결)
+ *     얇은 원통(tube)으로 만들어 색상 100% 표시
+ *
+ *  2. 코일 배치 + 회전축 수정
+ *     - 이전: 코일이 XY 평면에 있고 Z축 회전 → 자석 방향과 맞지 않아 엉뚱하게 회전
+ *     - 수정: 코일을 XZ 평면에 배치(실제 DC 모터처럼 자기장 B가 X축일 때)
+ *             Y축 중심으로 회전(rotation_axis: "y")
+ *             자석은 위아래(Y축), 코일은 가운데서 Y축 회전
+ *
+ *  3. 회전 방향: omegaData.rotation_direction(백엔드) × dt 그대로 적용
  */
 
 import apiClient from "@/api/core/apiClient";
-import { Line, OrbitControls, Text, useGLTF } from "@react-three/drei";
+import { OrbitControls, Text, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import {
   Component,
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -35,99 +40,115 @@ const C = {
   sBlue: "#3b8bd4",
   coil: "#d4900a",
   force: "#4caf50",
-  field: "#00d4ff", // ★ 밝은 하늘색
+  field: "#00d4ff", // 밝은 하늘색
 };
 
-// ─── 자석·코일 치수 ───────────────────────────────────────────────────────
-const MX = 2.4; // 자석 중심 X
-const MT = 0.7; // 자석 두께
-const IX = MX - MT / 2; // 자석 내면 X ≈ 2.05
-const CW = 2.2; // 코일 폭 (X)
-const CH = 1.8; // 코일 높이 (Y)
+// ─── 자석 치수 ────────────────────────────────────────────────────────────
+// 자석: 위(N, +Y) / 아래(S, -Y) 배치 — 실제 DC 모터 단면도 방향
+// 코일은 XZ 평면에서 Y축 중심으로 회전
+const MY = 2.2; // 자석 중심 Y 위치
+const MW = 3.2; // 자석 X 방향 폭
+const MD = 2.8; // 자석 Z 방향 깊이
+const MT = 0.7; // 자석 Y 방향 두께
+const INNER_Y = MY - MT / 2; // 자석 내면 Y ≈ 1.85
+
+// ─── 코일 치수 (XZ 평면) ──────────────────────────────────────────────────
+const CW = 1.8; // X 방향 폭 (active 변 — B와 수직)
+const CD = 0.05; // Z 방향 깊이 (passive 변 — 얇게)
 const CR = 0.07; // 전선 반지름
 
-// ─── 원통 전선 ────────────────────────────────────────────────────────────
-function Wire({ x1, y1, z1, x2, y2, z2, r = CR, color = C.coil }) {
-  const from = new THREE.Vector3(x1, y1, z1);
-  const to = new THREE.Vector3(x2, y2, z2);
-  const dir = new THREE.Vector3().subVectors(to, from);
-  const len = dir.length();
-  const mid = from.clone().addScaledVector(dir.clone().normalize(), len / 2);
-  const quat = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    dir.clone().normalize(),
-  );
-  return (
-    <mesh position={[mid.x, mid.y, mid.z]} quaternion={quat} castShadow>
-      <cylinderGeometry args={[r, r, len, 12]} />
-      <meshStandardMaterial color={color} metalness={0.9} roughness={0.12} />
-    </mesh>
-  );
-}
-
-// ─── 자기력선 1행 ─────────────────────────────────────────────────────────
+// ─── Tube 형태 자기력선 ───────────────────────────────────────────────────
 /**
- * drei <Line> 사용 → color/lineWidth 100% 반영됨
- * N극(+IX) → S극(−IX) 방향
+ * TubeGeometry로 만든 자기력선
+ * WebGL lineWidth 제한을 우회 — 완전한 색상/굵기 표현
+ * 방향: N(+Y) → S(-Y)
  */
-function FieldLine({ y, z }) {
-  // N→S 방향으로 3단계 포인트 (화살촉 위치 계산용)
-  const pts = [
-    new THREE.Vector3(IX, y, z),
-    new THREE.Vector3(IX * 0.5, y, z),
-    new THREE.Vector3(0, y, z),
-    new THREE.Vector3(-IX * 0.5, y, z),
-    new THREE.Vector3(-IX, y, z),
-  ];
+function FieldTube({ x, z }) {
+  const geo = useMemo(() => {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(x, INNER_Y, z),
+      new THREE.Vector3(x, 0, z),
+      new THREE.Vector3(x, -INNER_Y, z),
+    ]);
+    return new THREE.TubeGeometry(curve, 12, 0.022, 6, false);
+  }, [x, z]);
 
   return (
     <group>
-      {/* ★ drei Line — color/lineWidth 확실히 동작 */}
-      <Line
-        points={pts}
-        color={C.field}
-        lineWidth={2}
-        transparent
-        opacity={0.9}
-      />
-      {/* 화살촉 — 중간 지점에서 −X 방향 */}
-      <mesh position={[0, y, z]} rotation={[0, 0, Math.PI / 2]}>
-        <coneGeometry args={[0.06, 0.2, 8]} />
+      <mesh geometry={geo}>
+        <meshBasicMaterial color={C.field} transparent opacity={0.9} />
+      </mesh>
+      {/* 화살촉 — 중간(Y=0)에서 아래(-Y) 방향 */}
+      <mesh position={[x, 0, z]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[0.07, 0.22, 8]} />
         <meshBasicMaterial color={C.field} />
       </mesh>
     </group>
   );
 }
 
+// ─── 원통 전선 헬퍼 ───────────────────────────────────────────────────────
+function Wire({ from, to, r = CR, color = C.coil }) {
+  const [fx, fy, fz] = from;
+  const [tx, ty, tz] = to;
+  const f = new THREE.Vector3(fx, fy, fz);
+  const t = new THREE.Vector3(tx, ty, tz);
+  const dir = new THREE.Vector3().subVectors(t, f);
+  const len = dir.length();
+  const mid = f.clone().addScaledVector(dir.clone().normalize(), len / 2);
+  const q = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    dir.clone().normalize(),
+  );
+  return (
+    <mesh position={[mid.x, mid.y, mid.z]} quaternion={q} castShadow>
+      <cylinderGeometry args={[r, r, len, 12]} />
+      <meshStandardMaterial color={color} metalness={0.9} roughness={0.12} />
+    </mesh>
+  );
+}
+
 // ─── 절차적 모터 씬 ───────────────────────────────────────────────────────
-function ProceduralMotor({ omegaRad, rotDir, rotAxis }) {
+/**
+ * 좌표계 정의 (플레밍의 왼손 법칙):
+ *   B 방향: N(+Y) → S(-Y), 즉 -Y
+ *   코일 active 변: X 방향 (전류 흐름)
+ *   힘 F = I(+X) × B(-Y) = +Z 방향 → 코일이 Y축 중심으로 회전
+ *
+ * 코일은 XZ 평면에 배치, Y축 중심으로 회전
+ */
+function ProceduralMotor({ omegaRad, rotDir }) {
   const coilRef = useRef();
   const angleRef = useRef(0);
 
   useFrame((_, dt) => {
-    // ★ 백엔드 rotation_direction 반영
     angleRef.current += omegaRad * rotDir * dt;
-    if (!coilRef.current) return;
-    if (rotAxis === "x") coilRef.current.rotation.x = angleRef.current;
-    else if (rotAxis === "y") coilRef.current.rotation.y = angleRef.current;
-    else coilRef.current.rotation.z = angleRef.current;
+    if (coilRef.current) {
+      coilRef.current.rotation.y = angleRef.current;
+    }
   });
+
+  // 코일: XZ 평면 사각형
+  // active 변: (-CW/2, 0, 0) ~ (CW/2, 0, 0) — X 방향 (B와 수직 → 힘 발생)
+  // passive 변: 앞/뒤 Z 방향 (얇게 표현)
+  const HALF = CW / 2;
+  const DEPTH = 1.2; // Z 방향 깊이 (교육용으로 적당히)
 
   return (
     <group>
-      {/* ── N극 (오른쪽 +X) ── */}
-      <group position={[MX, 0, 0]}>
+      {/* ── N극 자석 (위 +Y) ── */}
+      <group position={[0, MY, 0]}>
         <mesh castShadow>
-          <boxGeometry args={[MT, 2.4, 3.2]} />
+          <boxGeometry args={[MW, MT, MD]} />
           <meshStandardMaterial
             color={C.nRed}
             metalness={0.4}
             roughness={0.3}
           />
         </mesh>
-        {/* 극면 발광 */}
-        <mesh position={[-(MT / 2 + 0.04), 0, 0]}>
-          <boxGeometry args={[0.06, 2.2, 3.0]} />
+        {/* 극면 발광 (아래쪽) */}
+        <mesh position={[0, -(MT / 2 + 0.04), 0]}>
+          <boxGeometry args={[MW - 0.2, 0.06, MD - 0.2]} />
           <meshStandardMaterial
             color="#ff6644"
             emissive="#ff2200"
@@ -135,9 +156,9 @@ function ProceduralMotor({ omegaRad, rotDir, rotAxis }) {
           />
         </mesh>
         <Text
-          position={[MT / 2 + 0.12, 0, 0]}
-          rotation={[0, -Math.PI / 2, 0]}
-          fontSize={0.75}
+          position={[0, MT / 2 + 0.1, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.7}
           color="#fff"
           anchorX="center"
           anchorY="middle"
@@ -146,18 +167,18 @@ function ProceduralMotor({ omegaRad, rotDir, rotAxis }) {
         </Text>
       </group>
 
-      {/* ── S극 (왼쪽 −X) ── */}
-      <group position={[-MX, 0, 0]}>
+      {/* ── S극 자석 (아래 -Y) ── */}
+      <group position={[0, -MY, 0]}>
         <mesh castShadow>
-          <boxGeometry args={[MT, 2.4, 3.2]} />
+          <boxGeometry args={[MW, MT, MD]} />
           <meshStandardMaterial
             color={C.sBlue}
             metalness={0.4}
             roughness={0.3}
           />
         </mesh>
-        <mesh position={[MT / 2 + 0.04, 0, 0]}>
-          <boxGeometry args={[0.06, 2.2, 3.0]} />
+        <mesh position={[0, MT / 2 + 0.04, 0]}>
+          <boxGeometry args={[MW - 0.2, 0.06, MD - 0.2]} />
           <meshStandardMaterial
             color="#5599ff"
             emissive="#1144cc"
@@ -165,9 +186,9 @@ function ProceduralMotor({ omegaRad, rotDir, rotAxis }) {
           />
         </mesh>
         <Text
-          position={[-(MT / 2 + 0.12), 0, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-          fontSize={0.75}
+          position={[0, -(MT / 2 + 0.1), 0]}
+          rotation={[Math.PI / 2, 0, 0]}
+          fontSize={0.7}
           color="#fff"
           anchorX="center"
           anchorY="middle"
@@ -176,46 +197,32 @@ function ProceduralMotor({ omegaRad, rotDir, rotAxis }) {
         </Text>
       </group>
 
-      {/* ── 자기력선 — ★ drei <Line> 사용, 밝은 하늘색 ── */}
-      {[-0.65, 0, 0.65].map((z) =>
-        [-0.6, 0, 0.6].map((y) => (
-          <FieldLine key={`f-${z}-${y}`} y={y} z={z} />
+      {/* ── 자기력선 (N→S, Y축) — TubeGeometry 사용 ── */}
+      {[-0.8, -0.3, 0, 0.3, 0.8].map((x) =>
+        [-0.7, 0, 0.7].map((z) => (
+          <FieldTube key={`f-${x}-${z}`} x={x} z={z} />
         )),
       )}
 
-      {/* ── 사각형 코일 (Z축 회전 피벗) ── */}
+      {/* ── 사각형 코일 (XZ 평면, Y축 회전) ── */}
       <group ref={coilRef}>
-        {/* 상변 */}
-        <Wire x1={-CW / 2} y1={CH / 2} z1={0} x2={CW / 2} y2={CH / 2} z2={0} />
-        {/* 하변 */}
-        <Wire
-          x1={-CW / 2}
-          y1={-CH / 2}
-          z1={0}
-          x2={CW / 2}
-          y2={-CH / 2}
-          z2={0}
-        />
-        {/* 좌변 */}
-        <Wire
-          x1={-CW / 2}
-          y1={-CH / 2}
-          z1={0}
-          x2={-CW / 2}
-          y2={CH / 2}
-          z2={0}
-        />
-        {/* 우변 */}
-        <Wire x1={CW / 2} y1={-CH / 2} z1={0} x2={CW / 2} y2={CH / 2} z2={0} />
+        {/* active 변 — 앞(+Z) */}
+        <Wire from={[-HALF, 0, DEPTH / 2]} to={[HALF, 0, DEPTH / 2]} />
+        {/* active 변 — 뒤(-Z) */}
+        <Wire from={[-HALF, 0, -DEPTH / 2]} to={[HALF, 0, -DEPTH / 2]} />
+        {/* passive 변 — 오른쪽 */}
+        <Wire from={[HALF, 0, -DEPTH / 2]} to={[HALF, 0, DEPTH / 2]} />
+        {/* passive 변 — 왼쪽 */}
+        <Wire from={[-HALF, 0, -DEPTH / 2]} to={[-HALF, 0, DEPTH / 2]} />
 
         {/* 코너 구 */}
         {[
-          [-CW / 2, CH / 2],
-          [CW / 2, CH / 2],
-          [-CW / 2, -CH / 2],
-          [CW / 2, -CH / 2],
-        ].map(([x, y], i) => (
-          <mesh key={i} position={[x, y, 0]}>
+          [-HALF, DEPTH / 2],
+          [HALF, DEPTH / 2],
+          [-HALF, -DEPTH / 2],
+          [HALF, -DEPTH / 2],
+        ].map(([x, z], i) => (
+          <mesh key={i} position={[x, 0, z]}>
             <sphereGeometry args={[CR * 1.3, 10, 10]} />
             <meshStandardMaterial
               color={C.coil}
@@ -225,22 +232,18 @@ function ProceduralMotor({ omegaRad, rotDir, rotAxis }) {
           </mesh>
         ))}
 
-        {/* 회전축 — Z 방향 */}
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.055, 0.055, 5.5, 12]} />
+        {/* 회전축 — Y 방향 */}
+        <mesh>
+          <cylinderGeometry args={[0.055, 0.055, MY * 2 + 0.6, 12]} />
           <meshStandardMaterial color="#aaa" metalness={0.9} roughness={0.2} />
         </mesh>
 
-        {/* 정류자 반환 */}
+        {/* 정류자 (Y+ 끝단) */}
         {[0, Math.PI].map((rot, i) => (
-          <group
-            key={i}
-            position={[0, CH / 2 + 0.25, 0]}
-            rotation={[0, rot, 0]}
-          >
+          <group key={i} position={[0, MY - 0.1, 0]} rotation={[0, rot, 0]}>
             <mesh>
               <cylinderGeometry
-                args={[0.22, 0.22, 0.28, 16, 1, false, 0, Math.PI]}
+                args={[0.22, 0.22, 0.3, 16, 1, false, 0, Math.PI]}
               />
               <meshStandardMaterial
                 color="#d4a800"
@@ -251,40 +254,47 @@ function ProceduralMotor({ omegaRad, rotDir, rotAxis }) {
           </group>
         ))}
 
-        {/* 전류 방향 화살표 */}
-        <mesh position={[CW * 0.18, CH / 2, 0]} rotation={[0, 0, -Math.PI / 2]}>
+        {/* 전류 방향 화살표 (active 변, 앞) */}
+        <mesh
+          position={[HALF * 0.3, 0, DEPTH / 2]}
+          rotation={[0, 0, Math.PI / 2]}
+        >
           <coneGeometry args={[0.09, 0.25, 8]} />
           <meshBasicMaterial color={C.force} />
         </mesh>
+        {/* 반대편 (뒤) */}
         <mesh
-          position={[-CW * 0.18, -CH / 2, 0]}
-          rotation={[0, 0, Math.PI / 2]}
+          position={[-HALF * 0.3, 0, -DEPTH / 2]}
+          rotation={[0, 0, -Math.PI / 2]}
         >
           <coneGeometry args={[0.09, 0.25, 8]} />
           <meshBasicMaterial color={C.force} />
         </mesh>
       </group>
 
-      {/* ── 브러시 ── */}
+      {/* ── 브러시 (Y+ 방향) ── */}
       {[-0.27, 0.27].map((x, i) => (
-        <mesh key={i} position={[x, CH / 2 + 0.25, 0]}>
+        <mesh key={i} position={[x, MY - 0.05, 0]}>
           <boxGeometry args={[0.1, 0.18, 0.14]} />
           <meshStandardMaterial color="#444" metalness={0.3} roughness={0.7} />
         </mesh>
       ))}
 
-      <gridHelper args={[12, 24, "#1e2235", "#1a1d2a"]} position={[0, -2, 0]} />
+      <gridHelper
+        args={[12, 24, "#1e2235", "#1a1d2a"]}
+        position={[0, -3.2, 0]}
+      />
     </group>
   );
 }
 
-// ─── GLB 모델 로더 ────────────────────────────────────────────────────────
+// ─── GLB 로더 ─────────────────────────────────────────────────────────────
 function GlbMotorModel({
   modelUrl,
   omegaRad,
   rotDir,
   coilObjectName,
-  rotAxis = "z",
+  rotAxis = "y",
 }) {
   const { scene } = useGLTF(modelUrl);
   const coilRef = useRef(null);
@@ -299,8 +309,8 @@ function GlbMotorModel({
     angleRef.current += omegaRad * rotDir * dt;
     if (!coilRef.current) return;
     if (rotAxis === "x") coilRef.current.rotation.x = angleRef.current;
-    else if (rotAxis === "y") coilRef.current.rotation.y = angleRef.current;
-    else coilRef.current.rotation.z = angleRef.current;
+    else if (rotAxis === "z") coilRef.current.rotation.z = angleRef.current;
+    else coilRef.current.rotation.y = angleRef.current;
   });
 
   return <primitive object={scene} />;
@@ -317,35 +327,30 @@ class GlbErrorBoundary extends Component {
     this.props.onFail?.();
   }
   render() {
-    if (this.state.failed) return null;
-    return this.props.children;
+    return this.state.failed ? null : this.props.children;
   }
 }
 
 // ─── 씬 루트 ─────────────────────────────────────────────────────────────
 function MotorScene({ omegaRad, rotDir, apiData }) {
   const [glbFailed, setGlbFailed] = useState(!apiData?.model_url);
-  const rotAxis = apiData?.rotation_axis ?? "z";
-
-  const fallback = (
-    <ProceduralMotor omegaRad={omegaRad} rotDir={rotDir} rotAxis={rotAxis} />
-  );
+  const fallback = <ProceduralMotor omegaRad={omegaRad} rotDir={rotDir} />;
 
   return (
     <>
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[5, 8, 6]} intensity={1.4} castShadow />
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
       <pointLight
-        position={[MX, 0, 0]}
+        position={[0, MY, 0]}
         color={C.nRed}
-        intensity={1.1}
-        distance={10}
+        intensity={0.9}
+        distance={8}
       />
       <pointLight
-        position={[-MX, 0, 0]}
+        position={[0, -MY, 0]}
         color={C.sBlue}
-        intensity={1.1}
-        distance={10}
+        intensity={0.9}
+        distance={8}
       />
 
       <OrbitControls
@@ -365,7 +370,7 @@ function MotorScene({ omegaRad, rotDir, apiData }) {
               omegaRad={omegaRad}
               rotDir={rotDir}
               coilObjectName={apiData.coil_object_name}
-              rotAxis={rotAxis}
+              rotAxis={apiData.rotation_axis ?? "y"}
             />
           </GlbErrorBoundary>
         </Suspense>
@@ -376,7 +381,7 @@ function MotorScene({ omegaRad, rotDir, apiData }) {
   );
 }
 
-// ─── UI helpers ───────────────────────────────────────────────────────────
+// ─── UI ───────────────────────────────────────────────────────────────────
 function SliderRow({ label, unit, value, min, max, step, onChange, color }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -521,7 +526,7 @@ export default function DcCoilMotorWidget({ apiData }) {
   const omega = omegaData?.omega_rad_s ?? 0;
   const rpm = omegaData?.omega_rpm ?? 0;
   const torque = omegaData?.torque_scale_n_m ?? 0;
-  const rotDir = omegaData?.rotation_direction ?? 1; // ★ 백엔드가 결정
+  const rotDir = omegaData?.rotation_direction ?? 1;
   const dirLabel = rotDir >= 0 ? "↺ CCW (반시계)" : "↻ CW (시계)";
 
   return (
@@ -590,10 +595,10 @@ export default function DcCoilMotorWidget({ apiData }) {
         </div>
       </div>
 
-      {/* 3D 캔버스 */}
-      <div style={{ height: 460, background: C.bg }}>
+      {/* 3D */}
+      <div style={{ height: 480, background: C.bg }}>
         <Canvas
-          camera={{ position: [0, 2.5, 8], fov: 50 }}
+          camera={{ position: [5, 3, 7], fov: 48 }}
           shadows
           style={{ height: "100%", width: "100%" }}
           gl={{ antialias: true }}
@@ -602,7 +607,7 @@ export default function DcCoilMotorWidget({ apiData }) {
         </Canvas>
       </div>
 
-      {/* 하단 패널 */}
+      {/* 하단 */}
       <div
         style={{
           padding: "16px 18px",
@@ -613,7 +618,6 @@ export default function DcCoilMotorWidget({ apiData }) {
           flexWrap: "wrap",
         }}
       >
-        {/* 슬라이더 */}
         <div style={{ flex: "1 1 220px", minWidth: 200 }}>
           <div
             style={{
@@ -649,7 +653,6 @@ export default function DcCoilMotorWidget({ apiData }) {
           />
         </div>
 
-        {/* 수치 카드 */}
         <div style={{ flex: "1 1 220px", minWidth: 200 }}>
           <div
             style={{
@@ -685,7 +688,6 @@ export default function DcCoilMotorWidget({ apiData }) {
           </div>
         </div>
 
-        {/* 수식 */}
         {apiData?.formula_panel && (
           <div style={{ flex: "0 0 auto", minWidth: 160 }}>
             <div
@@ -720,7 +722,6 @@ export default function DcCoilMotorWidget({ apiData }) {
         )}
       </div>
 
-      {/* 노트 */}
       {apiData?.notes?.length > 0 && (
         <div
           style={{
