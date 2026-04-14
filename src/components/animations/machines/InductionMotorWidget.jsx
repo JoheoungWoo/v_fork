@@ -306,19 +306,29 @@ export default function InductionMotorWidget({ apiData = null }) {
   }, []);
 
   const panelStyle = {
-    position: "absolute",
-    left: "50%",
-    bottom: 16,
-    transform: "translateX(-50%)",
-    width: "min(420px, calc(100% - 24px))",
+    width: "100%",
+    boxSizing: "border-box",
     padding: "14px 16px",
     borderRadius: 14,
     background: "rgba(15, 23, 42, 0.94)",
     border: "1px solid rgba(148, 163, 184, 0.35)",
-    boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
     color: "#e2e8f0",
     fontFamily: "system-ui, -apple-system, sans-serif",
-    zIndex: 2,
+  };
+
+  const statusCardStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "12px 16px",
+    borderRadius: 14,
+    background: "rgba(15, 23, 42, 0.92)",
+    border: "1px solid rgba(148, 163, 184, 0.35)",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+    color: "#e2e8f0",
+    fontFamily: "system-ui, sans-serif",
+    fontSize: 13,
+    lineHeight: 1.55,
   };
 
   const labelStyle = {
@@ -380,25 +390,36 @@ export default function InductionMotorWidget({ apiData = null }) {
           flexDirection: "row",
           flexWrap: "wrap",
           flex: 1,
-          minHeight: 520,
+          alignItems: "flex-start",
+          gap: 0,
         }}
       >
         <div
           style={{
-            position: "relative",
             flex: "1 1 280px",
-            minHeight: 480,
             minWidth: 0,
             display: "flex",
             flexDirection: "column",
+            gap: 12,
+            minHeight: 0,
           }}
         >
-          <div style={{ flex: 1, position: "relative", minHeight: 400 }}>
+          <div
+            style={{
+              width: "100%",
+              height: 400,
+              minHeight: 320,
+              flexShrink: 0,
+              borderRadius: "0 0 0 0",
+              overflow: "hidden",
+              background: "#0b1220",
+            }}
+          >
             <Canvas
               shadows
               camera={{ position: CAM_POS, fov: 45 }}
               gl={{ antialias: true, alpha: false }}
-              style={{ width: "100%", height: "100%", minHeight: 400 }}
+              style={{ width: "100%", height: "100%", display: "block" }}
             >
               <color attach="background" args={["#0b1220"]} />
               <Suspense fallback={null}>
@@ -413,100 +434,83 @@ export default function InductionMotorWidget({ apiData = null }) {
                 />
               </Suspense>
             </Canvas>
+          </div>
 
+          <div style={statusCardStyle}>
             <div
               style={{
-                position: "absolute",
-                top: 14,
-                left: 14,
-                zIndex: 2,
-                padding: "12px 14px",
-                borderRadius: 12,
-                background: "rgba(15, 23, 42, 0.92)",
-                border: "1px solid rgba(148, 163, 184, 0.35)",
-                boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
-                color: "#e2e8f0",
-                fontFamily: "system-ui, sans-serif",
-                fontSize: 13,
-                lineHeight: 1.55,
-                minWidth: 210,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                color: "#94a3b8",
+                marginBottom: 8,
               }}
             >
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.06em",
-                  color: "#94a3b8",
-                  marginBottom: 8,
-                }}
-              >
-                {"\uc6b4\uc804 \uc0c1\ud0dc"}
-              </div>
-              <div>
-                {"\ub3d9\uae30 \uc18d\ub3c4 (N\u209b): "}
-                <strong style={{ color: "#f8fafc" }}>{Math.round(ns)}</strong>
-                {" RPM"}
-              </div>
-              <div>
-                {"\ud68c\uc804\uc790 \uc18d\ub3c4 (N\u1d63): "}
-                <strong style={{ color: "#f8fafc" }}>{Math.round(nr)}</strong>
-                {" RPM"}
-              </div>
-              <div>
-                {"\uc2ac\ub9bd (s): "}
-                <strong style={{ color: "#f8fafc" }}>
-                  {slipPct.toFixed(1)}
-                </strong>
-                {" %"}
-              </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
-                {"\uadf9\uc218 "}
-                {poles}
-                {"\uadf9 \xb7 \uc8fc\ud30c\uc218 "}
-                {frequency.toFixed(0)}
-                {" Hz \xb7 \ubd80\ud558 "}
-                {load}
-                {"%"}
-                {validatedModelUrl ? " \xb7 GLB" : ""}
-              </div>
+              {"\uc6b4\uc804 \uc0c1\ud0dc"}
             </div>
+            <div>
+              {"\ub3d9\uae30 \uc18d\ub3c4 (N\u209b): "}
+              <strong style={{ color: "#f8fafc" }}>{Math.round(ns)}</strong>
+              {" RPM"}
+            </div>
+            <div>
+              {"\ud68c\uc804\uc790 \uc18d\ub3c4 (N\u1d63): "}
+              <strong style={{ color: "#f8fafc" }}>{Math.round(nr)}</strong>
+              {" RPM"}
+            </div>
+            <div>
+              {"\uc2ac\ub9bd (s): "}
+              <strong style={{ color: "#f8fafc" }}>
+                {slipPct.toFixed(1)}
+              </strong>
+              {" %"}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+              {"\uadf9\uc218 "}
+              {poles}
+              {"\uadf9 \xb7 \uc8fc\ud30c\uc218 "}
+              {frequency.toFixed(0)}
+              {" Hz \xb7 \ubd80\ud558 "}
+              {load}
+              {"%"}
+              {validatedModelUrl ? " \xb7 GLB" : ""}
+            </div>
+          </div>
 
-            <div style={panelStyle}>
-              <div style={{ marginBottom: 12, fontSize: 12, color: "#94a3b8" }}>
-                {
-                  "\uc870\uc791 \ud328\ub110 \xb7 \uc2ac\ub9bd\uc740 \ubd80\ud558\uc5d0 \ub530\ub77c 0% ~ 10%\ub85c \uc99d\uac00\ud569\ub2c8\ub2e4."
-                }
-              </div>
-              <label style={labelStyle}>
-                {"\uacf5\uae09 \uc8fc\ud30c\uc218 (f): "}
-                {frequency.toFixed(0)}
-                {" Hz (0 ~ 60)"}
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={60}
-                step={1}
-                value={frequency}
-                onChange={(e) => setFrequency(Number(e.target.value))}
-                style={{ ...sliderStyle, marginBottom: 14 }}
-              />
-              <label style={labelStyle}>
-                {"\ubd80\ud558 (load): "}
-                {load}
-                {"% (0 ~ 100)"}
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={load}
-                onChange={(e) => setLoad(Number(e.target.value))}
-                style={sliderStyle}
-              />
+          <div style={panelStyle}>
+            <div style={{ marginBottom: 12, fontSize: 12, color: "#94a3b8" }}>
+              {
+                "\uc870\uc791 \ud328\ub110 \xb7 \uc2ac\ub9bd\uc740 \ubd80\ud558\uc5d0 \ub530\ub77c 0% ~ 10%\ub85c \uc99d\uac00\ud569\ub2c8\ub2e4."
+              }
             </div>
+            <label style={labelStyle}>
+              {"\uacf5\uae09 \uc8fc\ud30c\uc218 (f): "}
+              {frequency.toFixed(0)}
+              {" Hz (0 ~ 60)"}
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={60}
+              step={1}
+              value={frequency}
+              onChange={(e) => setFrequency(Number(e.target.value))}
+              style={{ ...sliderStyle, marginBottom: 14 }}
+            />
+            <label style={labelStyle}>
+              {"\ubd80\ud558 (load): "}
+              {load}
+              {"% (0 ~ 100)"}
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={load}
+              onChange={(e) => setLoad(Number(e.target.value))}
+              style={sliderStyle}
+            />
           </div>
 
           <CurrentWaveformChart spec={waveformSpec} />
