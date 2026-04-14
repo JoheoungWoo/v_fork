@@ -67,7 +67,7 @@ function CurrentFlux({ enabled, direction }) {
     new THREE.Vector3(0, -0.68, 0.52),
     new THREE.Vector3(0, 0.68, 0.52),
   ];
-  const particles = 10;
+  const particles = 16;
   const refs = useRef([]);
   const phase = useRef(0);
 
@@ -84,7 +84,7 @@ function CurrentFlux({ enabled, direction }) {
 
   useFrame((_, dt) => {
     if (!enabled) return;
-    phase.current += dt * 0.35 * direction;
+    phase.current += dt * 0.6 * direction;
     for (let i = 0; i < particles; i += 1) {
       const r = refs.current[i];
       if (!r) continue;
@@ -95,7 +95,7 @@ function CurrentFlux({ enabled, direction }) {
 
   return (
     <group visible={enabled}>
-      <Line points={path} color="#ffe66d" lineWidth={2} />
+      <Line points={path} color="#ffe66d" lineWidth={3} />
       {Array.from({ length: particles }).map((_, i) => (
         <mesh
           key={i}
@@ -103,8 +103,8 @@ function CurrentFlux({ enabled, direction }) {
             refs.current[i] = el;
           }}
         >
-          <sphereGeometry args={[0.03, 12, 12]} />
-          <meshBasicMaterial color="#fff4b3" />
+          <sphereGeometry args={[0.036, 12, 12]} />
+          <meshBasicMaterial color="#ffe34d" />
         </mesh>
       ))}
     </group>
@@ -113,8 +113,9 @@ function CurrentFlux({ enabled, direction }) {
 
 export default function DcCoilMotorWidget({ apiData }) {
   const [powerOn, setPowerOn] = useState(false);
-  const [currentA, setCurrentA] = useState(4);
-  const [bTesla, setBTesla] = useState(0.35);
+  const [currentAmp, setCurrentAmp] = useState(4);
+  const [currentForward, setCurrentForward] = useState(true);
+  const [bForward, setBForward] = useState(true);
   const [omegaData, setOmegaData] = useState({
     omega_rad_s: 0,
     omega_rpm: 0,
@@ -130,31 +131,31 @@ export default function DcCoilMotorWidget({ apiData }) {
     const t = setTimeout(async () => {
       try {
         const u = new URL("/api/machine/dc_coil_motor/omega", window.location.origin);
-        u.searchParams.set("current_a", String(Math.abs(currentA)));
-        u.searchParams.set("b_t", String(Math.abs(bTesla)));
+        u.searchParams.set("current_a", String(Math.abs(currentAmp)));
+        u.searchParams.set("b_t", "0.8");
         const res = await fetch(u.toString());
         if (!res.ok) throw new Error("omega");
         setOmegaData(await res.json());
       } catch {
-        const i = Math.abs(currentA);
-        const b = Math.abs(bTesla);
+        const i = Math.abs(currentAmp);
+        const b = 0.8;
         const omega = Math.min(72, (380 * 12 * 0.012 * i * b) / (1 + 0.18 * i * b + 0.05 * i * i));
         setOmegaData({
           omega_rad_s: omega,
           omega_rpm: (omega * 30) / Math.PI,
           torque_scale_n_m: 12 * 0.012 * i * b,
-          rotation_direction: currentA >= 0 ? 1 : -1,
+          rotation_direction: 1,
         });
       }
     }, 180);
     return () => clearTimeout(t);
-  }, [currentA, bTesla]);
+  }, [currentAmp]);
 
-  const omega = powerOn ? omegaData.omega_rad_s ?? 0 : 0;
+  const omega = powerOn ? Math.min(12, omegaData.omega_rad_s ?? 0) : 0;
   const rpm = omegaData.omega_rpm ?? 0;
   const torque = omegaData.torque_scale_n_m ?? 0;
-  const currentDir = currentA >= 0 ? 1 : -1;
-  const bDir = bTesla >= 0 ? 1 : -1;
+  const currentDir = currentForward ? 1 : -1;
+  const bDir = bForward ? 1 : -1;
   const rotDir = powerOn ? currentDir * bDir : 0;
   const magnetGap = 1.45;
   const nPosX = bDir >= 0 ? -magnetGap : magnetGap;
@@ -196,16 +197,22 @@ export default function DcCoilMotorWidget({ apiData }) {
             {powerOn ? "전류 공급 중" : "전류 차단"}
           </span>
         </div>
-        <div style={{ marginBottom: 8 }}>전류 I: {currentA.toFixed(2)} A</div>
-        <input type="range" min={-10} max={10} step={0.1} value={currentA} onChange={(e) => setCurrentA(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
-        <div style={{ marginBottom: 8 }}>자기장 B: {bTesla.toFixed(2)} T</div>
-        <input type="range" min={-2} max={2} step={0.01} value={bTesla} onChange={(e) => setBTesla(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
+        <div style={{ marginBottom: 8 }}>전류 크기 I: {currentAmp.toFixed(2)} A</div>
+        <input type="range" min={0} max={10} step={0.1} value={currentAmp} onChange={(e) => setCurrentAmp(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <button type="button" onClick={() => setCurrentForward((v) => !v)}>
+            전류 방향: {currentForward ? "정방향" : "역방향"}
+          </button>
+          <button type="button" onClick={() => setBForward((v) => !v)}>
+            자기장 방향: {bForward ? "N→S" : "S→N"}
+          </button>
+        </div>
         <div style={{ marginBottom: 8, fontSize: 12, color: "#9cb0c0" }}>
           자석 위치는 자기장 방향에 따라 자동 교대 (N/S 좌우 전환)
         </div>
 
         <div style={{ marginTop: 6, fontSize: 13, color: C.muted }}>
-          omega: {omega.toFixed(2)} rad/s | rpm: {Math.round(rpm)} | torque: {torque.toFixed(3)} N·m
+          omega: {omega.toFixed(2)} rad/s (속도 제한 적용) | rpm: {Math.round(rpm)} | torque: {torque.toFixed(3)} N·m
         </div>
         <div style={{ marginTop: 6, fontSize: 12, color: "#9cb0c0" }}>
           회전방향 판정 = sign(I) x sign(B) ({currentDir > 0 ? "+" : "-"} x {bDir > 0 ? "+" : "-"})
