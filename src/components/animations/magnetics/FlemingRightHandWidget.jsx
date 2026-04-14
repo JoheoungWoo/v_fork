@@ -1,0 +1,441 @@
+import { Environment, OrbitControls, Text } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Suspense, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+
+const COL = {
+  N: "#dc2626",
+  S: "#2563eb",
+  B: "#f472b6",
+  V: "#f59e0b",
+  I: "#22c55e",
+  rod: "#94a3b8",
+};
+
+function WireSegment({ from, to, radius = 0.022, color = "#94a3b8" }) {
+  const mid = useMemo(
+    () => new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5),
+    [from, to],
+  );
+  const len = useMemo(() => from.distanceTo(to), [from, to]);
+  const quat = useMemo(() => {
+    const dir = new THREE.Vector3().subVectors(to, from).normalize();
+    const q = new THREE.Quaternion();
+    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    return q;
+  }, [from, to]);
+
+  return (
+    <mesh position={mid} quaternion={quat} castShadow>
+      <cylinderGeometry args={[radius, radius, len, 12]} />
+      <meshStandardMaterial color={color} metalness={0.25} roughness={0.45} />
+    </mesh>
+  );
+}
+
+function RotatingLoop({ emfRef, iSign }) {
+  const p1Ref = useRef(null);
+  const p2Ref = useRef(null);
+  const p3Ref = useRef(null);
+  const phaseRef = useRef(0);
+  const w = 0.9;
+  const h = 1.15;
+  const perimeter = useMemo(() => 2 * (w + h), [w, h]);
+  const pts = useMemo(
+    () => ({
+      lt: new THREE.Vector3(-w / 2, h / 2, 0),
+      rt: new THREE.Vector3(w / 2, h / 2, 0),
+      rb: new THREE.Vector3(w / 2, -h / 2, 0),
+      lb: new THREE.Vector3(-w / 2, -h / 2, 0),
+    }),
+    [w, h],
+  );
+
+  const pointOnLoop = (u) => {
+    const d = ((u % 1) + 1) % 1;
+    const L = d * perimeter;
+    if (L < w) return new THREE.Vector3(-w / 2 + L, h / 2, 0);
+    if (L < w + h) return new THREE.Vector3(w / 2, h / 2 - (L - w), 0);
+    if (L < w + h + w) return new THREE.Vector3(w / 2 - (L - w - h), -h / 2, 0);
+    return new THREE.Vector3(-w / 2, -h / 2 + (L - w - h - w), 0);
+  };
+
+  useFrame((_, delta) => {
+    const emf = emfRef.current;
+    const absE = Math.abs(emf);
+    phaseRef.current = (phaseRef.current + delta * (0.25 + absE * 1.8) * iSign + 10) % 1;
+    const pulses = [p1Ref.current, p2Ref.current, p3Ref.current];
+    const offsets = [0, 0.33, 0.66];
+    pulses.forEach((p, i) => {
+      if (!p) return;
+      if (absE < 0.03) {
+        p.visible = false;
+        return;
+      }
+      p.visible = true;
+      p.position.copy(pointOnLoop(phaseRef.current + offsets[i]));
+      p.scale.setScalar(0.045 + absE * 0.05);
+      if (p.material) p.material.emissiveIntensity = 0.9 + absE * 1.2;
+    });
+  });
+
+  return (
+    <group>
+      <WireSegment from={pts.lt} to={pts.rt} color="#a16207" />
+      <WireSegment from={pts.rt} to={pts.rb} color="#e879f9" />
+      <WireSegment from={pts.rb} to={pts.lb} color="#a16207" />
+      <WireSegment from={pts.lb} to={pts.lt} color="#e879f9" />
+      <mesh ref={p1Ref}>
+        <sphereGeometry args={[1, 10, 10]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
+      <mesh ref={p2Ref}>
+        <sphereGeometry args={[1, 10, 10]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
+      <mesh ref={p3Ref}>
+        <sphereGeometry args={[1, 10, 10]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function RotatingCommutator({ angleRef, emfRef, iSign }) {
+  const groupRef = useRef(null);
+  const pulseRef = useRef(null);
+  const phaseRef = useRef(0);
+  const radius = 0.2;
+
+  useFrame((_, delta) => {
+    const g = groupRef.current;
+    const pulse = pulseRef.current;
+    if (!g || !pulse) return;
+    g.rotation.y = angleRef.current;
+    const emf = emfRef.current;
+    const absE = Math.abs(emf);
+    phaseRef.current = (phaseRef.current + delta * (0.5 + absE * 2.5) * iSign + 20) % (Math.PI * 2);
+    const a = phaseRef.current;
+    pulse.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+    pulse.scale.setScalar(absE < 0.03 ? 0.001 : 0.05 + absE * 0.06);
+    if (pulse.material) pulse.material.emissiveIntensity = 0.9 + absE * 1.7;
+  });
+
+  return (
+    <group ref={groupRef} position={[0, -0.82, 0]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 0.1, 28, 1, false, 0, Math.PI]} />
+        <meshStandardMaterial color="#f97316" metalness={0.6} roughness={0.35} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 0.1, 28, 1, false, Math.PI, Math.PI]} />
+        <meshStandardMaterial color="#fb923c" metalness={0.6} roughness={0.35} />
+      </mesh>
+      <mesh ref={pulseRef}>
+        <sphereGeometry args={[1, 12, 12]} />
+        <meshStandardMaterial color={COL.I} emissive={COL.I} emissiveIntensity={1} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function Arrow3D({
+  origin = [0, 0, 0],
+  dir = [0, 1, 0],
+  length = 1,
+  color = "#fff",
+  label,
+}) {
+  const groupRef = useRef(null);
+  const matRef = useRef(null);
+
+  useFrame(() => {
+    const g = groupRef.current;
+    if (!g) return;
+    const d = new THREE.Vector3(...dir);
+    const len = d.length();
+    if (len < 1e-6) {
+      g.visible = false;
+      return;
+    }
+    g.visible = true;
+    const n = d.normalize();
+    g.position.set(...origin);
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      n,
+    );
+    g.quaternion.copy(q);
+    g.scale.set(1, length * len, 1);
+    if (matRef.current)
+      matRef.current.emissiveIntensity = 0.8 + Math.min(1.2, len) * 0.8;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh position={[0, 0.32, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 0.64, 12]} />
+        <meshStandardMaterial
+          ref={matRef}
+          color={color}
+          emissive={color}
+          emissiveIntensity={1}
+          metalness={0.25}
+          roughness={0.45}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={[0, 0.7, 0]}>
+        <coneGeometry args={[0.06, 0.2, 16]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={1}
+          toneMapped={false}
+        />
+      </mesh>
+      <Text
+        position={[0.1, 0.88, 0]}
+        fontSize={0.1}
+        color={color}
+        anchorX="left"
+      >
+        {label}
+      </Text>
+    </group>
+  );
+}
+
+function RightHandScene({ vMag, vDir, bDir, onCurrentChange }) {
+  const rotorGroupRef = useRef(null);
+  const rotAngleRef = useRef(0);
+  const emfRef = useRef(0);
+
+  const iSign = Math.sign(vDir * bDir) || 1;
+  const vecB = useMemo(() => new THREE.Vector3(bDir, 0, 0), [bDir]);
+  const vecV = useMemo(() => new THREE.Vector3(0, 0, vDir * vMag), [vDir, vMag]);
+  const vecI = useMemo(() => new THREE.Vector3().crossVectors(vecV, vecB), [vecV, vecB]);
+  const iNorm = useMemo(
+    () => new THREE.Vector3(0, iSign * Math.max(0.05, Math.min(1, Math.abs(vecI.y))), 0),
+    [vecI, iSign],
+  );
+  const leftPole = bDir > 0 ? "N" : "S";
+  const rightPole = bDir > 0 ? "S" : "N";
+  const leftColor = bDir > 0 ? COL.N : COL.S;
+  const rightColor = bDir > 0 ? COL.S : COL.N;
+
+  useFrame((_, delta) => {
+    const rotor = rotorGroupRef.current;
+    if (!rotor) return;
+    const omega = (0.3 + vMag * 2.2) * vDir;
+    rotAngleRef.current += omega * delta;
+    rotor.rotation.y = rotAngleRef.current;
+
+    const emf = vMag * Math.sin(rotAngleRef.current) * bDir * Math.sign(vDir || 1);
+    emfRef.current = emf;
+    if (onCurrentChange) onCurrentChange(emf * 120);
+  });
+
+  return (
+    <>
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[4, 6, 4]} intensity={1.1} castShadow />
+      <directionalLight position={[-3, 2, -2]} intensity={0.25} />
+      <Environment preset="city" />
+
+      <mesh
+        receiveShadow
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -1.05, 0]}
+      >
+        <planeGeometry args={[5, 3.4]} />
+        <meshStandardMaterial
+          color="#0f172a"
+          metalness={0.08}
+          roughness={0.92}
+        />
+      </mesh>
+
+      <group scale={[0.78, 0.78, 0.78]}>
+      <mesh castShadow position={[-1.3, 0, 0]}>
+        <boxGeometry args={[0.4, 1.4, 0.62]} />
+        <meshStandardMaterial color={leftColor} metalness={0.25} roughness={0.4} />
+      </mesh>
+      <Text
+        position={[-1.52, 0.78, 0.42]}
+        fontSize={0.15}
+        color="#fecaca"
+        anchorX="center"
+      >
+        {leftPole}
+      </Text>
+      <mesh castShadow position={[1.3, 0, 0]}>
+        <boxGeometry args={[0.4, 1.4, 0.62]} />
+        <meshStandardMaterial color={rightColor} metalness={0.25} roughness={0.4} />
+      </mesh>
+      <Text
+        position={[1.52, 0.78, 0.42]}
+        fontSize={0.15}
+        color="#bfdbfe"
+        anchorX="center"
+      >
+        {rightPole}
+      </Text>
+
+      {[0.25, 0, -0.25].map((y) => (
+        <mesh key={y} position={[0, y, 0]}>
+          <boxGeometry args={[2.2, 0.015, 0.03]} />
+          <meshStandardMaterial
+            color={COL.B}
+            emissive={COL.B}
+            emissiveIntensity={0.7}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+
+      <group ref={rotorGroupRef}>
+        <RotatingLoop emfRef={emfRef} iSign={iSign} />
+        <RotatingCommutator angleRef={rotAngleRef} emfRef={emfRef} iSign={iSign} />
+      </group>
+      <Text
+        position={[0.17, 0.95, 0]}
+        fontSize={0.08}
+        color="#e2e8f0"
+        anchorX="left"
+      >
+        회전 도체 루프
+      </Text>
+
+      <Arrow3D
+        origin={[-0.05, 0.8, 0.62]}
+        dir={[bDir, 0, 0]}
+        length={0.95}
+        color={COL.B}
+        label="B"
+      />
+      <Arrow3D
+        origin={[0, -0.75, 0]}
+        dir={[0, 0, vDir * vMag]}
+        length={0.9}
+        color={COL.V}
+        label="v"
+      />
+      <Arrow3D
+        origin={[0.45, 0, 0]}
+        dir={[0, iNorm.y, 0]}
+        length={0.95}
+        color={COL.I}
+        label="I"
+      />
+
+      <OrbitControls
+        enablePan={false}
+        minDistance={2.2}
+        maxDistance={5.6}
+        target={[0, 0, 0]}
+      />
+      </group>
+    </>
+  );
+}
+
+export default function FlemingRightHandWidget() {
+  const [vMag, setVMag] = useState(0.8);
+  const [vDir, setVDir] = useState(1);
+  const [bDir, setBDir] = useState(1);
+  const [currentMa, setCurrentMa] = useState(0);
+  const iDir = vMag < 0.01 ? 0 : vDir * bDir;
+  const meterPct = Math.min(100, Math.abs(currentMa) / 120 * 100);
+  const meterColor = currentMa >= 0 ? "#22c55e" : "#f87171";
+
+  return (
+    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#020617] p-5 font-sans shadow-2xl md:p-8">
+      <div className="relative z-10 mb-6 border-b border-slate-800 pb-4">
+        <h3 className="text-2xl font-black tracking-tight text-white">
+          플레밍{" "}
+          <span className="bg-gradient-to-r from-emerald-300 to-cyan-300 bg-clip-text text-transparent">
+            오른손 법칙
+          </span>{" "}
+          3D
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+          검지 = 자기장 <strong className="text-pink-300">B</strong>, 엄지 =
+          도체 운동 <strong className="text-amber-300">v</strong>, 중지 =
+          유도전류 <strong className="text-emerald-300">I</strong>. 여기서는{" "}
+          <code className="rounded bg-slate-800 px-1 py-0.5">I ∝ v × B</code> 로
+          계산합니다.
+        </p>
+      </div>
+
+      <div className="relative z-10 mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-slate-700 bg-slate-900/60 p-4 backdrop-blur-md">
+        <div className="min-w-[220px] flex-1">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-300">
+            도체 속도 크기 |v|
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={vMag}
+            onChange={(e) => setVMag(parseFloat(e.target.value))}
+            className="w-full accent-amber-500"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setVDir((d) => -d)}
+          className="rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-bold text-slate-200"
+        >
+          운동 방향 v: {vDir > 0 ? "+Z" : "-Z"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setBDir((d) => -d)}
+          className="rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-bold text-slate-200"
+        >
+          자기장 B: {bDir > 0 ? "N→S(+X)" : "S→N(-X)"}
+        </button>
+      </div>
+
+      <div className="mb-4 text-xs text-slate-400">
+        현재 유도전류 방향 I:{" "}
+        <span className="font-mono text-emerald-300">
+          {iDir === 0 ? "0" : iDir > 0 ? "+Y (위)" : "-Y (아래)"}
+        </span>
+      </div>
+      <div className="mb-4 rounded-xl border border-slate-700 bg-slate-900/70 p-3">
+        <div className="mb-1 text-xs font-bold text-slate-300">검류계 (유도 전류)</div>
+        <div className="mb-2 font-mono text-lg" style={{ color: meterColor }}>
+          {currentMa.toFixed(1)} mA
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded bg-slate-800">
+          <div
+            className="h-full rounded"
+            style={{ width: `${meterPct}%`, background: meterColor, transition: "width 120ms linear" }}
+          />
+        </div>
+      </div>
+
+      <div className="relative z-10 h-[min(52vh,430px)] min-h-[280px] w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#0b1120] shadow-inner md:min-h-[360px]">
+        <Canvas
+          shadows
+          frameloop="always"
+          camera={{ position: [0.4, 1.05, 3.7], fov: 43 }}
+          gl={{ antialias: true, alpha: false }}
+          className="h-full w-full touch-none"
+        >
+          <Suspense fallback={null}>
+            <RightHandScene
+              vMag={vMag}
+              vDir={vDir}
+              bDir={bDir}
+              onCurrentChange={(ma) => setCurrentMa(ma)}
+            />
+          </Suspense>
+        </Canvas>
+      </div>
+    </div>
+  );
+}

@@ -1,35 +1,9 @@
-import { useEffect, useState } from "react";
-import DcCoilMotorWidget from "./components/animations/machines/DcCoilMotorWidget";
+import { RouterProvider } from "react-router-dom";
+// import root from "./router/root";
+import root from "@/router/root";
 
-const FALLBACK_DATA = {
-  type: "dc_coil_motor_3d",
-  title: "DC 사각형 코일 모터",
-  subtitle: "백엔드 연동 실패 시 로컬 데이터로 동작합니다.",
-  coil_model_url: "/models/dc_coil_only.glb",
-  n_model_url: "/models/dc_magnet_n.glb",
-  s_model_url: "/models/dc_magnet_s.glb",
-  rotation_axis: "y",
-};
-
-export default function App() {
-  const [apiData, setApiData] = useState(FALLBACK_DATA);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/machine/widget/machine_dc_coil_motor")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!cancelled && d?.type === "dc_coil_motor_3d") setApiData(d);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return (
-    <div style={{ minHeight: "100vh", padding: 16, background: "#0b0f16" }}>
-      <DcCoilMotorWidget apiData={apiData} />
-    </div>
-  );
+function App() {
+  return <RouterProvider router={root} />;
 }
+
+export default App;
