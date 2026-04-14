@@ -32,9 +32,9 @@ function RotatingCoil({ url, omegaRad, rotDir, axis = "z" }) {
 function PowerSupply({ powerOn }) {
   const wireColor = powerOn ? "#ffd84d" : "#5a5a5a";
   return (
-    <group position={[0, 1.15, 0]}>
+    <group position={[0, -1.35, 0]}>
       <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[0.55, 0.28, 0.24]} />
+        <boxGeometry args={[0.72, 0.3, 0.26]} />
         <meshStandardMaterial color={powerOn ? "#f1f1f1" : "#8e8e8e"} metalness={0.4} roughness={0.4} />
       </mesh>
       <mesh position={[-0.15, 0.09, 0.13]}>
@@ -45,8 +45,8 @@ function PowerSupply({ powerOn }) {
         <boxGeometry args={[0.06, 0.06, 0.02]} />
         <meshStandardMaterial color="#ff4a4a" />
       </mesh>
-      <Line points={[[-0.15, -0.02, 0.12], [0, -0.55, 0.5]]} color={wireColor} lineWidth={2} />
-      <Line points={[[0.15, -0.02, 0.12], [0, -0.55, -0.5]]} color={wireColor} lineWidth={2} />
+      <Line points={[[-0.15, 0.08, 0.12], [0, 0.95, 0.52]]} color={wireColor} lineWidth={2} />
+      <Line points={[[0.15, 0.08, 0.12], [0, 0.95, -0.52]]} color={wireColor} lineWidth={2} />
     </group>
   );
 }
@@ -116,8 +116,6 @@ export default function DcCoilMotorWidget({ apiData }) {
   const [showN, setShowN] = useState(true);
   const [showS, setShowS] = useState(true);
   const [showCoil, setShowCoil] = useState(true);
-  const [nX, setNX] = useState(1.35);
-  const [sX, setSX] = useState(-1.35);
 
   const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
   const nGlbUrl = apiData?.n_model_url ?? "/models/dc_magnet_n.glb";
@@ -154,6 +152,9 @@ export default function DcCoilMotorWidget({ apiData }) {
   const currentDir = currentA >= 0 ? 1 : -1;
   const bDir = bTesla >= 0 ? 1 : -1;
   const rotDir = powerOn ? currentDir * bDir : 0;
+  const magnetGap = 1.45;
+  const nPosX = bDir >= 0 ? -magnetGap : magnetGap;
+  const sPosX = -nPosX;
 
   return (
     <div style={{ background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", fontFamily: "Segoe UI,sans-serif" }}>
@@ -168,8 +169,8 @@ export default function DcCoilMotorWidget({ apiData }) {
           <OrbitControls target={[0, 0, 0]} minDistance={3} maxDistance={20} />
           <Suspense fallback={null}>
             {showCoil ? <RotatingCoil url={coilGlbUrl} omegaRad={omega} rotDir={rotDir} axis={rotAxis} /> : null}
-            <GlbPart url={nGlbUrl} visible={showN} position={[nX, 0, 0]} />
-            <GlbPart url={sGlbUrl} visible={showS} position={[sX, 0, 0]} />
+            <GlbPart url={nGlbUrl} visible={showN} position={[nPosX, 0, 0]} />
+            <GlbPart url={sGlbUrl} visible={showS} position={[sPosX, 0, 0]} />
             <PowerSupply powerOn={powerOn} />
             <CurrentFlux enabled={powerOn} direction={currentDir} />
           </Suspense>
@@ -189,10 +190,9 @@ export default function DcCoilMotorWidget({ apiData }) {
         <input type="range" min={-10} max={10} step={0.1} value={currentA} onChange={(e) => setCurrentA(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
         <div style={{ marginBottom: 8 }}>자기장 B: {bTesla.toFixed(2)} T</div>
         <input type="range" min={-2} max={2} step={0.01} value={bTesla} onChange={(e) => setBTesla(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
-        <div style={{ marginBottom: 8 }}>N극 X 위치: {nX.toFixed(2)}</div>
-        <input type="range" min={-2.5} max={2.5} step={0.01} value={nX} onChange={(e) => setNX(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
-        <div style={{ marginBottom: 8 }}>S극 X 위치: {sX.toFixed(2)}</div>
-        <input type="range" min={-2.5} max={2.5} step={0.01} value={sX} onChange={(e) => setSX(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
+        <div style={{ marginBottom: 8, fontSize: 12, color: "#9cb0c0" }}>
+          자석 위치는 자기장 방향에 따라 자동 교대 (N/S 좌우 전환)
+        </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
           <button type="button" onClick={() => setShowCoil((v) => !v)}>{showCoil ? "코일 숨김" : "코일 표시"}</button>
@@ -205,6 +205,9 @@ export default function DcCoilMotorWidget({ apiData }) {
         </div>
         <div style={{ marginTop: 6, fontSize: 12, color: "#9cb0c0" }}>
           회전방향 판정 = sign(I) x sign(B) ({currentDir > 0 ? "+" : "-"} x {bDir > 0 ? "+" : "-"})
+        </div>
+        <div style={{ marginTop: 6, fontSize: 12, color: "#9cb0c0" }}>
+          자석 배치: {nPosX < 0 ? "N-좌 / S-우" : "S-좌 / N-우"}
         </div>
         <div style={{ marginTop: 6, fontSize: 12, color: "#9cb0c0" }}>
           coil: {coilGlbUrl} / N: {nGlbUrl} / S: {sGlbUrl}
