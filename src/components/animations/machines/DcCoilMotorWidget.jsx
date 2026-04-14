@@ -76,7 +76,16 @@ function FluxFieldLines({ strength }) {
   );
 }
 
-function DcMotorGLB({ url, coilName, spinAxis, omegaRadS, currentA }) {
+function DcMotorGLB({
+  url,
+  coilName,
+  spinAxis,
+  omegaRadS,
+  currentA,
+  bTesla,
+  northPoleNames,
+  southPoleNames,
+}) {
   const { scene } = useGLTF(url);
   const root = useMemo(() => scene.clone(true), [scene]);
   const coilRef = useRef(null);
@@ -95,28 +104,49 @@ function DcMotorGLB({ url, coilName, spinAxis, omegaRadS, currentA }) {
   });
 
   useEffect(() => {
+    const bGain = Math.min(1, Math.max(0, Math.abs(bTesla) / 1.2));
+    const northSet = new Set(northPoleNames);
+    const southSet = new Set(southPoleNames);
     root.traverse((o) => {
       if (!o.isMesh) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       mats.forEach((m) => {
         if (!m || !m.emissive) return;
+        if (!m.userData._dcBaseE) {
+          m.userData._dcBaseE = m.emissive.clone();
+          m.userData._dcBaseI = m.emissiveIntensity ?? 0;
+        }
         let p = o;
         let underCoil = false;
         while (p) {
           if (p.name === coilName) underCoil = true;
           p = p.parent;
         }
-        if (!underCoil) return;
-        if (!m.userData._dcBaseE) {
-          m.userData._dcBaseE = m.emissive.clone();
-          m.userData._dcBaseI = m.emissiveIntensity ?? 0;
+        if (underCoil) {
+          const g = Math.min(1.2, Math.abs(currentA) / 6);
+          m.emissive.copy(m.userData._dcBaseE).lerp(new THREE.Color("#fbbf24"), g);
+          m.emissiveIntensity = m.userData._dcBaseI + g * 0.5;
+          return;
         }
-        const g = Math.min(1.2, Math.abs(currentA) / 6);
-        m.emissive.copy(m.userData._dcBaseE).lerp(new THREE.Color("#fbbf24"), g);
-        m.emissiveIntensity = m.userData._dcBaseI + g * 0.5;
+        if (northSet.has(o.name)) {
+          m.emissive
+            .copy(m.userData._dcBaseE)
+            .lerp(new THREE.Color("#fb7185"), 0.22 + bGain * 0.45);
+          m.emissiveIntensity = m.userData._dcBaseI + bGain * 0.35;
+          return;
+        }
+        if (southSet.has(o.name)) {
+          m.emissive
+            .copy(m.userData._dcBaseE)
+            .lerp(new THREE.Color("#60a5fa"), 0.22 + bGain * 0.45);
+          m.emissiveIntensity = m.userData._dcBaseI + bGain * 0.35;
+          return;
+        }
+        m.emissive.copy(m.userData._dcBaseE);
+        m.emissiveIntensity = m.userData._dcBaseI;
       });
     });
-  }, [root, coilName, currentA]);
+  }, [root, coilName, currentA, bTesla, northPoleNames, southPoleNames]);
 
   return <primitive object={root} />;
 }
@@ -128,6 +158,8 @@ function SceneRig({
   omegaRadS,
   currentA,
   bTesla,
+  northPoleNames,
+  southPoleNames,
   orbitRef,
 }) {
   const bNorm = Math.min(1, Math.max(0, bTesla / 1.2));
@@ -159,6 +191,9 @@ function SceneRig({
               spinAxis={spinAxis}
               omegaRadS={omegaRadS}
               currentA={currentA}
+              bTesla={bTesla}
+              northPoleNames={northPoleNames}
+              southPoleNames={southPoleNames}
             />
           </Suspense>
         ) : null}
@@ -182,6 +217,12 @@ export default function DcCoilMotorWidget({ apiData }) {
   const coilName = apiData?.coil_object_name ?? "Motor_Coil_Root";
   const spinAxis = apiData?.rotation_axis ?? "z";
   const omegaPath = apiData?.omega_api_path ?? "/api/machine/dc_coil_motor/omega";
+  const northPoleNames = apiData?.north_pole_names ?? ["Magnet_North"];
+  const southPoleNames = apiData?.south_pole_names ?? ["Magnet_South"];
+  const modelSourceScript = apiData?.model_source_script ?? "scripts/dc_motor_blender.py";
+  const modelBuildCommand =
+    apiData?.model_build_command ??
+    "blender --background --python scripts/dc_motor_blender.py";
 
   const [currentA, setCurrentA] = useState(defaults.current_a ?? 2);
   const [bT, setBT] = useState(defaults.b_tesla ?? 0.35);
@@ -352,8 +393,9 @@ export default function DcCoilMotorWidget({ apiData }) {
             <code className="mx-1 rounded bg-slate-800 px-1">public/models/dc_coil_motor.glb</code>{" "}
             생성:{" "}
             <code className="mx-1 rounded bg-slate-800 px-1">
-              node scripts/generate-dc-coil-motor-glb.mjs
+              {modelBuildCommand}
             </code>
+            <div className="mt-1 text-xs text-slate-300">source: {modelSourceScript}</div>
           </div>
         ) : null}
         <Canvas
@@ -367,6 +409,8 @@ export default function DcCoilMotorWidget({ apiData }) {
             omegaRadS={omegaRadS}
             currentA={currentA}
             bTesla={bT}
+            northPoleNames={northPoleNames}
+            southPoleNames={southPoleNames}
             orbitRef={orbitRef}
           />
         </Canvas>
