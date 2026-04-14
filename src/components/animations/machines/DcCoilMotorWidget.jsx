@@ -1,7 +1,6 @@
-import { OrbitControls, Text, useGLTF } from "@react-three/drei";
+import { OrbitControls, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import * as THREE from "three";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 const C = {
   bg: "#0f1117",
@@ -10,142 +9,7 @@ const C = {
   text: "#e2e0d8",
   muted: "#7a7872",
   nRed: "#e84040",
-  sBlue: "#3b8bd4",
-  coil: "#d4900a",
-  field: "#9ff7ff",
 };
-
-const MY = 2.2;
-const MW = 3.2;
-const MD = 2.8;
-const MT = 0.7;
-const INNER_Y = MY - MT / 2;
-const CW = 1.8;
-const CR = 0.07;
-
-function Wire({ from, to }) {
-  const f = new THREE.Vector3(...from);
-  const t = new THREE.Vector3(...to);
-  const dir = new THREE.Vector3().subVectors(t, f);
-  const len = dir.length();
-  const mid = f.clone().addScaledVector(dir.clone().normalize(), len / 2);
-  const q = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    dir.clone().normalize(),
-  );
-  return (
-    <mesh position={[mid.x, mid.y, mid.z]} quaternion={q} castShadow>
-      <cylinderGeometry args={[CR, CR, len, 12]} />
-      <meshStandardMaterial color={C.coil} metalness={0.9} roughness={0.12} />
-    </mesh>
-  );
-}
-
-function FieldTube({ x, z }) {
-  const geo = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(x, INNER_Y, z),
-      new THREE.Vector3(x, 0, z),
-      new THREE.Vector3(x, -INNER_Y, z),
-    ]);
-    return new THREE.TubeGeometry(curve, 24, 0.07, 12, false);
-  }, [x, z]);
-  return (
-    <group renderOrder={900}>
-      <mesh geometry={geo}>
-        <meshBasicMaterial
-          color={C.field}
-          transparent
-          opacity={0.98}
-          depthTest={false}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh geometry={geo}>
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.65}
-          depthTest={false}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          toneMapped={false}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-function ProceduralMotor({ omegaRad, rotDir }) {
-  const coilRef = useRef(null);
-  const angleRef = useRef(0);
-  const half = CW / 2;
-  const depth = 1.2;
-
-  useFrame((_, dt) => {
-    angleRef.current += omegaRad * rotDir * dt;
-    if (coilRef.current) coilRef.current.rotation.y = angleRef.current;
-  });
-
-  return (
-    <group>
-      <group position={[0, MY, 0]}>
-        <mesh castShadow>
-          <boxGeometry args={[MW, MT, MD]} />
-          <meshStandardMaterial
-            color={C.nRed}
-            metalness={0.4}
-            roughness={0.3}
-          />
-        </mesh>
-        <Text
-          position={[0, MT / 2 + 0.1, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.7}
-          color="#fff"
-        >
-          N
-        </Text>
-      </group>
-      <group position={[0, -MY, 0]}>
-        <mesh castShadow>
-          <boxGeometry args={[MW, MT, MD]} />
-          <meshStandardMaterial
-            color={C.sBlue}
-            metalness={0.4}
-            roughness={0.3}
-          />
-        </mesh>
-        <Text
-          position={[0, -(MT / 2 + 0.1), 0]}
-          rotation={[Math.PI / 2, 0, 0]}
-          fontSize={0.7}
-          color="#fff"
-        >
-          S
-        </Text>
-      </group>
-
-      {[-0.8, -0.3, 0, 0.3, 0.8].map((x) =>
-        [-0.7, 0, 0.7].map((z) => <FieldTube key={`${x}-${z}`} x={x} z={z} />),
-      )}
-
-      <group ref={coilRef}>
-        <Wire from={[-half, 0, depth / 2]} to={[half, 0, depth / 2]} />
-        <Wire from={[-half, 0, -depth / 2]} to={[half, 0, -depth / 2]} />
-        <Wire from={[half, 0, -depth / 2]} to={[half, 0, depth / 2]} />
-        <Wire from={[-half, 0, -depth / 2]} to={[-half, 0, depth / 2]} />
-      </group>
-
-      <gridHelper
-        args={[20, 30, "#223040", "#1b2330"]}
-        position={[0, -3.2, 0]}
-      />
-    </group>
-  );
-}
 
 function GlbMotor({
   modelUrl,
@@ -258,9 +122,7 @@ export default function DcCoilMotorWidget({ apiData }) {
                 coilObjectName={apiData?.coil_object_name}
                 rotAxis={apiData?.rotation_axis ?? "y"}
               />
-            ) : (
-              <ProceduralMotor omegaRad={omega} rotDir={rotDir} />
-            )}
+            ) : null}
           </Suspense>
         </Canvas>
       </div>
