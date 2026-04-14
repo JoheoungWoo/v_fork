@@ -1,4 +1,4 @@
-import { Line, OrbitControls, useGLTF } from "@react-three/drei";
+import { Line, OrbitControls, Text, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -16,7 +16,40 @@ function GlbPart({ url, position = [0, 0, 0], visible = true }) {
   return <primitive object={scene} position={position} visible={visible} />;
 }
 
-function RotatingCoil({ url, omegaRad, rotDir, axis = "y", showFlux, currentDir }) {
+// 💡 추가된 컴포넌트: N극 / S극을 코드로 직접 생성 (GLB 파일 불필요)
+function Magnet({ type, position }) {
+  const isN = type === "N";
+  const color = isN ? "#ff3b30" : "#007aff"; // N극: 빨강, S극: 파랑
+
+  return (
+    <group position={position}>
+      <mesh>
+        {/* 자석의 크기 (폭, 높이, 깊이) */}
+        <boxGeometry args={[0.5, 1.6, 1.6]} />
+        <meshStandardMaterial color={color} metalness={0.3} roughness={0.5} />
+      </mesh>
+      {/* 자석 안쪽 면에 N, S 글자 표시 */}
+      <Text
+        position={[isN ? 0.26 : -0.26, 0, 0]}
+        rotation={[0, isN ? Math.PI / 2 : -Math.PI / 2, 0]}
+        fontSize={0.6}
+        color="white"
+        fontWeight="bold"
+      >
+        {type}
+      </Text>
+    </group>
+  );
+}
+
+function RotatingCoil({
+  url,
+  omegaRad,
+  rotDir,
+  axis = "y",
+  showFlux,
+  currentDir,
+}) {
   const { scene } = useGLTF(url);
   const groupRef = useRef(null);
   const angleRef = useRef(0);
@@ -43,7 +76,11 @@ function PowerSupply({ powerOn }) {
     <group position={[0, -0.35, 1.35]}>
       <mesh position={[0, 0, 0]}>
         <boxGeometry args={[0.72, 0.3, 0.26]} />
-        <meshStandardMaterial color={powerOn ? "#f1f1f1" : "#8e8e8e"} metalness={0.4} roughness={0.4} />
+        <meshStandardMaterial
+          color={powerOn ? "#f1f1f1" : "#8e8e8e"}
+          metalness={0.4}
+          roughness={0.4}
+        />
       </mesh>
       <mesh position={[-0.15, 0.09, 0.13]}>
         <boxGeometry args={[0.06, 0.06, 0.02]} />
@@ -53,8 +90,22 @@ function PowerSupply({ powerOn }) {
         <boxGeometry args={[0.06, 0.06, 0.02]} />
         <meshStandardMaterial color="#ff4a4a" />
       </mesh>
-      <Line points={[[-0.15, 0.08, -0.12], [0, 0.38, -0.82]]} color={wireColor} lineWidth={2} />
-      <Line points={[[0.15, 0.08, -0.12], [0, -0.38, -0.82]]} color={wireColor} lineWidth={2} />
+      <Line
+        points={[
+          [-0.15, 0.08, -0.12],
+          [0, 0.38, -0.82],
+        ]}
+        color={wireColor}
+        lineWidth={2}
+      />
+      <Line
+        points={[
+          [0.15, 0.08, -0.12],
+          [0, -0.38, -0.82],
+        ]}
+        color={wireColor}
+        lineWidth={2}
+      />
     </group>
   );
 }
@@ -122,15 +173,18 @@ export default function DcCoilMotorWidget({ apiData }) {
     torque_scale_n_m: 0,
     rotation_direction: 1,
   });
+
+  // 💡 기존의 단일 코일 GLB 파일 경로만 유지합니다. (위치에 맞게 경로를 수정해주세요)
   const coilGlbUrl = apiData?.coil_model_url ?? "/models/dc_coil_only.glb";
-  const nGlbUrl = apiData?.n_model_url ?? "/models/dc_magnet_n.glb";
-  const sGlbUrl = apiData?.s_model_url ?? "/models/dc_magnet_s.glb";
   const rotAxis = "y";
 
   useEffect(() => {
     const t = setTimeout(async () => {
       try {
-        const u = new URL("/api/machine/dc_coil_motor/omega", window.location.origin);
+        const u = new URL(
+          "/api/machine/dc_coil_motor/omega",
+          window.location.origin,
+        );
         u.searchParams.set("current_a", String(Math.abs(currentAmp)));
         u.searchParams.set("b_t", "0.8");
         const res = await fetch(u.toString());
@@ -139,7 +193,10 @@ export default function DcCoilMotorWidget({ apiData }) {
       } catch {
         const i = Math.abs(currentAmp);
         const b = 0.8;
-        const omega = Math.min(72, (380 * 12 * 0.012 * i * b) / (1 + 0.18 * i * b + 0.05 * i * i));
+        const omega = Math.min(
+          72,
+          (380 * 12 * 0.012 * i * b) / (1 + 0.18 * i * b + 0.05 * i * i),
+        );
         setOmegaData({
           omega_rad_s: omega,
           omega_rpm: (omega * 30) / Math.PI,
@@ -162,13 +219,32 @@ export default function DcCoilMotorWidget({ apiData }) {
   const sPosX = -nPosX;
 
   return (
-    <div style={{ background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", fontFamily: "Segoe UI,sans-serif" }}>
-      <div style={{ padding: 12, borderBottom: `1px solid ${C.border}`, fontWeight: 600 }}>
-        DC 모터 분리 GLB 제어 (코일/N/S 독립)
+    <div
+      style={{
+        background: C.bg,
+        color: C.text,
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
+        overflow: "hidden",
+        fontFamily: "Segoe UI,sans-serif",
+      }}
+    >
+      <div
+        style={{
+          padding: 12,
+          borderBottom: `1px solid ${C.border}`,
+          fontWeight: 600,
+        }}
+      >
+        DC 모터 시뮬레이션 (코일 GLB + 절차적 자석)
       </div>
 
       <div style={{ height: 480 }}>
-        <Canvas camera={{ position: [5, 3, 7], fov: 48 }} shadows gl={{ antialias: true }}>
+        <Canvas
+          camera={{ position: [0, 5, 8], fov: 48 }}
+          shadows
+          gl={{ antialias: true }}
+        >
           <ambientLight intensity={0.75} />
           <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
           <OrbitControls target={[0, 0, 0]} minDistance={3} maxDistance={20} />
@@ -181,13 +257,15 @@ export default function DcCoilMotorWidget({ apiData }) {
               showFlux={powerOn}
               currentDir={currentDir}
             />
-            <GlbPart url={nGlbUrl} position={[nPosX, 0, 0]} />
-            <GlbPart url={sGlbUrl} position={[sPosX, 0, 0]} />
+            {/* 💡 수정된 부분: GLB 파일 대신 코드로 생성한 자석 컴포넌트 배치 */}
+            <Magnet type="N" position={[nPosX, 0, 0]} />
+            <Magnet type="S" position={[sPosX, 0, 0]} />
             <PowerSupply powerOn={powerOn} />
           </Suspense>
         </Canvas>
       </div>
 
+      {/* --- 이하 UI 컨트롤 패널은 기존과 동일 --- */}
       <div style={{ padding: 12, background: C.surface }}>
         <div style={{ marginBottom: 10, display: "flex", gap: 8 }}>
           <button type="button" onClick={() => setPowerOn((v) => !v)}>
@@ -197,8 +275,18 @@ export default function DcCoilMotorWidget({ apiData }) {
             {powerOn ? "전류 공급 중" : "전류 차단"}
           </span>
         </div>
-        <div style={{ marginBottom: 8 }}>전류 크기 I: {currentAmp.toFixed(2)} A</div>
-        <input type="range" min={0} max={10} step={0.1} value={currentAmp} onChange={(e) => setCurrentAmp(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
+        <div style={{ marginBottom: 8 }}>
+          전류 크기 I: {currentAmp.toFixed(2)} A
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={10}
+          step={0.1}
+          value={currentAmp}
+          onChange={(e) => setCurrentAmp(Number(e.target.value))}
+          style={{ width: "100%", marginBottom: 10 }}
+        />
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
           <button type="button" onClick={() => setCurrentForward((v) => !v)}>
             전류 방향: {currentForward ? "정방향" : "역방향"}
@@ -207,21 +295,10 @@ export default function DcCoilMotorWidget({ apiData }) {
             자기장 방향: {bForward ? "N→S" : "S→N"}
           </button>
         </div>
-        <div style={{ marginBottom: 8, fontSize: 12, color: "#9cb0c0" }}>
-          자석 위치는 자기장 방향에 따라 자동 교대 (N/S 좌우 전환)
-        </div>
 
         <div style={{ marginTop: 6, fontSize: 13, color: C.muted }}>
-          omega: {omega.toFixed(2)} rad/s (속도 제한 적용) | rpm: {Math.round(rpm)} | torque: {torque.toFixed(3)} N·m
-        </div>
-        <div style={{ marginTop: 6, fontSize: 12, color: "#9cb0c0" }}>
-          회전방향 판정 = sign(I) x sign(B) ({currentDir > 0 ? "+" : "-"} x {bDir > 0 ? "+" : "-"})
-        </div>
-        <div style={{ marginTop: 6, fontSize: 12, color: "#9cb0c0" }}>
-          자석 배치: {nPosX < 0 ? "N-좌 / S-우" : "S-좌 / N-우"}
-        </div>
-        <div style={{ marginTop: 6, fontSize: 12, color: "#9cb0c0" }}>
-          coil: {coilGlbUrl} / N: {nGlbUrl} / S: {sGlbUrl}
+          omega: {omega.toFixed(2)} rad/s | rpm: {Math.round(rpm)} | torque:{" "}
+          {torque.toFixed(3)} N·m
         </div>
       </div>
     </div>
