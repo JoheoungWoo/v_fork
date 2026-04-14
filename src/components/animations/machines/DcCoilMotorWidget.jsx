@@ -18,8 +18,7 @@ function Magnet({ type, position }) {
   return (
     <group position={position}>
       <mesh>
-        {/* 자석의 깊이(Z축)를 코일 길이에 맞춰 4로 길게 늘림 */}
-        <boxGeometry args={[0.6, 1.6, 4]} />
+        <boxGeometry args={[0.6, 1.6, 4.5]} />
         <meshStandardMaterial color={color} metalness={0.3} roughness={0.5} />
       </mesh>
       <Text
@@ -37,24 +36,25 @@ function Magnet({ type, position }) {
 
 function RotatingCoil({ url, omegaRad, rotDir, showFlux, currentDir }) {
   const { scene } = useGLTF(url);
-  const groupRef = useRef(null);
+  const shaftRef = useRef(null);
   const angleRef = useRef(0);
 
   useFrame((_, dt) => {
-    // 💡 이제 회전축은 Z축(Shaft 방향)으로 고정됩니다.
+    // 💡 회전축을 모터의 샤프트(Z축) 방향으로 고정
     angleRef.current -= omegaRad * rotDir * dt;
-    if (groupRef.current) {
-      groupRef.current.rotation.z = angleRef.current;
+    if (shaftRef.current) {
+      shaftRef.current.rotation.z = angleRef.current;
     }
   });
 
   return (
-    <group ref={groupRef}>
-      {/* 💡 핵심 수정: 모델 자체를 X축 기준으로 -90도 눕혀서 확실한 수평(XZ 평면) 상태로 정렬 */}
-      <group rotation={[-Math.PI / 2, 0, 0]}>
+    <group ref={shaftRef}>
+      {/* 💡 핵심: 원본 블렌더 모델(X-Y평면)을 X축 기준 90도 회전시켜 바닥(X-Z)으로 완벽히 눕힘 */}
+      <group rotation={[Math.PI / 2, 0, 0]}>
         <primitive object={scene} />
+        {/* 전류 효과를 코일과 같은 그룹 안에 넣어 완전히 동기화시킴 */}
+        <CurrentFlux enabled={showFlux} direction={currentDir} />
       </group>
-      <CurrentFlux enabled={showFlux} direction={currentDir} />
     </group>
   );
 }
@@ -62,7 +62,7 @@ function RotatingCoil({ url, omegaRad, rotDir, showFlux, currentDir }) {
 function PowerSupply({ powerOn }) {
   const wireColor = powerOn ? "#ffd84d" : "#5a5a5a";
   return (
-    <group position={[0, -0.35, 1.35]}>
+    <group position={[0, -0.35, 2.5]}>
       <mesh position={[0, 0, 0]}>
         <boxGeometry args={[0.72, 0.3, 0.26]} />
         <meshStandardMaterial
@@ -82,7 +82,7 @@ function PowerSupply({ powerOn }) {
       <Line
         points={[
           [-0.15, 0.08, -0.12],
-          [0, 0.38, -0.82],
+          [-0.15, 0.08, -1.5],
         ]}
         color={wireColor}
         lineWidth={2}
@@ -90,7 +90,7 @@ function PowerSupply({ powerOn }) {
       <Line
         points={[
           [0.15, 0.08, -0.12],
-          [0, -0.38, -0.82],
+          [0.15, 0.08, -1.5],
         ]}
         color={wireColor}
         lineWidth={2}
@@ -100,16 +100,16 @@ function PowerSupply({ powerOn }) {
 }
 
 function CurrentFlux({ enabled, direction }) {
-  // 💡 수정된 부분: 눕혀진 코일의 실제 구리선 궤적에 완벽하게 일치하도록 전류 흐름 경로 재설정
+  // 💡 수정된 부분: 블렌더 파이썬 코드의 실린더 좌표(-1.2 ~ 1.2, -0.5 ~ 3.5)와 100% 일치시킴
   const path = [
-    new THREE.Vector3(0.7, 0, 0.5), // 우측 정류자
-    new THREE.Vector3(1.2, 0, 0.5), // 우측 선 앞쪽
-    new THREE.Vector3(1.2, 0, -3.5), // 우측 선 뒤쪽
-    new THREE.Vector3(-1.2, 0, -3.5), // 좌측 선 뒤쪽
-    new THREE.Vector3(-1.2, 0, 0.5), // 좌측 선 앞쪽
-    new THREE.Vector3(-0.7, 0, 0.5), // 좌측 정류자
+    new THREE.Vector3(0.7, -0.5, 0), // 정류자 우측
+    new THREE.Vector3(1.2, -0.5, 0), // 우측 코일 진입점
+    new THREE.Vector3(1.2, 3.5, 0), // 우측 코일 끝점
+    new THREE.Vector3(-1.2, 3.5, 0), // 좌측 코일 끝점
+    new THREE.Vector3(-1.2, -0.5, 0), // 좌측 코일 진입점
+    new THREE.Vector3(-0.7, -0.5, 0), // 정류자 좌측
   ];
-  const particles = 20; // 입자 수 증가
+  const particles = 24;
   const refs = useRef([]);
   const phase = useRef(0);
 
@@ -137,7 +137,13 @@ function CurrentFlux({ enabled, direction }) {
 
   return (
     <group visible={enabled}>
-      <Line points={path} color="#ffe66d" lineWidth={3} />
+      <Line
+        points={path}
+        color="#ffe66d"
+        lineWidth={3}
+        transparent
+        opacity={0.6}
+      />
       {Array.from({ length: particles }).map((_, i) => (
         <mesh
           key={i}
@@ -204,11 +210,10 @@ export default function DcCoilMotorWidget({ apiData }) {
   const bDir = bForward ? 1 : -1;
   const rotDir = powerOn ? currentDir * bDir : 0;
 
-  // 코일의 물리적 크기에 맞춰 자석 위치 조정
-  const magnetGap = 1.6;
+  const magnetGap = 1.8;
   const nPosX = bDir >= 0 ? -magnetGap : magnetGap;
   const sPosX = -nPosX;
-  const magnetZ = -1.5; // 코일 중심점 깊이에 맞춤
+  const magnetZ = 1.5; // 코일 중심점 깊이 보정
 
   return (
     <div
@@ -228,20 +233,19 @@ export default function DcCoilMotorWidget({ apiData }) {
           fontWeight: 600,
         }}
       >
-        DC 모터 시뮬레이션 (완전한 수평 배열)
+        DC 모터 시뮬레이션 (동기화 완료)
       </div>
 
       <div style={{ height: 480 }}>
-        {/* 💡 카메라 앵글을 위에서 약간 내려다보도록 조정하여 수평 사각형이 잘 보이게 함 */}
         <Canvas
-          camera={{ position: [0, 4, 6], fov: 50 }}
+          camera={{ position: [0, 4, 7], fov: 50 }}
           shadows
           gl={{ antialias: true }}
         >
           <ambientLight intensity={0.75} />
           <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
           <OrbitControls
-            target={[0, 0, -1.5]}
+            target={[0, 0, 1.5]}
             minDistance={3}
             maxDistance={20}
           />
