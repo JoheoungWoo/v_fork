@@ -16,6 +16,12 @@ import { CurrentWaveformChart } from "./Wiring3DViewer";
 
 const CAM_POS = [2.4, 1.35, 2.35];
 
+/** GLB 2.0 header: magic "glTF" at offset 0, version uint32 at offset 4. */
+function isBinaryGlb(buffer) {
+  if (!buffer || buffer.byteLength < 12) return false;
+  return new DataView(buffer).getUint32(0, true) === 0x46546c67;
+}
+
 /** Same sampling as cloudflare_prj/generators/machines/induction_motor_widget._waveform_spec */
 function buildStatorWaveformSpec(fHz, nSamples = 96) {
   const omega = 2 * Math.PI * fHz;
@@ -221,9 +227,12 @@ const btnBase = {
  */
 export default function InductionMotorWidget({ apiData = null }) {
   const poles = apiData?.defaults?.poles ?? 4;
-  const modelUrl = apiData?.model_url ?? null;
+  const requestedModelUrl = apiData?.model_url ?? null;
   const rotorName = apiData?.rotor_object_name ?? "Motor_Rotor";
   const spinAxis = apiData?.spin_axis ?? "z";
+
+  /** Only set after fetch proves the URL returns a GLB (avoids SPA404 HTML crashing useGLTF). */
+  const [validatedModelUrl, setValidatedModelUrl] = useState(null);
 
   const [frequency, setFrequency] = useState(
     apiData?.defaults?.frequency_hz ?? 60,
@@ -235,8 +244,35 @@ export default function InductionMotorWidget({ apiData = null }) {
   const orbitRef = useRef(null);
 
   useEffect(() => {
-    if (modelUrl) useGLTF.preload(modelUrl);
-  }, [modelUrl]);
+    if (!requestedModelUrl) {
+      setValidatedModelUrl(null);
+      return;
+    }
+    setValidatedModelUrl(null);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(requestedModelUrl);
+        if (!res.ok) throw new Error(String(res.status));
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        if (ct.includes("text/html") || ct.includes("application/json")) {
+          throw new Error("not a model");
+        }
+        const buf = await res.arrayBuffer();
+        if (!isBinaryGlb(buf)) throw new Error("not glb");
+        if (!cancelled) setValidatedModelUrl(requestedModelUrl);
+      } catch {
+        if (!cancelled) setValidatedModelUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedModelUrl]);
+
+  useEffect(() => {
+    if (validatedModelUrl) useGLTF.preload(validatedModelUrl);
+  }, [validatedModelUrl]);
 
   const { ns, nr, slipPct } = useMemo(() => {
     const f = Math.max(0, Math.min(60, frequency));
@@ -371,7 +407,7 @@ export default function InductionMotorWidget({ apiData = null }) {
                   highlight={highlight}
                   onPartPick={onPartPick}
                   orbitRef={orbitRef}
-                  modelUrl={modelUrl}
+                  modelUrl={validatedModelUrl}
                   rotorName={rotorName}
                   spinAxis={spinAxis}
                 />
@@ -432,7 +468,7 @@ export default function InductionMotorWidget({ apiData = null }) {
                 {" Hz \xb7 \ubd80\ud558 "}
                 {load}
                 {"%"}
-                {modelUrl ? " \xb7 GLB" : ""}
+                {validatedModelUrl ? " \xb7 GLB" : ""}
               </div>
             </div>
 
