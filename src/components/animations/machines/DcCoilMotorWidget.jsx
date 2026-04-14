@@ -1,381 +1,683 @@
-import { Environment, Line, OrbitControls, useGLTF } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import * as THREE from "three";
+/**
+ * DcCoilMotorWidget.jsx
+ *
+ * DC 사각형 코일 모터 — 플레밍의 왼손 법칙 3D 시뮬레이터
+ *
+ * 아키텍처:
+ *  - MachineWidgetPage → apiData (type: "dc_coil_motor_3d") → DcCoilMotorWidget
+ *  - 슬라이더(I, B) 변경 → GET /api/machine/dc_coil_motor/omega → omega_rad_s → Three.js 코일 회전
+ *  - GLB 모델(model_url) 우선 로드, 실패 시 절차적 Three.js 폴백(fallback) 렌더
+ *
+ * 의존: @react-three/fiber, @react-three/drei, three, axios(apiClient)
+ */
+
 import apiClient from "@/api/core/apiClient";
+import { OrbitControls, Text, useGLTF } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 
-const CAM_POS = [6, 4.5, 7];
-const DEBOUNCE_MS = 120;
-const BASE_OMEGA = 1.2;
+// ─── 상수 ─────────────────────────────────────────────────────────────────
+const DARK = {
+  bg: "#0f1117",
+  surface: "#1a1d27",
+  border: "#2a2e3e",
+  text: "#e2e0d8",
+  muted: "#7a7872",
+  nRed: "#e84040",
+  sBlue: "#3b8bd4",
+  coil: "#d4900a",
+  force: "#4caf50",
+  field: "#4488cc",
+};
 
-function isBinaryGlb(buffer) {
-  if (!buffer || buffer.byteLength < 12) return false;
-  return new DataView(buffer).getUint32(0, true) === 0x46546c67;
-}
+// ─── 절차적 코일 모터 씬 (GLB 폴백) ───────────────────────────────────────
+/**
+ * 사각형 코일: 상/하 변(active) + 좌/우 변(passive)
+ * pivot(coilRoot) 이 Y축 회전 → coilObjectName 이 있으면 GLB 오브젝트만 회전
+ */
+function ProceduralMotor({ omegaRad, apiData }) {
+  const coilRef = useRef();
+  const arrow1Ref = useRef();
+  const arrow2Ref = useRef();
+  const angleRef = useRef(0);
 
-function computeOmegaLocal(currentA, bT, pc) {
-  const i = Math.max(0, Math.abs(Number(currentA) || 0));
-  const b = Math.max(0, Math.abs(Number(bT) || 0));
-  const nTurns = pc?.n_turns ?? 12;
-  const area = pc?.area_m2 ?? 0.012;
-  const gain = pc?.motor_gain ?? 380;
-  const damp = pc?.damping ?? 0.18;
-  const cap = pc?.omega_cap_rad_s ?? 72;
-  const raw = (gain * nTurns * area * i * b) / (1 + damp * i * b + 0.05 * i * i);
-  return Math.min(cap, Math.max(0, raw));
-}
+  const rotationAxis = apiData?.rotation_axis ?? "z";
+  const W = 1.8,
+    H = 2.0,
+    R = 0.07;
 
-function FluxFieldLines({ visible, fieldStrength }) {
-  const strength = Math.max(0, Math.min(2, fieldStrength));
-  const lines = useMemo(() => {
-    const out = [];
-    const zLevels = [-0.8, -0.4, 0, 0.4, 0.8];
-    const yLevels = [-0.7, 0, 0.7];
-    zLevels.forEach((z) => {
-      yLevels.forEach((y) => {
-        out.push([new THREE.Vector3(2.8, y, z), new THREE.Vector3(-2.8, y, z)]);
-      });
+  useFrame((_, dt) => {
+    angleRef.current += omegaRad * dt;
+    if (coilRef.current) {
+      if (rotationAxis === "z") coilRef.current.rotation.z = angleRef.current;
+      else if (rotationAxis === "x")
+        coilRef.current.rotation.x = angleRef.current;
+      else coilRef.current.rotation.y = angleRef.current;
+    }
+
+    // 힘 벡터 화살표: sin(θ)에 비례하는 크기
+    const s = Math.abs(Math.sin(angleRef.current));
+    [arrow1Ref, arrow2Ref].forEach((r) => {
+      if (r.current) r.current.scale.setScalar(0.3 + s * 0.9);
     });
-    return out;
-  }, []);
-  if (!visible) return null;
+  });
+
+  // 원통 wire 헬퍼
+  const Wire = ({ from, to, r = R }) => {
+    const dir = new THREE.Vector3(...to).sub(new THREE.Vector3(...from));
+    const len = dir.length();
+    const mid = new THREE.Vector3(...from).addScaledVector(
+      dir.normalize(),
+      len / 2,
+    );
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      dir.clone().normalize(),
+    );
+    return (
+      <mesh position={mid.toArray()} quaternion={q} castShadow>
+        <cylinderGeometry args={[r, r, len, 12]} />
+        <meshStandardMaterial
+          color={DARK.coil}
+          metalness={0.95}
+          roughness={0.1}
+        />
+      </mesh>
+    );
+  };
+
   return (
     <group>
-      {lines.map((pts, i) => (
-        <Line key={i} points={pts} color="#3b82f6" lineWidth={1.1} transparent opacity={0.16 + 0.15 * strength} />
+      {/* ── N극 자석 (오른쪽 +X) ── */}
+      <group position={[3.4, 0, 0]}>
+        <mesh castShadow>
+          <boxGeometry args={[1.2, 2.2, 3.0]} />
+          <meshStandardMaterial
+            color={DARK.nRed}
+            metalness={0.4}
+            roughness={0.3}
+          />
+        </mesh>
+        {/* 극면 발광 */}
+        <mesh position={[-0.62, 0, 0]}>
+          <boxGeometry args={[0.08, 2.0, 2.8]} />
+          <meshStandardMaterial
+            color="#ff6644"
+            emissive="#ff2200"
+            emissiveIntensity={0.45}
+            metalness={0.6}
+            roughness={0.15}
+          />
+        </mesh>
+        <Text
+          position={[0.7, 0, 0]}
+          rotation={[0, -Math.PI / 2, 0]}
+          fontSize={0.7}
+          color="#fff"
+        >
+          N
+        </Text>
+      </group>
+
+      {/* ── S극 자석 (왼쪽 −X) ── */}
+      <group position={[-3.4, 0, 0]}>
+        <mesh castShadow>
+          <boxGeometry args={[1.2, 2.2, 3.0]} />
+          <meshStandardMaterial
+            color={DARK.sBlue}
+            metalness={0.4}
+            roughness={0.3}
+          />
+        </mesh>
+        <mesh position={[0.62, 0, 0]}>
+          <boxGeometry args={[0.08, 2.0, 2.8]} />
+          <meshStandardMaterial
+            color="#5599ff"
+            emissive="#1144cc"
+            emissiveIntensity={0.45}
+            metalness={0.6}
+            roughness={0.15}
+          />
+        </mesh>
+        <Text
+          position={[-0.7, 0, 0]}
+          rotation={[0, Math.PI / 2, 0]}
+          fontSize={0.7}
+          color="#fff"
+        >
+          S
+        </Text>
+      </group>
+
+      {/* ── 자기장선 (N→S, X축) ── */}
+      {[-0.7, 0, 0.7].map((z) =>
+        [-0.6, 0, 0.6].map((y) => (
+          <line key={`fl-${z}-${y}`}>
+            <bufferGeometry>
+              <bufferAttribute
+                attach="attributes-position"
+                array={new Float32Array([2.78, y, z, -2.78, y, z])}
+                itemSize={3}
+                count={2}
+              />
+            </bufferGeometry>
+            <lineBasicMaterial color={DARK.field} transparent opacity={0.35} />
+          </line>
+        )),
+      )}
+
+      {/* ── 사각형 코일 (회전 피벗) ── */}
+      <group ref={coilRef}>
+        {/* 4변 */}
+        <Wire from={[-W / 2, H / 2, 0]} to={[W / 2, H / 2, 0]} />
+        <Wire from={[-W / 2, -H / 2, 0]} to={[W / 2, -H / 2, 0]} />
+        <Wire from={[-W / 2, -H / 2, 0]} to={[-W / 2, H / 2, 0]} />
+        <Wire from={[W / 2, -H / 2, 0]} to={[W / 2, H / 2, 0]} />
+
+        {/* 코너 구 */}
+        {[
+          [-W / 2, H / 2],
+          [W / 2, H / 2],
+          [-W / 2, -H / 2],
+          [W / 2, -H / 2],
+        ].map(([x, y], i) => (
+          <mesh key={i} position={[x, y, 0]}>
+            <sphereGeometry args={[R * 1.15, 10, 10]} />
+            <meshStandardMaterial
+              color={DARK.coil}
+              metalness={0.95}
+              roughness={0.1}
+            />
+          </mesh>
+        ))}
+
+        {/* 회전축 */}
+        <mesh rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.055, 0.055, 5.0, 12]} />
+          <meshStandardMaterial color="#888" metalness={0.9} roughness={0.2} />
+        </mesh>
+
+        {/* 정류자 반환 */}
+        {[0, Math.PI].map((rot, i) => (
+          <group key={i} position={[0, H / 2 + 0.28, 0]} rotation={[0, rot, 0]}>
+            <mesh>
+              <cylinderGeometry
+                args={[0.22, 0.22, 0.3, 16, 1, false, 0, Math.PI]}
+              />
+              <meshStandardMaterial
+                color="#d4a800"
+                metalness={1.0}
+                roughness={0.05}
+              />
+            </mesh>
+          </group>
+        ))}
+
+        {/* 전류 방향 화살표 (상변) */}
+        <group ref={arrow1Ref} position={[(W / 2) * 0.3, H / 2, 0]}>
+          <mesh rotation={[0, 0, -Math.PI / 2]}>
+            <coneGeometry args={[0.1, 0.28, 8]} />
+            <meshBasicMaterial color={DARK.force} />
+          </mesh>
+        </group>
+        {/* 전류 방향 화살표 (하변) */}
+        <group ref={arrow2Ref} position={[(-W / 2) * 0.3, -H / 2, 0]}>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <coneGeometry args={[0.1, 0.28, 8]} />
+            <meshBasicMaterial color={DARK.force} />
+          </mesh>
+        </group>
+      </group>
+
+      {/* ── 브러시 ── */}
+      {[-0.26, 0.26].map((x, i) => (
+        <mesh key={i} position={[x, H / 2 + 0.28, 0]}>
+          <boxGeometry args={[0.1, 0.18, 0.14]} />
+          <meshStandardMaterial color="#333" metalness={0.3} roughness={0.7} />
+        </mesh>
       ))}
     </group>
   );
 }
 
-function ForceVectors({ angle, currentStrength, fieldStrength }) {
-  const commutator = Math.sign(Math.sin(angle)) || 1;
-  const mag = Math.abs(Math.sin(angle + 0.01)) * currentStrength * fieldStrength;
-  const scale = 0.45 + mag * 0.8;
-  const f1 = new THREE.Vector3(0, Math.cos(angle), -Math.sin(angle)).multiplyScalar(commutator).normalize();
-  const f2 = f1.clone().multiplyScalar(-1);
-  const p1 = new THREE.Vector3(-0.9, 1, 0).applyEuler(new THREE.Euler(0, angle, 0));
-  const p2 = new THREE.Vector3(0.9, -1, 0).applyEuler(new THREE.Euler(0, angle, 0));
-  const opacity = Math.max(0.2, Math.abs(Math.sin(angle)));
-  return (
-    <group>
-      <group position={p1.toArray()} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), f1)}>
-        <mesh position={[0, 0.35 * scale, 0]}>
-          <cylinderGeometry args={[0.035, 0.035, 0.7 * scale, 8]} />
-          <meshBasicMaterial color="#4caf50" transparent opacity={opacity} />
-        </mesh>
-        <mesh position={[0, 0.82 * scale, 0]}>
-          <coneGeometry args={[0.1, 0.28, 8]} />
-          <meshBasicMaterial color="#4caf50" transparent opacity={opacity} />
-        </mesh>
-      </group>
-      <group position={p2.toArray()} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), f2)}>
-        <mesh position={[0, 0.35 * scale, 0]}>
-          <cylinderGeometry args={[0.035, 0.035, 0.7 * scale, 8]} />
-          <meshBasicMaterial color="#4caf50" transparent opacity={opacity} />
-        </mesh>
-        <mesh position={[0, 0.82 * scale, 0]}>
-          <coneGeometry args={[0.1, 0.28, 8]} />
-          <meshBasicMaterial color="#4caf50" transparent opacity={opacity} />
-        </mesh>
-      </group>
-    </group>
-  );
-}
+// ─── GLB 모델 로더 (model_url 있을 때) ─────────────────────────────────────
+function GlbMotorModel({
+  modelUrl,
+  omegaRad,
+  coilObjectName,
+  rotationAxis = "z",
+}) {
+  const { scene } = useGLTF(modelUrl);
+  const coilRef = useRef();
+  const angleRef = useRef(0);
 
-function DcMotorGLB({ url, coilName, spinAxis, angle, currentStrength, fieldStrength, northPoleNames, southPoleNames }) {
-  const { scene } = useGLTF(url);
-  const root = useMemo(() => scene.clone(true), [scene]);
-  const coilRef = useRef(null);
+  // coilObjectName 에 해당하는 오브젝트 찾기
+  useEffect(() => {
+    if (!scene || !coilObjectName) return;
+    const obj = scene.getObjectByName(coilObjectName);
+    coilRef.current = obj ?? null;
+  }, [scene, coilObjectName]);
 
-  useLayoutEffect(() => {
-    coilRef.current = root.getObjectByName(coilName) ?? null;
-  }, [root, coilName]);
-
-  useFrame(() => {
-    const c = coilRef.current;
-    if (!c) return;
-    if (spinAxis === "y") c.rotation.y = angle;
-    else c.rotation.z = angle;
+  useFrame((_, dt) => {
+    angleRef.current += omegaRad * dt;
+    if (coilRef.current) {
+      if (rotationAxis === "z") coilRef.current.rotation.z = angleRef.current;
+      else if (rotationAxis === "x")
+        coilRef.current.rotation.x = angleRef.current;
+      else coilRef.current.rotation.y = angleRef.current;
+    }
   });
 
-  useEffect(() => {
-    const northSet = new Set(northPoleNames);
-    const southSet = new Set(southPoleNames);
-    const bGain = Math.min(1.2, Math.max(0, fieldStrength / 1.2));
-    const iGain = Math.min(1.2, Math.max(0, currentStrength / 1.6));
-    root.traverse((o) => {
-      if (!o.isMesh) return;
-      const mats = Array.isArray(o.material) ? o.material : [o.material];
-      mats.forEach((m) => {
-        if (!m || !m.emissive) return;
-        if (!m.userData._dcBaseE) {
-          m.userData._dcBaseE = m.emissive.clone();
-          m.userData._dcBaseI = m.emissiveIntensity ?? 0;
-        }
-        let p = o;
-        let underCoil = false;
-        while (p) {
-          if (p.name === coilName) underCoil = true;
-          p = p.parent;
-        }
-        if (underCoil) {
-          m.emissive.copy(m.userData._dcBaseE).lerp(new THREE.Color("#e8a623"), 0.25 + iGain * 0.55);
-          m.emissiveIntensity = m.userData._dcBaseI + iGain * 0.6;
-          return;
-        }
-        if (northSet.has(o.name)) {
-          m.emissive.copy(m.userData._dcBaseE).lerp(new THREE.Color("#e8593c"), 0.25 + bGain * 0.45);
-          m.emissiveIntensity = m.userData._dcBaseI + bGain * 0.45;
-          return;
-        }
-        if (southSet.has(o.name)) {
-          m.emissive.copy(m.userData._dcBaseE).lerp(new THREE.Color("#3b8bd4"), 0.25 + bGain * 0.45);
-          m.emissiveIntensity = m.userData._dcBaseI + bGain * 0.45;
-          return;
-        }
-        m.emissive.copy(m.userData._dcBaseE);
-        m.emissiveIntensity = m.userData._dcBaseI;
-      });
-    });
-  }, [root, coilName, currentStrength, fieldStrength, northPoleNames, southPoleNames]);
-
-  return <primitive object={root} />;
+  return <primitive object={scene} />;
 }
 
-function SceneRig(props) {
-  const { modelUrl, showFieldLines, fieldStrength, orbitRef } = props;
-  const canLoadModel = typeof modelUrl === "string" && modelUrl.length > 0;
+// ─── 씬 루트 (GLB 우선, 오류 시 절차적) ───────────────────────────────────
+function MotorScene({ omegaRad, apiData }) {
+  const [glbFailed, setGlbFailed] = useState(!apiData?.model_url);
+
   return (
     <>
-      <color attach="background" args={["#0d0f14"]} />
-      <ambientLight intensity={0.6} color="#404060" />
-      <directionalLight castShadow position={[6, 8, 5]} intensity={1.3} color="#fff5e0" />
-      <pointLight position={[-4, 2, 3]} intensity={0.8} color="#3b8bd4" distance={20} />
-      <pointLight position={[3, 0, 0]} intensity={0.35 + fieldStrength * 0.35} color="#e8593c" distance={8} />
-      <pointLight position={[-3, 0, 0]} intensity={0.35 + fieldStrength * 0.35} color="#3b8bd4" distance={8} />
-      <Environment preset="city" />
-      <FluxFieldLines visible={showFieldLines} fieldStrength={fieldStrength} />
-      <Suspense fallback={null}>
-        {canLoadModel ? (
-          <DcMotorGLB
-            url={modelUrl}
-            coilName={props.coilName}
-            spinAxis={props.spinAxis}
-            angle={props.angle}
-            currentStrength={props.currentStrength}
-            fieldStrength={props.fieldStrength}
-            northPoleNames={props.northPoleNames}
-            southPoleNames={props.southPoleNames}
-          />
-        ) : null}
-      </Suspense>
-      <ForceVectors angle={props.angle} currentStrength={props.currentStrength} fieldStrength={props.fieldStrength} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow>
-        <planeGeometry args={[30, 30]} />
-        <meshStandardMaterial color="#111420" roughness={0.9} />
-      </mesh>
-      <OrbitControls ref={orbitRef} enableDamping dampingFactor={0.08} minDistance={4} maxDistance={20} />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[6, 8, 5]} intensity={1.4} castShadow />
+      <pointLight
+        position={[3, 0, 0]}
+        color={DARK.nRed}
+        intensity={0.9}
+        distance={10}
+      />
+      <pointLight
+        position={[-3, 0, 0]}
+        color={DARK.sBlue}
+        intensity={0.9}
+        distance={10}
+      />
+
+      <OrbitControls enablePan enableZoom enableRotate />
+
+      {apiData?.model_url && !glbFailed ? (
+        <Suspense
+          fallback={<ProceduralMotor omegaRad={omegaRad} apiData={apiData} />}
+        >
+          <GlbErrorBoundary onFail={() => setGlbFailed(true)}>
+            <GlbMotorModel
+              modelUrl={apiData.model_url}
+              omegaRad={omegaRad}
+              coilObjectName={apiData.coil_object_name}
+              rotationAxis={apiData.rotation_axis}
+            />
+          </GlbErrorBoundary>
+        </Suspense>
+      ) : (
+        <ProceduralMotor omegaRad={omegaRad} apiData={apiData} />
+      )}
     </>
   );
 }
 
+// ─── GLB 오류 경계 (클래스 컴포넌트) ──────────────────────────────────────
+import { Component } from "react";
+class GlbErrorBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onFail?.();
+  }
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
+
+// ─── 슬라이더 + 수치 패널 ──────────────────────────────────────────────────
+function SliderRow({
+  label,
+  unit,
+  value,
+  min,
+  max,
+  step = 0.05,
+  onChange,
+  color = DARK.text,
+}) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 5,
+          fontSize: 12,
+          color: DARK.muted,
+        }}
+      >
+        <span>{label}</span>
+        <span
+          style={{ color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+        >
+          {value.toFixed(2)} {unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        style={{
+          width: "100%",
+          accentColor: color,
+          cursor: "pointer",
+          height: 4,
+        }}
+      />
+    </div>
+  );
+}
+
+function MetricCard({ label, value, unit, color }) {
+  return (
+    <div
+      style={{
+        background: DARK.surface,
+        border: `0.5px solid ${DARK.border}`,
+        borderRadius: 8,
+        padding: "10px 14px",
+        flex: 1,
+        minWidth: 90,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          color: DARK.muted,
+          marginBottom: 4,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 20,
+          fontWeight: 500,
+          color: color ?? DARK.text,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+        <span style={{ fontSize: 11, marginLeft: 4, color: DARK.muted }}>
+          {unit}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────
+/**
+ * @param {{ apiData: import("./types").DcCoilMotorApiData }} props
+ */
 export default function DcCoilMotorWidget({ apiData }) {
-  const defaults = apiData?.defaults ?? {};
-  const pc = apiData?.physics_constants ?? {};
-  const modelUrlRaw = apiData?.model_url ?? "/models/dc_coil_motor.glb";
-  const modelUrlSafe =
-    typeof modelUrlRaw === "string" && modelUrlRaw.length > 0
-      ? modelUrlRaw
-      : "/models/dc_coil_motor.glb";
-  const coilName = apiData?.coil_object_name ?? "Motor_Coil_Root";
-  const spinAxis = apiData?.rotation_axis ?? "z";
-  const omegaPath = apiData?.omega_api_path ?? "/api/machine/dc_coil_motor/omega";
-  const northPoleNames = apiData?.north_pole_names ?? ["N_Pole_Body", "N_Pole_Face", "Magnet_North"];
-  const southPoleNames = apiData?.south_pole_names ?? ["S_Pole_Body", "S_Pole_Face", "Magnet_South"];
-  const modelBuildCommand = apiData?.model_build_command ?? "blender --background --python scripts/dc_motor_blender.py";
+  const def = apiData?.defaults ?? {};
+  const phys = apiData?.physics_constants ?? {};
+  const omegaApiPath =
+    apiData?.omega_api_path ?? "/api/machine/dc_coil_motor/omega";
 
-  const [currentA, setCurrentA] = useState(defaults.current_a ?? 1);
-  const [bT, setBT] = useState(defaults.b_tesla ?? 1);
-  const [speedMult, setSpeedMult] = useState(1);
-  const [playing, setPlaying] = useState(true);
-  const [showFieldLines, setShowFieldLines] = useState(true);
-  const [omegaRadS, setOmegaRadS] = useState(0);
-  const [usedLocalOmega, setUsedLocalOmega] = useState(false);
-  const [omegaError, setOmegaError] = useState(null);
-  const [validatedModelUrl, setValidatedModelUrl] = useState(null);
-  const [angle, setAngle] = useState(0);
-  const orbitRef = useRef(null);
-  const debounceRef = useRef(null);
-  const clockRef = useRef(0);
+  const [currentA, setCurrentA] = useState(def.current_a ?? 2.0);
+  const [bTesla, setBTesla] = useState(def.b_tesla ?? 0.35);
+  const [omegaData, setOmegaData] = useState(null);
+  const [fetching, setFetching] = useState(false);
 
-  const imin = defaults.current_min_a ?? 0.2;
-  const imax = defaults.current_max_a ?? 2;
-  const bmin = defaults.b_min_t ?? 0.3;
-  const bmax = defaults.b_max_t ?? 2;
-
-  useEffect(() => {
-    let cancelled = false;
-    const base = modelUrlSafe.startsWith("http")
-      ? modelUrlSafe
-      : `${window.location.origin}${modelUrlSafe}`;
-    (async () => {
+  // 백엔드 omega 요청
+  const fetchOmega = useCallback(
+    async (i, b) => {
+      setFetching(true);
       try {
-        const res = await fetch(base);
-        if (!res.ok) throw new Error(`model fetch failed: ${res.status}`);
-        const buf = await res.arrayBuffer();
-        if (!isBinaryGlb(buf)) throw new Error("not glb");
-        if (!cancelled) setValidatedModelUrl(modelUrlSafe);
-      } catch {
-        if (!cancelled) setValidatedModelUrl(null);
+        const res = await apiClient.get(omegaApiPath, {
+          params: {
+            current_a: i,
+            b_t: b,
+            n_turns: phys.n_turns ?? 12,
+            area_m2: phys.area_m2 ?? 0.012,
+            motor_gain: phys.motor_gain ?? 380.0,
+            damping: phys.damping ?? 0.18,
+            omega_cap_rad_s: phys.omega_cap_rad_s ?? 72.0,
+          },
+        });
+        setOmegaData(res.data);
+      } catch (e) {
+        console.error("dc_coil omega fetch failed:", e);
+        // 폴백: 간단 계산
+        const raw =
+          (380.0 * (phys.n_turns ?? 12) * (phys.area_m2 ?? 0.012) * i * b) /
+          (1 + 0.18 * i * b + 0.05 * i * i);
+        const omega = Math.min(phys.omega_cap_rad_s ?? 72, Math.max(0, raw));
+        setOmegaData({
+          omega_rad_s: omega,
+          omega_rpm: (omega * 30) / Math.PI,
+          torque_scale_n_m:
+            (phys.n_turns ?? 12) * (phys.area_m2 ?? 0.012) * i * b,
+        });
+      } finally {
+        setFetching(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [modelUrlSafe]);
+    },
+    [omegaApiPath, phys],
+  );
 
+  // 슬라이더 변경 시 디바운스 요청
   useEffect(() => {
-    if (typeof validatedModelUrl === "string" && validatedModelUrl.length > 0) {
-      useGLTF.preload(validatedModelUrl);
-    }
-  }, [validatedModelUrl]);
+    const t = setTimeout(() => fetchOmega(currentA, bTesla), 280);
+    return () => clearTimeout(t);
+  }, [currentA, bTesla, fetchOmega]);
 
-  const fetchOmega = useCallback(async () => {
-    setOmegaError(null);
-    try {
-      const res = await apiClient.get(omegaPath, {
-        params: {
-          current_a: currentA,
-          b_t: bT,
-          n_turns: pc.n_turns,
-          area_m2: pc.area_m2,
-          motor_gain: pc.motor_gain,
-          damping: pc.damping,
-          omega_cap_rad_s: pc.omega_cap_rad_s,
-        },
-      });
-      setOmegaRadS(res.data?.omega_rad_s ?? 0);
-      setUsedLocalOmega(false);
-    } catch (e) {
-      setOmegaRadS(computeOmegaLocal(currentA, bT, pc));
-      setUsedLocalOmega(true);
-      setOmegaError(e?.response?.data?.detail || e?.message || "omega API unavailable");
-    }
-  }, [omegaPath, currentA, bT, pc]);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(fetchOmega, DEBOUNCE_MS);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [fetchOmega]);
-
-  useEffect(() => {
-    let rafId = 0;
-    const loop = (t) => {
-      if (!clockRef.current) clockRef.current = t;
-      const dt = Math.min(0.05, (t - clockRef.current) / 1000);
-      clockRef.current = t;
-      if (playing) {
-        const next = (angle + dt * BASE_OMEGA * speedMult * Math.sign(currentA || 1)) % (Math.PI * 2);
-        setAngle(next < 0 ? next + Math.PI * 2 : next);
-      }
-      rafId = requestAnimationFrame(loop);
-    };
-    rafId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafId);
-  }, [playing, speedMult, currentA, angle]);
-
-  const commutator = Math.sign(Math.sin(angle)) || 1;
-  const flux = Math.abs(Math.cos(angle)) * Math.max(0.3, bT);
-  const emf = Math.abs(Math.sin(angle)) * BASE_OMEGA * speedMult * bT * Math.abs(currentA);
-  const torque = Math.abs(Math.sin(angle + 0.01)) * bT * Math.abs(currentA);
-  const angleDeg = Math.round((angle * 180) / Math.PI) % 360;
-
-  const resetView = () => {
-    const c = orbitRef.current;
-    if (!c) return;
-    c.target.set(0, 0.2, 0);
-    c.object.position.set(CAM_POS[0], CAM_POS[1], CAM_POS[2]);
-    c.update();
-  };
+  const omega = omegaData?.omega_rad_s ?? 0;
+  const rpm = omegaData?.omega_rpm ?? 0;
+  const torque = omegaData?.torque_scale_n_m ?? 0;
 
   return (
-    <div className="relative w-full overflow-hidden rounded-xl border border-slate-700 bg-[#0d0f14]" style={{ height: "min(78vh, 640px)" }}>
-      {!validatedModelUrl ? (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/90 p-4 text-center text-sm text-amber-100">
-          GLB load failed. <code className="mx-1 rounded bg-slate-800 px-1">public/models/dc_coil_motor.glb</code>
-          <br />
-          Build: <code className="mx-1 rounded bg-slate-800 px-1">{modelBuildCommand}</code>
+    <div
+      style={{
+        background: DARK.bg,
+        borderRadius: 12,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: "var(--font-sans, 'Segoe UI', sans-serif)",
+        color: DARK.text,
+        border: `0.5px solid ${DARK.border}`,
+      }}
+    >
+      {/* ── 헤더 ── */}
+      <div
+        style={{
+          padding: "14px 18px",
+          borderBottom: `0.5px solid ${DARK.border}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            {apiData?.title ?? "DC 사각형 코일 모터"}
+          </div>
+          {apiData?.subtitle && (
+            <div style={{ fontSize: 12, color: DARK.muted, marginTop: 3 }}>
+              {apiData.subtitle}
+            </div>
+          )}
         </div>
-      ) : null}
-
-      <div className="absolute left-4 top-4 z-20 rounded-lg border border-white/10 bg-slate-900/80 px-4 py-3 text-xs text-slate-300 backdrop-blur">
-        Fleming left-hand law
-        <div className="mt-1 text-base font-semibold text-white">DC motor - rectangular coil rotation</div>
+        {fetching && (
+          <div
+            style={{
+              fontSize: 11,
+              color: DARK.muted,
+              padding: "3px 8px",
+              background: DARK.surface,
+              borderRadius: 6,
+              border: `0.5px solid ${DARK.border}`,
+            }}
+          >
+            연산 중…
+          </div>
+        )}
       </div>
 
-      <div className="absolute right-4 top-4 z-20 min-w-[220px] rounded-lg border border-white/10 bg-slate-900/80 px-4 py-3 text-xs text-slate-300 backdrop-blur">
-        <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#3B8BD4]" />B <span className="ml-auto text-slate-100">N -&gt; S (-X)</span></div>
-        <div className="mt-1 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#E8A623]" />I <span className="ml-auto text-slate-100">{commutator > 0 ? "+Z: front-back" : "+Z: back-front"}</span></div>
-        <div className="mt-1 flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#4CAF50]" />F <span className="ml-auto text-slate-100">{torque > 0.08 ? "torque on" : "dead zone"}</span></div>
-        <div className="mt-2 border-t border-white/10 pt-2">
-          <div className="flex justify-between"><span>Flux</span><span className="text-slate-100">{flux.toFixed(3)} Wb</span></div>
-          <div className="mt-1 flex justify-between"><span>EMF</span><span className="text-slate-100">{emf.toFixed(2)} V</span></div>
-          <div className="mt-1 flex justify-between"><span>Torque</span><span className="text-slate-100">{torque.toFixed(2)} N*m</span></div>
-          <div className="mt-1 flex justify-between"><span>Omega</span><span className="text-slate-100">{(omegaRadS * speedMult).toFixed(2)} rad/s</span></div>
-          {usedLocalOmega ? <div className="mt-1 text-amber-300">Local formula ({String(omegaError)})</div> : null}
+      {/* ── 3D 캔버스 ── */}
+      <div style={{ height: 460, background: DARK.bg }}>
+        <Canvas
+          camera={{ position: [5.5, 3.5, 7], fov: 45 }}
+          shadows
+          style={{ height: "100%", width: "100%" }}
+          gl={{ antialias: true }}
+        >
+          <MotorScene omegaRad={omega} apiData={apiData} />
+        </Canvas>
+      </div>
+
+      {/* ── 하단 패널 ── */}
+      <div
+        style={{
+          padding: "16px 18px",
+          borderTop: `0.5px solid ${DARK.border}`,
+          background: DARK.surface,
+          display: "flex",
+          gap: 24,
+          flexWrap: "wrap",
+        }}
+      >
+        {/* 슬라이더 */}
+        <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: DARK.muted,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 12,
+            }}
+          >
+            파라미터 제어
+          </div>
+          <SliderRow
+            label="전류 I"
+            unit="A"
+            value={currentA}
+            min={def.current_min_a ?? 0}
+            max={def.current_max_a ?? 10}
+            step={0.1}
+            onChange={setCurrentA}
+            color={DARK.nRed}
+          />
+          <SliderRow
+            label="자기장 B"
+            unit="T"
+            value={bTesla}
+            min={def.b_min_t ?? 0}
+            max={def.b_max_t ?? 1.2}
+            step={0.01}
+            onChange={setBTesla}
+            color={DARK.sBlue}
+          />
         </div>
-      </div>
 
-      <div className="absolute bottom-4 right-4 z-20 text-right text-white">
-        <div className="text-3xl font-light">{angleDeg}°</div>
-        <div className="text-[10px] uppercase tracking-widest text-slate-400">rotation</div>
-      </div>
-
-      <div className="absolute left-4 top-1/2 z-20 flex -translate-y-1/2 items-center gap-2">
-        <div className="relative h-52 w-3 overflow-hidden rounded-full border border-white/10 bg-gradient-to-b from-[#E8593C] to-[#3B8BD4]">
-          <div className="absolute bottom-0 left-0 right-0 bg-black/55" style={{ height: `${(1 - Math.min(1, flux / Math.max(0.0001, bmax))) * 100}%` }} />
+        {/* 수치 카드 */}
+        <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: DARK.muted,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 12,
+            }}
+          >
+            연산 결과
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <MetricCard
+              label="각속도"
+              value={omega.toFixed(1)}
+              unit="rad/s"
+              color={DARK.force}
+            />
+            <MetricCard
+              label="RPM"
+              value={Math.round(rpm)}
+              unit="rpm"
+              color={DARK.coil}
+            />
+            <MetricCard
+              label="토크"
+              value={torque.toFixed(3)}
+              unit="N·m"
+              color={DARK.field}
+            />
+          </div>
         </div>
+
+        {/* 수식 패널 */}
+        {apiData?.formula_panel && (
+          <div style={{ flex: "0 0 auto", minWidth: 160 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: DARK.muted,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                marginBottom: 12,
+              }}
+            >
+              {apiData.formula_panel.heading}
+            </div>
+            {apiData.formula_panel.items.map((item, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginBottom: 6,
+                  fontSize: 13,
+                  alignItems: "baseline",
+                }}
+              >
+                <span style={{ color: DARK.muted, minWidth: 44 }}>
+                  {item.label}
+                </span>
+                <span style={{ fontFamily: "monospace", color: DARK.text }}>
+                  {item.expr}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-white/10 bg-slate-900/80 px-4 py-3 text-xs text-slate-300 backdrop-blur">
-        <button type="button" onClick={() => setPlaying((v) => !v)} className={`rounded border px-3 py-1 ${playing ? "border-orange-400 text-orange-300" : "border-white/20 text-slate-100"}`}>
-          {playing ? "Pause" : "Play"}
-        </button>
-        <div className="mx-1 h-8 w-px bg-white/15" />
-        <label className="flex flex-col items-center gap-1">Speed
-          <input type="range" min={0.2} max={4} step={0.1} value={speedMult} onChange={(e) => setSpeedMult(Number(e.target.value))} className="w-28 accent-orange-500" />
-        </label>
-        <div className="mx-1 h-8 w-px bg-white/15" />
-        <label className="flex flex-col items-center gap-1">Current
-          <input type="range" min={Math.max(0.2, imin)} max={Math.max(2, imax)} step={0.05} value={currentA} onChange={(e) => setCurrentA(Number(e.target.value))} className="w-28 accent-orange-500" />
-        </label>
-        <div className="mx-1 h-8 w-px bg-white/15" />
-        <label className="flex flex-col items-center gap-1">Field
-          <input type="range" min={Math.max(0.3, bmin)} max={Math.max(2, bmax)} step={0.05} value={bT} onChange={(e) => setBT(Number(e.target.value))} className="w-28 accent-orange-500" />
-        </label>
-        <div className="mx-1 h-8 w-px bg-white/15" />
-        <button type="button" onClick={() => setShowFieldLines((v) => !v)} className="rounded border border-white/20 px-3 py-1 text-slate-100">Field Lines</button>
-        <button type="button" onClick={resetView} className="rounded border border-white/20 px-3 py-1 text-slate-100">Reset View</button>
-      </div>
-
-      <Canvas shadows camera={{ position: CAM_POS, fov: 45, near: 0.1, far: 100 }}>
-        <SceneRig
-          modelUrl={validatedModelUrl}
-          coilName={coilName}
-          spinAxis={spinAxis}
-          angle={angle}
-          currentStrength={Math.abs(currentA)}
-          fieldStrength={bT}
-          showFieldLines={showFieldLines}
-          northPoleNames={northPoleNames}
-          southPoleNames={southPoleNames}
-          orbitRef={orbitRef}
-        />
-      </Canvas>
+      {/* ── 노트 ── */}
+      {apiData?.notes?.length > 0 && (
+        <div
+          style={{
+            padding: "10px 18px",
+            borderTop: `0.5px solid ${DARK.border}`,
+            fontSize: 11,
+            color: DARK.muted,
+            lineHeight: 1.7,
+          }}
+        >
+          {apiData.notes.map((n, i) => (
+            <div key={i}>• {n}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
