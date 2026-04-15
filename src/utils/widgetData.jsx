@@ -292,6 +292,11 @@ const WIDGET_MAP = {
   h_bridge_control: [
     lazy(() => import("@/components/animations/machines/HBridgeSimulation")),
   ],
+  three_phase_induction_motor: [
+    lazy(
+      () => import("@/components/animations/machines/ThreePhaseinductionMotor"),
+    ),
+  ],
 };
 
 export default WIDGET_MAP;
