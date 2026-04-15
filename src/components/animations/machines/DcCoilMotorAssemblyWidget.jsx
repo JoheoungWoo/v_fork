@@ -1,24 +1,28 @@
 /**
  * DcMotorDynamicsWidget.jsx
  *
- * 조명(Lighting)과 재질(Material)을 밝게 개선한 직류 전동기 동역학 시뮬레이션
+ * 직류 전동기 동역학 시뮬레이션 (라이트 테마 + LaTeX 수식 렌더링 적용)
  */
 
 import { OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useRef, useState } from "react";
 
+// 💡 LaTeX 렌더링을 위한 패키지 임포트
+import "katex/dist/katex.min.css";
+import { BlockMath, InlineMath } from "react-katex";
+
 const C = {
-  bg: "#0f1117",
-  surface: "#1a1d27",
-  surfaceLight: "#23283b",
-  border: "#2a2e3e",
-  text: "#e2e0d8",
-  muted: "#7a7872",
-  accent: "#4facf7",
-  success: "#9cffb5",
-  danger: "#ff7a7a",
-  highlight: "#ffe66d",
+  bg: "#ffffff",
+  surface: "#f8f9fa",
+  surfaceLight: "#ffffff",
+  border: "#dee2e6",
+  text: "#212529",
+  muted: "#6c757d",
+  accent: "#0d6efd", // Ia (파란색)
+  success: "#198754", // 알파 양수 (초록색)
+  danger: "#dc3545", // Tl (빨간색)
+  highlight: "#fd7e14", // 오렌지색
 };
 
 function StripedCylinder({ args, color, position, nameText }) {
@@ -39,7 +43,7 @@ function StripedCylinder({ args, color, position, nameText }) {
         rotation={[angle, 0, 0]}
       >
         <boxGeometry args={[height + 0.05, 0.05, 0.1]} />
-        <meshStandardMaterial color="#ffffff" emissive="#333333" />
+        <meshStandardMaterial color="#ffffff" emissive="#dddddd" />
       </mesh>,
     );
   }
@@ -48,11 +52,15 @@ function StripedCylinder({ args, color, position, nameText }) {
     <group position={position}>
       <mesh rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[radius, radius, height, radialSegments]} />
-        {/* 💡 metalness를 낮추고 roughness를 높여 빛 반사를 부드럽게(밝게) 만듦 */}
-        <meshStandardMaterial color={color} metalness={0.2} roughness={0.6} />
+        <meshStandardMaterial color={color} metalness={0.1} roughness={0.7} />
       </mesh>
       {markers}
-      <Text position={[0, radius + 0.6, 0]} fontSize={0.4} color="white">
+      <Text
+        position={[0, radius + 0.6, 0]}
+        fontSize={0.4}
+        color="#343a40"
+        fontWeight="bold"
+      >
         {nameText}
       </Text>
     </group>
@@ -104,26 +112,24 @@ function DynamicsSimulation({
 
   return (
     <group ref={systemRef}>
-      {/* 💡 색상을 더 밝은 파란색(#3399ff)으로 변경 */}
       <StripedCylinder
         args={[1.0, 2.0, 32]}
-        color="#3399ff"
+        color="#4dabf7"
         position={[-2, 0, 0]}
         nameText="전동기 (Motor)"
       />
 
       <mesh rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.2, 0.2, 3, 16]} />
-        <meshStandardMaterial color="#dddddd" metalness={0.5} roughness={0.3} />
+        <meshStandardMaterial color="#cccccc" metalness={0.4} roughness={0.5} />
       </mesh>
-      <Text position={[0, 0.5, 0]} fontSize={0.3} color="#eeeeee">
+      <Text position={[0, 0.5, 0]} fontSize={0.3} color="#495057">
         축 (Shaft)
       </Text>
 
-      {/* 💡 색상을 더 밝은 회색(#888888)으로 변경 */}
       <StripedCylinder
         args={[1.2, 2.0, 32]}
-        color="#888888"
+        color="#adb5bd"
         position={[2, 0, 0]}
         nameText="부하 (Load)"
       />
@@ -161,6 +167,7 @@ export default function DcMotorDynamicsWidget() {
       <div
         style={{
           padding: 12,
+          background: C.surface,
           borderBottom: `1px solid ${C.border}`,
           fontWeight: 600,
           display: "flex",
@@ -169,8 +176,9 @@ export default function DcMotorDynamicsWidget() {
         }}
       >
         <span>직류 전동기 기계적 부하 동역학 시뮬레이션</span>
-        <span style={{ fontSize: 13, color: C.muted, fontWeight: "normal" }}>
-          T<sub>M</sub> = J(dω/dt) + Bω + T<sub>L</sub>
+        {/* 💡 헤더에 LaTeX 수식 적용 */}
+        <span style={{ fontSize: 14, color: C.muted, fontWeight: "normal" }}>
+          <InlineMath math="T_M = J \frac{d\omega_m}{dt} + B\omega_m + T_L" />
         </span>
       </div>
 
@@ -180,22 +188,14 @@ export default function DcMotorDynamicsWidget() {
           shadows
           gl={{ antialias: true }}
         >
-          {/* 💡 3D 캔버스 배경색을 추가하여 공간이 너무 까맣지 않게 만듦 */}
-          <color attach="background" args={["#1a1f2e"]} />
-
-          {/* 💡 조명 세팅 대폭 강화 */}
-          <ambientLight intensity={1.5} />
-          <hemisphereLight
-            skyColor="#ffffff"
-            groundColor="#444444"
-            intensity={1.0}
-          />
+          <color attach="background" args={["#f1f3f5"]} />
+          <ambientLight intensity={1.8} />
           <directionalLight
             position={[10, 15, 10]}
-            intensity={2.0}
+            intensity={1.5}
             castShadow
           />
-          <directionalLight position={[-10, 5, -10]} intensity={1.2} />
+          <directionalLight position={[-10, -5, -10]} intensity={0.5} />
 
           <OrbitControls target={[0, 0, 0]} minDistance={3} maxDistance={20} />
           <Suspense fallback={null}>
@@ -213,8 +213,9 @@ export default function DcMotorDynamicsWidget() {
 
       <div
         style={{
-          padding: "12px 20px",
-          background: "#0a0c10",
+          padding: "16px 20px",
+          background: C.surfaceLight,
+          borderTop: `1px solid ${C.border}`,
           borderBottom: `1px solid ${C.border}`,
           display: "flex",
           gap: "20px",
@@ -222,22 +223,29 @@ export default function DcMotorDynamicsWidget() {
         }}
       >
         <div>
-          <div style={{ fontSize: 11, color: C.muted }}>현재 RPM</div>
-          <div style={{ fontSize: 20, fontWeight: "bold", color: C.highlight }}>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
+            현재 RPM
+          </div>
+          <div style={{ fontSize: 22, fontWeight: "bold", color: C.highlight }}>
             {Math.round(metrics.rpm)}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 11, color: C.muted }}>각속도 (ω)</div>
-          <div style={{ fontSize: 16, fontWeight: "bold", color: C.highlight }}>
-            {metrics.omega.toFixed(2)} rad/s
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
+            각속도 (ω)
+          </div>
+          <div style={{ fontSize: 18, fontWeight: "bold", color: C.highlight }}>
+            {metrics.omega.toFixed(2)}{" "}
+            <span style={{ fontSize: 12, fontWeight: "normal" }}>rad/s</span>
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 11, color: C.muted }}>각가속도 (α)</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
+            각가속도 (α)
+          </div>
           <div
             style={{
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: "bold",
               color:
                 metrics.alpha > 0
@@ -247,32 +255,36 @@ export default function DcMotorDynamicsWidget() {
                     : C.text,
             }}
           >
-            {metrics.alpha.toFixed(2)} rad/s²
+            {metrics.alpha.toFixed(2)}{" "}
+            <span style={{ fontSize: 12, fontWeight: "normal" }}>rad/s²</span>
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 11, color: C.muted }}>발생 토크 (Te)</div>
-          <div style={{ fontSize: 16, fontWeight: "bold", color: C.accent }}>
-            {metrics.Te.toFixed(2)} Nm
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
+            발생 토크 (Te)
+          </div>
+          <div style={{ fontSize: 18, fontWeight: "bold", color: C.accent }}>
+            {metrics.Te.toFixed(2)}{" "}
+            <span style={{ fontSize: 12, fontWeight: "normal" }}>Nm</span>
           </div>
         </div>
       </div>
 
       <div
         style={{
-          padding: 16,
-          background: C.surfaceLight,
+          padding: 20,
+          background: C.bg,
           borderBottom: `1px solid ${C.border}`,
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: "16px",
+          gap: "20px",
         }}
       >
         <div>
           <div
             style={{
-              marginBottom: 4,
-              fontSize: 13,
+              marginBottom: 8,
+              fontSize: 14,
               display: "flex",
               justifyContent: "space-between",
             }}
@@ -299,8 +311,8 @@ export default function DcMotorDynamicsWidget() {
         <div>
           <div
             style={{
-              marginBottom: 4,
-              fontSize: 13,
+              marginBottom: 8,
+              fontSize: 14,
               display: "flex",
               justifyContent: "space-between",
             }}
@@ -327,8 +339,8 @@ export default function DcMotorDynamicsWidget() {
         <div>
           <div
             style={{
-              marginBottom: 4,
-              fontSize: 13,
+              marginBottom: 8,
+              fontSize: 14,
               display: "flex",
               justifyContent: "space-between",
             }}
@@ -351,8 +363,8 @@ export default function DcMotorDynamicsWidget() {
         <div>
           <div
             style={{
-              marginBottom: 4,
-              fontSize: 13,
+              marginBottom: 8,
+              fontSize: 14,
               display: "flex",
               justifyContent: "space-between",
             }}
@@ -374,79 +386,62 @@ export default function DcMotorDynamicsWidget() {
         </div>
       </div>
 
+      {/* 💡 완전히 LaTeX로 렌더링된 실시간 수식 풀이 과정 */}
       <div
         style={{
-          padding: 16,
+          padding: "20px 24px",
           background: C.surface,
-          fontFamily: "monospace",
-          fontSize: 14,
-          lineHeight: "1.6",
+          fontSize: 15,
+          lineHeight: "1.8",
         }}
       >
         <div
           style={{
             fontWeight: "bold",
-            fontSize: 13,
-            color: C.muted,
+            fontSize: 14,
+            color: C.text,
             marginBottom: 12,
-            borderBottom: `1px solid ${C.border}`,
-            paddingBottom: 6,
+            borderBottom: `2px solid ${C.border}`,
+            paddingBottom: 8,
           }}
         >
-          [실시간 운동 방정식 풀이 과정]
+          📝 실시간 운동 방정식 풀이 과정
         </div>
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ color: C.muted }}>① 모터 발생 토크 (Te):</span>
-          <br />
-          &nbsp;&nbsp;T<sub>e</sub> = K<sub>T</sub> ×{" "}
-          <span style={{ color: C.accent }}>
-            I<sub>a</sub>
+
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ color: C.muted, fontWeight: "bold", fontSize: 13 }}>
+            ① 모터 발생 토크 (Te):
           </span>
-          <br />
-          &nbsp;&nbsp;T<sub>e</sub> = {kt.toFixed(1)} ×{" "}
-          <span style={{ color: C.accent }}>{currentI.toFixed(2)}</span> ={" "}
-          <strong>{metrics.Te.toFixed(2)} Nm</strong>
+          <BlockMath
+            math={`T_e = K_T \\cdot \\color{${C.accent}}{I_a} = ${kt.toFixed(1)} \\cdot \\color{${C.accent}}{${currentI.toFixed(2)}} = \\mathbf{${metrics.Te.toFixed(2)} \\text{ Nm}}`}
+          />
         </div>
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ color: C.muted }}>② 마찰 손실 토크 (Tf):</span>
-          <br />
-          &nbsp;&nbsp;T<sub>f</sub> = B × ω<br />
-          &nbsp;&nbsp;T<sub>f</sub> = {frictionB.toFixed(2)} ×{" "}
-          {metrics.omega.toFixed(2)} ={" "}
-          <strong>{metrics.Tf.toFixed(2)} Nm</strong>
+
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ color: C.muted, fontWeight: "bold", fontSize: 13 }}>
+            ② 마찰 손실 토크 (Tf):
+          </span>
+          <BlockMath
+            math={`T_f = B \\cdot \\omega_m = ${frictionB.toFixed(2)} \\cdot ${metrics.omega.toFixed(2)} = \\mathbf{${metrics.Tf.toFixed(2)} \\text{ Nm}}`}
+          />
         </div>
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ color: C.muted }}>③ 알짜 토크 (T_net = 남은 힘):</span>
-          <br />
-          &nbsp;&nbsp;T<sub>net</sub> = T<sub>e</sub> -{" "}
-          <span style={{ color: C.danger }}>
-            T<sub>L</sub>
-          </span>{" "}
-          - T<sub>f</sub>
-          <br />
-          &nbsp;&nbsp;T<sub>net</sub> = {metrics.Te.toFixed(2)} -{" "}
-          <span style={{ color: C.danger }}>{loadTl.toFixed(2)}</span> -{" "}
-          {metrics.Tf.toFixed(2)} ={" "}
-          <strong>{metrics.netTorque.toFixed(2)} Nm</strong>
+
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ color: C.muted, fontWeight: "bold", fontSize: 13 }}>
+            ③ 알짜 토크 (T_net = 남은 힘):
+          </span>
+          <BlockMath
+            math={`T_{net} = T_e - \\color{${C.danger}}{T_L} - T_f = ${metrics.Te.toFixed(2)} - \\color{${C.danger}}{${loadTl.toFixed(2)}} - ${metrics.Tf.toFixed(2)} = \\mathbf{${metrics.netTorque.toFixed(2)} \\text{ Nm}}`}
+          />
         </div>
+
         <div>
-          <span style={{ color: C.muted }}>④ 가속력 (각가속도 α):</span>
-          <br />
-          &nbsp;&nbsp;α = T<sub>net</sub> / J<br />
-          &nbsp;&nbsp;α = {metrics.netTorque.toFixed(2)} / {inertiaJ.toFixed(2)}{" "}
-          ={" "}
-          <strong
-            style={{
-              color:
-                metrics.alpha > 0
-                  ? C.success
-                  : metrics.alpha < 0
-                    ? C.danger
-                    : C.text,
-            }}
-          >
-            {metrics.alpha.toFixed(3)} rad/s²
-          </strong>
+          <span style={{ color: C.muted, fontWeight: "bold", fontSize: 13 }}>
+            ④ 가속력 (각가속도 α):
+          </span>
+          <BlockMath
+            math={`\\alpha = \\frac{T_{net}}{J} = \\frac{${metrics.netTorque.toFixed(2)}}{${inertiaJ.toFixed(2)}} = \\mathbf{\\color{${metrics.alpha > 0 ? C.success : metrics.alpha < 0 ? C.danger : C.text}}{${metrics.alpha.toFixed(3)}} \\text{ rad/s}^2}`}
+          />
         </div>
 
         {metrics.alpha === 0 &&
@@ -454,16 +449,20 @@ export default function DcMotorDynamicsWidget() {
           metrics.omega < 0.05 && (
             <div
               style={{
-                marginTop: 8,
-                padding: 8,
-                background: "rgba(255, 122, 122, 0.1)",
+                marginTop: 16,
+                padding: 12,
+                background: "#ffe3e3",
                 color: C.danger,
+                borderLeft: `4px solid ${C.danger}`,
                 borderRadius: 4,
-                fontSize: 12,
+                fontSize: 13,
+                fontWeight: "bold",
               }}
             >
-              ⚠️ 발생 토크(T<sub>e</sub>)가 부하 토크(T<sub>L</sub>)보다 작거나
-              같아 모터가 회전할 수 없습니다. 전류를 높이거나 부하를 줄이세요.
+              ⚠️ 발생 토크 <InlineMath math="(T_e)" />가 부하 토크{" "}
+              <InlineMath math="(T_L)" />
+              보다 작거나 같아 모터가 회전할 수 없습니다. 전류를 높이거나 부하를
+              줄이세요.
             </div>
           )}
       </div>
