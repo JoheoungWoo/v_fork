@@ -3,37 +3,39 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-// --- [공통 수학/물리 로직] ---
-const useMagneticField = (speedHz, phaseA, phaseB, phaseC) => {
+// ==========================================
+// 공통 물리 & 애니메이션 로직
+// ==========================================
+const useMotorPhysics = (frequency, phaseA, phaseB, phaseC) => {
   const angles = useMemo(() => [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3], []);
-
-  // 시각적 회전 속도 조절을 위한 스케일링
-  const visualSpeed = speedHz * 0.05;
-
+  // 시각적으로 너무 빠르지 않게 스케일링
+  const visualSpeed = frequency * 0.08;
   return { angles, visualSpeed };
 };
 
 // ==========================================
-// [위쪽 화면] 실제 유도 전동기 구조 (Physical)
+// [상단 뷰] 물리적 구조 (고정자 & 회전자)
 // ==========================================
 
-const StatorPolePhysical = ({ angle, color, intensity }) => {
+const StatorPole = ({ angle, color, intensity }) => {
   const radius = 2.8;
   const x = Math.cos(angle) * radius;
   const y = Math.sin(angle) * radius;
 
   return (
     <group position={[x, y, 0]} rotation={[0, 0, angle]}>
+      {/* 철심 */}
       <mesh position={[-0.4, 0, 0]}>
         <boxGeometry args={[1.2, 0.8, 1.8]} />
         <meshStandardMaterial color="#4a4f59" metalness={0.7} roughness={0.4} />
       </mesh>
+      {/* 구리 코일 (전류에 따라 밝기 변화) */}
       <mesh position={[-0.4, 0, 0]}>
         <boxGeometry args={[0.9, 0.95, 1.9]} />
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={intensity * 0.8}
+          emissiveIntensity={intensity * 0.9}
           metalness={0.6}
           roughness={0.4}
         />
@@ -42,44 +44,11 @@ const StatorPolePhysical = ({ angle, color, intensity }) => {
   );
 };
 
-const RealisticRotor = ({ rotorRef }) => {
-  const bars = 18;
-  return (
-    <group ref={rotorRef}>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[1.5, 1.5, 1.8, 32]} />
-        <meshStandardMaterial color="#6a7282" metalness={0.6} roughness={0.5} />
-      </mesh>
-      {Array.from({ length: bars }).map((_, i) => {
-        const angle = (i / bars) * Math.PI * 2;
-        return (
-          <mesh
-            key={i}
-            position={[Math.cos(angle) * 1.45, Math.sin(angle) * 1.45, 0]}
-            rotation={[Math.PI / 2, 0, 0]}
-          >
-            <cylinderGeometry args={[0.08, 0.08, 1.85, 8]} />
-            <meshStandardMaterial
-              color="#dcdde1"
-              metalness={0.9}
-              roughness={0.1}
-            />
-          </mesh>
-        );
-      })}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.3, 0.3, 3.5, 16]} />
-        <meshStandardMaterial color="#b0b5c0" metalness={0.8} roughness={0.2} />
-      </mesh>
-    </group>
-  );
-};
-
-const PhysicalScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
+const PhysicalScene = ({ frequency, phaseA, phaseB, phaseC }) => {
   const rotorRef = useRef();
   const [coilIntensity, setCoilIntensity] = useState({ a: 0, b: 0, c: 0 });
-  const { angles, visualSpeed } = useMagneticField(
-    speedHz,
+  const { angles, visualSpeed } = useMotorPhysics(
+    frequency,
     phaseA,
     phaseB,
     phaseC,
@@ -108,14 +77,21 @@ const PhysicalScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
       c: Math.abs(magC),
     });
 
-    if (rotorRef.current && length > 0.5) {
-      // 정상 회전 (결상 시에는 length가 작아져서 덜덜거림)
-      rotorRef.current.rotation.z -= visualSpeed * length * 0.015;
+    // 회전자 회전 로직 (결상 시 덜덜거림 구현)
+    if (rotorRef.current) {
+      if (length > 0.5) {
+        // 정상 회전
+        rotorRef.current.rotation.z -= visualSpeed * length * 0.015;
+      } else {
+        // 결상 시 멈칫/진동
+        rotorRef.current.rotation.z += Math.sin(t * 10) * 0.01;
+      }
     }
   });
 
   return (
     <group>
+      {/* 고정자 외부 프레임 */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <tubeGeometry
           args={[new THREE.EllipseCurve(0, 0, 3.6, 3.6), 64, 0.5, 16]}
@@ -123,55 +99,90 @@ const PhysicalScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
         <meshStandardMaterial color="#2d3436" metalness={0.4} roughness={0.7} />
       </mesh>
 
-      <StatorPolePhysical
+      {/* 6극 코일 (마주보는 극끼리 같은 상) */}
+      <StatorPole
         angle={angles[0]}
         color="#ff4757"
         intensity={coilIntensity.a}
       />
-      <StatorPolePhysical
+      <StatorPole
         angle={angles[0] + Math.PI}
         color="#ff4757"
         intensity={coilIntensity.a}
       />
-      <StatorPolePhysical
+      <StatorPole
         angle={angles[1]}
         color="#2ed573"
         intensity={coilIntensity.b}
       />
-      <StatorPolePhysical
+      <StatorPole
         angle={angles[1] + Math.PI}
         color="#2ed573"
         intensity={coilIntensity.b}
       />
-      <StatorPolePhysical
+      <StatorPole
         angle={angles[2]}
         color="#1e90ff"
         intensity={coilIntensity.c}
       />
-      <StatorPolePhysical
+      <StatorPole
         angle={angles[2] + Math.PI}
         color="#1e90ff"
         intensity={coilIntensity.c}
       />
 
-      <RealisticRotor rotorRef={rotorRef} />
+      {/* 농형 회전자 (다람쥐 쳇바퀴) */}
+      <group ref={rotorRef}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[1.5, 1.5, 1.8, 32]} />
+          <meshStandardMaterial
+            color="#6a7282"
+            metalness={0.6}
+            roughness={0.5}
+          />
+        </mesh>
+        {Array.from({ length: 18 }).map((_, i) => {
+          const angle = (i / 18) * Math.PI * 2;
+          return (
+            <mesh
+              key={i}
+              position={[Math.cos(angle) * 1.45, Math.sin(angle) * 1.45, 0]}
+              rotation={[Math.PI / 2, 0, 0]}
+            >
+              <cylinderGeometry args={[0.08, 0.08, 1.85, 8]} />
+              <meshStandardMaterial
+                color="#dcdde1"
+                metalness={0.9}
+                roughness={0.1}
+              />
+            </mesh>
+          );
+        })}
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.3, 0.3, 3.5, 16]} />
+          <meshStandardMaterial
+            color="#b0b5c0"
+            metalness={0.8}
+            roughness={0.2}
+          />
+        </mesh>
+      </group>
     </group>
   );
 };
 
 // ==========================================
-// [아래쪽 화면] 추상적 회전 자기장 (Abstract)
+// [하단 뷰] 추상적 자기장 시각화
 // ==========================================
 
-const AbstractScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
+const AbstractScene = ({ frequency, phaseA, phaseB, phaseC }) => {
   const magneticFieldRef = useRef();
   const nPoleRef = useRef();
   const sPoleRef = useRef();
   const fluxLinesRef = useRef();
-  const arrowRef = useRef();
 
-  const { angles, visualSpeed } = useMagneticField(
-    speedHz,
+  const { angles, visualSpeed } = useMotorPhysics(
+    frequency,
     phaseA,
     phaseB,
     phaseC,
@@ -201,16 +212,11 @@ const AbstractScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
         magneticFieldRef.current.visible = true;
         magneticFieldRef.current.rotation.z = fieldAngle;
 
-        // 결상 시 찌그러짐 표현 (Scale)
+        // 결상 시 자기장이 찌그러지는 현상 반영
         const scaleStrength = length / 1.5;
         fluxLinesRef.current.scale.set(scaleStrength, scaleStrength, 1);
         nPoleRef.current.position.x = 2.5 * scaleStrength;
         sPoleRef.current.position.x = -2.5 * scaleStrength;
-
-        // 중앙 화살표
-        const dir = new THREE.Vector3(1, 0, 0).normalize(); // 이미 부모 group이 회전하므로 1,0,0
-        arrowRef.current.setDirection(dir);
-        arrowRef.current.setLength(length * 1.5, length * 0.5, length * 0.2);
 
         // 자기력선 출렁임
         const pulse = Math.sin(t * 10) * 0.1;
@@ -223,14 +229,27 @@ const AbstractScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
 
   return (
     <group>
-      {/* 배경 가이드라인 */}
+      {/* 120도 위상차 가이드라인 */}
+      <mesh rotation={[0, 0, 0]}>
+        <cylinderGeometry args={[0.02, 0.02, 7]} />
+        <meshBasicMaterial color="#333" />
+      </mesh>
+      <mesh rotation={[0, 0, Math.PI / 3]}>
+        <cylinderGeometry args={[0.02, 0.02, 7]} />
+        <meshBasicMaterial color="#333" />
+      </mesh>
+      <mesh rotation={[0, 0, -Math.PI / 3]}>
+        <cylinderGeometry args={[0.02, 0.02, 7]} />
+        <meshBasicMaterial color="#333" />
+      </mesh>
       <mesh>
         <ringGeometry args={[3.4, 3.45, 64]} />
         <meshBasicMaterial color="#333" transparent opacity={0.5} />
       </mesh>
 
-      {/* 동적 자기장 그룹 */}
+      {/* 동적 자기장 */}
       <group ref={magneticFieldRef}>
+        {/* N극 */}
         <group ref={nPoleRef}>
           <mesh>
             <sphereGeometry args={[0.4, 32, 32]} />
@@ -248,6 +267,7 @@ const AbstractScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
           </Billboard>
         </group>
 
+        {/* S극 */}
         <group ref={sPoleRef}>
           <mesh>
             <sphereGeometry args={[0.4, 32, 32]} />
@@ -265,7 +285,7 @@ const AbstractScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
           </Billboard>
         </group>
 
-        {/* 출렁이는 자기력선 */}
+        {/* 굽이치는 자기력선 */}
         <group ref={fluxLinesRef}>
           <mesh>
             <torusGeometry args={[1.5, 0.03, 16, 50, Math.PI]} />
@@ -304,35 +324,25 @@ const AbstractScene = ({ speedHz, phaseA, phaseB, phaseC }) => {
             />
           </mesh>
         </group>
-
-        <arrowHelper
-          ref={arrowRef}
-          args={[
-            new THREE.Vector3(1, 0, 0),
-            new THREE.Vector3(0, 0, 0),
-            0,
-            0xffff00,
-          ]}
-        />
       </group>
     </group>
   );
 };
 
 // ==========================================
-// 메인 앱: UI 및 화면 분할 관리
+// 메인 앱: 상하 분할 레이아웃 및 상태 관리
 // ==========================================
 
-export default function ThreePhaseinductionMotor() {
-  const [speedHz, setSpeedHz] = useState(60);
+export default function App() {
+  const [frequency, setFrequency] = useState(60);
   const [phaseA, setPhaseA] = useState(true);
   const [phaseB, setPhaseB] = useState(true);
   const [phaseC, setPhaseC] = useState(true);
 
   // 동기 속도 Ns = 120 * f / P (극수 P=2로 가정)
-  const syncSpeedRPM = speedHz * 60;
-  // 슬립(Slip) 약 5% 가정 (결상 시 속도 급감)
+  const syncSpeedRPM = frequency * 60;
   const isHealthy = phaseA && phaseB && phaseC;
+  // 슬립(Slip) 적용 실제 속도 (정상 95%, 결상 시 10% 급감)
   const actualSpeedRPM = isHealthy
     ? Math.round(syncSpeedRPM * 0.95)
     : Math.round(syncSpeedRPM * 0.1);
@@ -348,7 +358,7 @@ export default function ThreePhaseinductionMotor() {
         fontFamily: "sans-serif",
       }}
     >
-      {/* 1. 상단 컨트롤 패널 */}
+      {/* 1. 상단 UI 컨트롤 패널 */}
       <div
         style={{
           padding: "15px 25px",
@@ -362,15 +372,7 @@ export default function ThreePhaseinductionMotor() {
           zIndex: 10,
         }}
       >
-        <h3
-          style={{
-            margin: 0,
-            borderRight: "1px solid #555",
-            paddingRight: "20px",
-          }}
-        >
-          3상 유도 전동기 시뮬레이터
-        </h3>
+        <h3 style={{ margin: 0 }}>3상 유도 전동기 시뮬레이터</h3>
 
         <label
           style={{
@@ -381,15 +383,15 @@ export default function ThreePhaseinductionMotor() {
           }}
         >
           <span>
-            회전 속도 (주파수): <strong>{speedHz} Hz</strong>
+            회전 속도 (주파수): <strong>{frequency} Hz</strong>
           </span>
           <input
             type="range"
             min="0"
             max="120"
             step="1"
-            value={speedHz}
-            onChange={(e) => setSpeedHz(Number(e.target.value))}
+            value={frequency}
+            onChange={(e) => setFrequency(Number(e.target.value))}
             style={{ width: "150px" }}
           />
         </label>
@@ -417,7 +419,7 @@ export default function ThreePhaseinductionMotor() {
               checked={phaseA}
               onChange={(e) => setPhaseA(e.target.checked)}
             />{" "}
-            A상 (Red)
+            A상
           </label>
           <label
             style={{
@@ -434,7 +436,7 @@ export default function ThreePhaseinductionMotor() {
               checked={phaseB}
               onChange={(e) => setPhaseB(e.target.checked)}
             />{" "}
-            B상 (Green)
+            B상
           </label>
           <label
             style={{
@@ -451,7 +453,7 @@ export default function ThreePhaseinductionMotor() {
               checked={phaseC}
               onChange={(e) => setPhaseC(e.target.checked)}
             />{" "}
-            C상 (Blue)
+            C상
           </label>
         </div>
 
@@ -471,7 +473,7 @@ export default function ThreePhaseinductionMotor() {
             <span style={{ color: "#fca311" }}>{syncSpeedRPM} RPM</span>
           </div>
           <div>
-            실제 회전자 속도:{" "}
+            실제 속도:{" "}
             <span style={{ color: isHealthy ? "#00f5d4" : "#ff4757" }}>
               {actualSpeedRPM} RPM {!isHealthy && "(결상/맥동)"}
             </span>
@@ -479,7 +481,7 @@ export default function ThreePhaseinductionMotor() {
         </div>
       </div>
 
-      {/* 2. 화면 분할 컨테이너 */}
+      {/* 2. 화면 분할 (상: 물리 3D / 하: 추상 3D) */}
       <div
         style={{
           display: "flex",
@@ -502,28 +504,27 @@ export default function ThreePhaseinductionMotor() {
               top: "15px",
               left: "20px",
               color: "white",
-              fontSize: "18px",
+              fontSize: "16px",
               fontWeight: "bold",
               zIndex: 5,
-              background: "rgba(0,0,0,0.5)",
+              background: "rgba(0,0,0,0.6)",
               padding: "5px 10px",
               borderRadius: "5px",
             }}
           >
-            [1] 실제 전동기 구조 (물리적 회전)
+            [1] 3D 기계 구조 (Stator & Rotor)
           </div>
-          <Canvas camera={{ position: [0, -4, 8], fov: 45 }}>
+          <Canvas camera={{ position: [0, -5, 7], fov: 45 }}>
             <color attach="background" args={["#15171e"]} />
             <ambientLight intensity={0.6} />
             <directionalLight position={[10, 10, 15]} intensity={1.5} />
-            <directionalLight position={[-10, -10, -10]} intensity={0.5} />
             <PhysicalScene
-              speedHz={speedHz}
+              frequency={frequency}
               phaseA={phaseA}
               phaseB={phaseB}
               phaseC={phaseC}
             />
-            <OrbitControls enableZoom={true} maxPolarAngle={Math.PI / 1.5} />
+            <OrbitControls enableZoom={true} />
           </Canvas>
         </div>
 
@@ -535,27 +536,26 @@ export default function ThreePhaseinductionMotor() {
               top: "15px",
               left: "20px",
               color: "white",
-              fontSize: "18px",
+              fontSize: "16px",
               fontWeight: "bold",
               zIndex: 5,
-              background: "rgba(0,0,0,0.5)",
+              background: "rgba(0,0,0,0.6)",
               padding: "5px 10px",
               borderRadius: "5px",
             }}
           >
-            [2] 회전 자기장 및 자기력선 (추상적 시각화)
+            [2] 회전 자기장 파동 (Magnetic Field)
           </div>
           <Canvas camera={{ position: [0, 0, 9], fov: 50 }}>
             <color attach="background" args={["#0a0b0e"]} />
             <ambientLight intensity={1.0} />
             <AbstractScene
-              speedHz={speedHz}
+              frequency={frequency}
               phaseA={phaseA}
               phaseB={phaseB}
               phaseC={phaseC}
             />
-            <OrbitControls enableZoom={true} enableRotate={false} />{" "}
-            {/* 2D 느낌을 위해 회전 제한 */}
+            <OrbitControls enableZoom={true} enableRotate={true} />
           </Canvas>
         </div>
       </div>
