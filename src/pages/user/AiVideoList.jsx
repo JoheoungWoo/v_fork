@@ -18,6 +18,7 @@ const SUBJECT_TO_CATEGORY_TAB = {
   회로이론: "회로이론",
   전자기학: "전자기학",
   전기기기: "전기기기",
+  전력공학: "전력공학",
   제어공학: "제어공학",
   "AI Company": "Vision",
 };
@@ -71,7 +72,18 @@ const getCategory = (video) => {
   )
     return "회로이론";
 
-  // 🌟 4. 제어공학
+  // 🌟 4. 전력공학
+  if (
+    subject.includes("전력") ||
+    idStr.includes("power") ||
+    idStr.includes("grid") ||
+    idStr.includes("transmission") ||
+    idStr.includes("distribution") ||
+    idStr.includes("substation")
+  )
+    return "전력공학";
+
+  // 🌟 5. 제어공학
   if (
     subject.includes("제어") ||
     idStr.includes("control") ||
@@ -81,7 +93,7 @@ const getCategory = (video) => {
   )
     return "제어공학";
 
-  // 🌟 5. 기초 수학 (전자기학/회로 등에서 안 걸러진 나머지 일반 수학)
+  // 🌟 6. 기초 수학 (전자기학/회로 등에서 안 걸러진 나머지 일반 수학)
   if (
     subject.includes("수학") ||
     idStr.includes("math") ||
@@ -95,7 +107,7 @@ const getCategory = (video) => {
   )
     return "기초 수학";
 
-  // 🌟 6. Vision
+  // 🌟 7. Vision
   if (
     subject.includes("Vision") ||
     subject.includes("AI") ||
