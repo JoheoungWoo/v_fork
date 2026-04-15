@@ -29,7 +29,7 @@ const ShuntGenerator3D = ({ speed, isLoad, Ia, If }) => {
       <group position={[2.5, 0, 0]}>
         <mesh>
           <boxGeometry args={[0.8, 1.2, 1.5]} />
-          <meshStandardMaterial color="#34495e" />
+          <meshStandardMaterial color="#5d6d7e" metalness={0.35} roughness={0.55} />
         </mesh>
         {[...Array(6)].map((_, i) => (
           <mesh
@@ -54,7 +54,7 @@ const ShuntGenerator3D = ({ speed, isLoad, Ia, If }) => {
       <group position={[-2.5, 0, 0]}>
         <mesh>
           <boxGeometry args={[0.8, 1.2, 1.5]} />
-          <meshStandardMaterial color="#34495e" />
+          <meshStandardMaterial color="#5d6d7e" metalness={0.35} roughness={0.55} />
         </mesh>
         {[...Array(6)].map((_, i) => (
           <mesh
@@ -81,7 +81,13 @@ const ShuntGenerator3D = ({ speed, isLoad, Ia, If }) => {
       <group ref={rotorRef}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[1.5, 1.5, 1.6, 32]} />
-          <meshStandardMaterial color="#7f8c8d" metalness={0.8} />
+          <meshStandardMaterial
+            color="#c0c7cf"
+            emissive="#3a3f46"
+            emissiveIntensity={0.35}
+            metalness={0.75}
+            roughness={0.28}
+          />
         </mesh>
         {[...Array(12)].map((_, i) => (
           <mesh
