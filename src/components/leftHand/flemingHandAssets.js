@@ -3,7 +3,7 @@
  *
  * `FLEMING_LEFT_HAND_IMAGE_URL`에 PNG/WebP(투명 배경 권장) 경로를 두면
  * `public/` 기준으로 로드해 GLB 대신 평면에 표시합니다.
- * 빈 문자열이면 LeftHand.glb + 손가락 슬라이더만 사용합니다.
+ * 빈 문자열이면 left_finger.glb + 손가락 슬라이더만 사용합니다.
  */
 export const FLEMING_LEFT_HAND_IMAGE_URL = "/images/fleming-left-hand.png";
 

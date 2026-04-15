@@ -89,7 +89,7 @@ class GltfErrorBoundary extends React.Component {
         >
           <p>
             <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>
-              public/models/LeftHand.glb
+              public/models/left_finger.glb
             </code>
             를 불러오지 못했습니다. Blender에서{" "}
             <code style={{ background: "#1e293b", padding: "2px 6px", borderRadius: 4 }}>

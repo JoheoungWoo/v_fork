@@ -4,7 +4,8 @@ import { useLayoutEffect, useRef } from "react";
 
 import { BONE_NAMES, FINGER_ORDER, FLEX_CONFIG } from "./leftHandBoneConfig.js";
 
-export const LEFT_HAND_GLB_URL = "/models/LeftHand.glb";
+/** `public/models/left_finger.glb` — 서브패스 배포 대응 */
+export const LEFT_HAND_GLB_URL = `${import.meta.env.BASE_URL}models/left_finger.glb`;
 
 /**
  * @param {{ values?: Record<string, number> } & import('@react-three/fiber').GroupProps} props

@@ -21,7 +21,7 @@ class GltfErrorBoundary extends React.Component {
         <div className="flex h-full items-center justify-center p-6 text-center text-sm text-neutral-600 dark:text-neutral-400">
           <p>
             <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">
-              public/models/LeftHand.glb
+              public/models/left_finger.glb
             </code>
             를 불러오지 못했습니다. Blender에서{" "}
             <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">
@@ -65,7 +65,7 @@ function HandScene({ values }) {
 
 /**
  * 왼손 GLB + 손가락 슬라이더(0–100) 연동 뷰어.
- * GLB는 `frontend/public/models/LeftHand.glb`에 두고,
+ * GLB는 `frontend/public/models/left_finger.glb`에 두고,
  * `scripts/blender_left_hand.py`로 Blender에서 생성한다.
  */
 export default function LeftHandViewer({ className = "" }) {
