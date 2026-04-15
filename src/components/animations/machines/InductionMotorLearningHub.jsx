@@ -4,6 +4,7 @@ import InductionMotorTypeDiagram from "./diagrams/InductionMotorTypeDiagram";
 import InductionMotorTypeContent from "./induction-motor/InductionMotorTypeContent";
 import InductionMotorCombinedWidget from "./InductionMotorCombinedWidget";
 import ThreePhaseinductionMotor from "./ThreePhaseinductionMotor";
+import ExamPrepVoiceStrip from "./exam/ExamPrepVoiceStrip";
 
 function WoundRotorEquivalentSvg() {
   return (
@@ -117,6 +118,7 @@ export default function InductionMotorLearningHub() {
     >
       <InductionMotorTypeDiagram />
       <InductionMotorTypeContent activeType={activeType} onSelectType={setActiveType} />
+      <ExamPrepVoiceStrip area="induction" itemId={activeType} />
 
       <div style={{ padding: "0 20px 24px" }}>
         {activeType === "three_phase_cage" && (

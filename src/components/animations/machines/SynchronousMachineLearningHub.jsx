@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import SynchronousMachineTypeDiagram from "./diagrams/SynchronousMachineTypeDiagram";
 import SynchronousMachineTypeContent from "./synchronous-machine/SynchronousMachineTypeContent";
+import ExamPrepVoiceStrip from "./exam/ExamPrepVoiceStrip";
 
 function SynchronousEquivalentPanel({
   mode,
@@ -145,6 +146,7 @@ export default function SynchronousMachineLearningHub() {
         activeType={activeType}
         onSelectType={setActiveType}
       />
+      <ExamPrepVoiceStrip area="sync" itemId={activeType} />
 
       <div style={{ padding: "0 20px 24px", display: "grid", gap: "16px" }}>
         <div

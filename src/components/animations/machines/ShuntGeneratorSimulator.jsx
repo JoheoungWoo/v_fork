@@ -7,6 +7,7 @@ import ShuntCalculationPanel from "./shunt-generator/ShuntCalculationPanel";
 import ShuntEquivalentCircuit from "./shunt-generator/ShuntEquivalentCircuit";
 import ShuntGenerator3DModel from "./shunt-generator/ShuntGenerator3DModel";
 import ShuntGeneratorControls from "./shunt-generator/ShuntGeneratorControls";
+import ExamPrepVoiceStrip from "./exam/ExamPrepVoiceStrip";
 import { useMemo, useState } from "react";
 
 export default function ShuntGeneratorSimulator() {
@@ -65,6 +66,7 @@ export default function ShuntGeneratorSimulator() {
 
       <DcGeneratorTypeDiagram />
       <DcGeneratorTypeContent activeType={selectedType} onSelectType={setSelectedType} />
+      <ExamPrepVoiceStrip area="dc" itemId={selectedType} />
 
       {selectedType === "shunt" ? (
         <>
