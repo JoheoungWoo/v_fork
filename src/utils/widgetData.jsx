@@ -45,6 +45,7 @@ const WIDGET_MAP = {
   ],
   "8_time_constant": [
     lazy(() => import("@/components/animations/circuits/TimeConstantWidget")),
+    lazy(() => import("@/components/animations/circuits/RCCircuit")),
   ],
   "9_circuit_analysis_rlc": [
     lazy(() => import("@/components/animations/circuits/RLCCombinedWidget")),
