@@ -48,6 +48,7 @@ const RCCircuit = () => {
     ? `V_c(t) = ${v0} \\left( 1 - e^{-\\frac{t}{${tau}}} \\right)`
     : `V_c(t) = ${v0} e^{-\\frac{t}{${tau}}}`;
   const activeColor = isCharging ? "#2563eb" : "#dc2626";
+  const currentWaveColor = "#22c55e";
 
   return (
     <div
@@ -229,6 +230,49 @@ const RCCircuit = () => {
             <line x1="545" y1="60" x2="560" y2="60" stroke="#1f2937" strokeWidth="3" />
             <line x1="560" y1="60" x2="560" y2="185" stroke="#1f2937" strokeWidth="3" />
             <text x="555" y="118" fontSize="32" fontStyle="italic">C</text>
+
+            {/* 전류 흐름(초록 물결): 접점 상태에 따라 경로 변경 */}
+            {isCharging ? (
+              <>
+                <path
+                  d="M 60 60 L 165 60 L 260 60 L 414 60 L 560 60 L 560 185 L 60 185 L 60 60"
+                  fill="none"
+                  stroke={currentWaveColor}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray="4 10"
+                  opacity="0.9"
+                >
+                  <animate
+                    attributeName="stroke-dashoffset"
+                    from="0"
+                    to="-70"
+                    dur="1.2s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              </>
+            ) : (
+              <>
+                <path
+                  d="M 260 60 L 414 60 L 560 60 L 560 185 L 195 185 L 195 120"
+                  fill="none"
+                  stroke={currentWaveColor}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray="4 10"
+                  opacity="0.9"
+                >
+                  <animate
+                    attributeName="stroke-dashoffset"
+                    from="0"
+                    to="-70"
+                    dur="1.2s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              </>
+            )}
           </svg>
           <div style={{ textAlign: "center", marginTop: "6px", color: activeColor, fontWeight: 700 }}>
             현재 연결: {isCharging ? "A 접점 (충전 곡선 상승)" : "B 접점 (방전 곡선 하강)"}
