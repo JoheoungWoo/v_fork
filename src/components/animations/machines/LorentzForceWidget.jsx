@@ -5,10 +5,14 @@
  * 전원 ON/OFF 스위치 및 실시간 전류 입자 흐름(Particle) 시각화 추가.
  */
 
-import { Arrow, OrbitControls, Text } from "@react-three/drei";
+import { OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useRef, useState } from "react";
 import * as THREE from "three";
+
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const _dir = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
 
 import "katex/dist/katex.min.css";
 import { BlockMath, InlineMath } from "react-katex";
@@ -32,41 +36,54 @@ const C = {
 };
 
 /**
- * 💡 벡터 화살표 컴포넌트
+ * drei에는 Arrow가 없음 — 실린더+원뿔(+Y 기준 회전)
  */
 function VectorArrow({
-  direction,
+  vectorsRef,
+  vectorKey,
   color,
   length,
   label,
   position = [0, 0, 0],
   visible = true,
 }) {
-  const dirVec = useRef(new THREE.Vector3());
+  const groupRef = useRef(null);
+  const shaftR = length * 0.04;
+  const headLen = length * 0.22;
+  const shaftLen = Math.max(0.05, length - headLen);
+  const tipY = shaftLen / 2 + headLen / 2;
 
   useFrame(() => {
-    dirVec.current.set(...direction).normalize();
+    const d = vectorsRef.current[vectorKey];
+    _dir.set(d[0], d[1], d[2]);
+    if (_dir.lengthSq() < 1e-10) _dir.set(0, 1, 0);
+    _dir.normalize();
+    _quat.setFromUnitVectors(Y_AXIS, _dir);
+    if (groupRef.current) groupRef.current.quaternion.copy(_quat);
   });
 
   return (
     <group position={position} visible={visible}>
-      <Arrow
-        args={[dirVec.current, new THREE.Vector3(0, 0, 0), length, color]}
-        headLength={length * 0.3}
-        headWidth={length * 0.15}
-      />
-      <Text
-        position={[
-          direction[0] * length * 1.1,
-          direction[1] * length * 1.1,
-          direction[2] * length * 1.1,
-        ]}
-        fontSize={0.4}
-        color={color}
-        fontWeight="bold"
-      >
-        {label}
-      </Text>
+      <group ref={groupRef}>
+        <mesh position={[0, shaftLen / 2, 0]} castShadow>
+          <cylinderGeometry args={[shaftR, shaftR, shaftLen, 12]} />
+          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, shaftLen / 2 + headLen / 2, 0]} castShadow>
+          <coneGeometry args={[shaftR * 2.2, headLen, 12]} />
+          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
+        </mesh>
+        <Text
+          position={[0, tipY + 0.3, 0]}
+          fontSize={0.4}
+          color={color}
+          fontWeight="bold"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {label}
+        </Text>
+      </group>
     </group>
   );
 }
@@ -148,6 +165,11 @@ function LorentzSimulation({
   resetFlag,
 }) {
   const rodRef = useRef(null);
+  const vectorsRef = useRef({
+    i: [0, 0, 1],
+    b: [0, -1, 0],
+    f: [1, 0, 0],
+  });
 
   const positionX = useRef(0);
   const velocityX = useRef(0);
@@ -190,14 +212,19 @@ function LorentzSimulation({
       }
     }
 
+    const iVector = [0, 0, iDir];
+    const bVector = [0, bDir * -1, 0];
+    const fVector = [forceDir, 0, 0];
+    vectorsRef.current = { i: iVector, b: bVector, f: fVector };
+
     setMetrics({
       activeI: activeCurrent, // 현재 실제 흐르는 전류 (0 또는 설정값)
       F: forceMag * forceDir,
       a: accelX,
       x: positionX.current,
-      iVector: [0, 0, iDir],
-      bVector: [0, bDir * -1, 0],
-      fVector: [forceDir, 0, 0],
+      iVector,
+      bVector,
+      fVector,
     });
   });
 
@@ -276,14 +303,15 @@ function LorentzSimulation({
         {/* 벡터 화살표 */}
         <Suspense fallback={null}>
           <VectorArrow
-            direction={setMetrics.bVector || [0, -1, 0]}
+            vectorsRef={vectorsRef}
+            vectorKey="b"
             color={C.vectorB}
             length={1.5}
             label="자기장(B)"
           />
-          {/* 전원이 꺼지면 전류/힘 화살표 숨김 */}
           <VectorArrow
-            direction={setMetrics.iVector || [0, 0, 1]}
+            vectorsRef={vectorsRef}
+            vectorKey="i"
             color={C.vectorI}
             length={1.5}
             label="전류(I)"
@@ -291,7 +319,8 @@ function LorentzSimulation({
             visible={isPowerOn}
           />
           <VectorArrow
-            direction={setMetrics.fVector || [1, 0, 0]}
+            vectorsRef={vectorsRef}
+            vectorKey="f"
             color={C.vectorF}
             length={1.5}
             label="힘(F)"
