@@ -79,8 +79,8 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
       </EffectComposer>
 
       {/* 배선 */}
-      <Line points={PATH_POSITIVE} color="#78839a" lineWidth={1.2} />
-      <Line points={PATH_NEGATIVE} color="#78839a" lineWidth={1.2} />
+      <Line points={PATH_POSITIVE} color="#6f7788" lineWidth={1.2} />
+      <Line points={PATH_NEGATIVE} color="#6f7788" lineWidth={1.2} />
       <Line points={isPositiveHalf ? PATH_POSITIVE : PATH_NEGATIVE} color="#55aaff" lineWidth={3} toneMapped={false} />
 
       {/* 부하 (Load) */}
@@ -95,18 +95,18 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
       <group position={[2.5, 0, 0]}>
         <Cylinder args={[0.6, 0.6, 3, 32]}>
           <meshPhysicalMaterial 
-            color={capacitorEnabled ? "#2f7bff" : "#93a0b5"} 
+            color={capacitorEnabled ? "#2f7bff" : "#6e7688"} 
             emissive={capacitorEnabled ? "#00aaff" : "#000000"} 
             emissiveIntensity={capacitorEnabled ? 1.5 : 0} 
             transparent={true} opacity={capacitorEnabled ? 1.0 : 0.75}
             roughness={0.3} metalness={0.6} toneMapped={false}
           />
         </Cylinder>
-        <Text position={[0, 2.0, 0.5]} fontSize={0.35} color={capacitorEnabled ? "#ffffff" : "#5a6478"}>
+        <Text position={[0, 2.0, 0.5]} fontSize={0.35} color={capacitorEnabled ? "#ffffff" : "#8d96ab"}>
           Capacitor
         </Text>
-        <Line points={[[0, 1.5, 0], [0, 1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#78839a"} lineWidth={2} toneMapped={false}/>
-        <Line points={[[0, -1.5, 0], [0, -1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#78839a"} lineWidth={2} toneMapped={false}/>
+        <Line points={[[0, 1.5, 0], [0, 1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#6f7788"} lineWidth={2} toneMapped={false}/>
+        <Line points={[[0, -1.5, 0], [0, -1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#6f7788"} lineWidth={2} toneMapped={false}/>
       </group>
 
       {/* AC 전원 소스 */}
@@ -140,7 +140,7 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
           <Text 
             position={[0, d.rot[2] > 0 ? -0.8 : 0.8, 0.4]} 
             fontSize={0.35} 
-            color={d.active ? "#ffffff" : "#6a7488"}
+            color={d.active ? "#ffffff" : "#8a93a8"}
           >
             {d.id}
           </Text>
@@ -194,13 +194,13 @@ function WaveformPanel({ phase, amplitude, frequency, capacitorEnabled, capacita
   const markerX = width - 40; 
 
   return (
-    <div style={{ padding: "20px", background: "#eef2fa", color: "#1f2a3f", borderTop: "2px solid #c3ccdd" }}>
+    <div style={{ padding: "20px", background: "#1e222b", color: "#d9dfeb", borderTop: "2px solid #363d4b" }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
         <strong style={{ fontSize: "16px" }}>오실로스코프 파형 관찰</strong>
-        <span style={{ color: "#5e6b84" }}>{capacitorEnabled ? "맥동률(리플) 감소됨 (충·방전 상태)" : "전파 정류된 맥류 파형 (Pulsating DC)"}</span>
+        <span style={{ color: "#a0abbe" }}>{capacitorEnabled ? "맥동률(리플) 감소됨 (충·방전 상태)" : "전파 정류된 맥류 파형 (Pulsating DC)"}</span>
       </div>
       <svg width="100%" viewBox={`0 0 ${width} ${height}`}>
-        <line x1="40" y1={centerY} x2={width - 40} y2={centerY} stroke="#a2aec3" strokeWidth="2" strokeDasharray="5,5" />
+        <line x1="40" y1={centerY} x2={width - 40} y2={centerY} stroke="#5a6375" strokeWidth="2" strokeDasharray="5,5" />
         <polyline fill="none" stroke="#007bff" strokeWidth="2" opacity="0.55" points={inPoints.join(" ")} />
         <polyline fill="none" stroke="#ff3333" strokeWidth="4" points={outPoints.join(" ")} style={{ transition: 'all 0.1s' }} />
         <circle cx={markerX} cy={markerInputY} r="5" fill="#007bff" />
@@ -234,19 +234,19 @@ export default function FaintDiodeWidget() {
   }, [frequency]);
 
   return (
-    <div style={{ width: "100%", fontFamily: "sans-serif", borderRadius: "12px", overflow: "hidden", boxShadow: "0 10px 30px rgba(10,30,70,0.18)", border: "1px solid #cfd8e8" }}>
+    <div style={{ width: "100%", fontFamily: "sans-serif", borderRadius: "12px", overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.4)", border: "1px solid #3a4150" }}>
       {/* 컨트롤 패널 */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", padding: "20px", background: "#dce4f2", color: "#1f2a3f", alignItems: "center" }}>
-        <h2 style={{ margin: 0, fontSize: "20px", color: "#1f4fb8", width: "100%", borderBottom: "1px solid #b7c3da", paddingBottom: "10px" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", padding: "20px", background: "#2a2f3a", color: "#d8deea", alignItems: "center" }}>
+        <h2 style={{ margin: 0, fontSize: "20px", color: "#79a8ff", width: "100%", borderBottom: "1px solid #474f60", paddingBottom: "10px" }}>
           브리지 정류기 & 평활 회로
         </h2>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexGrow: 1 }}>
-          <button onClick={() => setCapacitorEnabled(!capacitorEnabled)} style={{ padding: "10px 20px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", border: "none", borderRadius: "6px", backgroundColor: capacitorEnabled ? "#2876ff" : "#7f8ba3", color: "white", transition: "0.2s" }}>
+          <button onClick={() => setCapacitorEnabled(!capacitorEnabled)} style={{ padding: "10px 20px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", border: "none", borderRadius: "6px", backgroundColor: capacitorEnabled ? "#2876ff" : "#626d84", color: "white", transition: "0.2s" }}>
             {capacitorEnabled ? "커패시터 ON" : "커패시터 OFF"}
           </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <label style={{ color: capacitorEnabled ? "#1f2a3f" : "#7f8aa0" }}>용량 (C):</label>
+          <label style={{ color: capacitorEnabled ? "#d8deea" : "#8b95aa" }}>용량 (C):</label>
           <input type="range" min="10" max="150" step="5" value={capacitance} disabled={!capacitorEnabled} onChange={(e) => setCapacitance(Number(e.target.value))} style={{ opacity: capacitorEnabled ? 1 : 0.45 }} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -256,9 +256,9 @@ export default function FaintDiodeWidget() {
       </div>
 
       {/* 3D 캔버스 영역 */}
-      <div style={{ height: "450px", background: "#e4ebf8" }}>
+      <div style={{ height: "450px", background: "#242933" }}>
         <Canvas camera={{ position: [0, 0, 15], fov: 50 }}>
-          <color attach="background" args={["#e4ebf8"]} />
+          <color attach="background" args={["#242933"]} />
           <BridgeScene phase={phase} amplitude={amplitude} capacitorEnabled={capacitorEnabled} />
         </Canvas>
       </div>
