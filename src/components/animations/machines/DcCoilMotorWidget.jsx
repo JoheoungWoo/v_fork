@@ -24,6 +24,14 @@ const C = {
   muted: "#7a7872",
 };
 
+/** Blender `dc_motor_blender.py` 사각 코일과 동일 비율 (회전축 = 로컬 Z, 루프는 XY 평면) */
+const COIL_HALF_W = 0.6;
+const COIL_HALF_H = 0.7;
+const COIL_PATH_Z = 0;
+
+/** API/폴백에서 나온 각속도 상한 (rad/s) — 시각화만 제한, 물리식과 무관 */
+const OMEGA_VIS_MAX = 120;
+
 /**
  * 영구자석 (N극 / S극)
  * - 자석은 자기장 방향 전환 시 좌우 위치가 바뀌어야 하므로 React에서 코드로 렌더링합니다.
@@ -79,8 +87,14 @@ function MotorAssembly({ url, omegaRad, rotDir, showFlux, currentDir }) {
       {nodes.Rotor && (
         <group ref={shaftRef}>
           <primitive object={nodes.Rotor} />
-          {/* 전류 흐름(노란 선)도 코일과 함께 회전하도록 Rotor 그룹 안에 배치 */}
-          <CurrentFlux enabled={showFlux} direction={currentDir} />
+          {/* GLTF Rotor 루트의 로컬 변환과 동일하게 맞춰 코일 와이어와 겹침 */}
+          <group
+            position={nodes.Rotor.position}
+            quaternion={nodes.Rotor.quaternion}
+            scale={nodes.Rotor.scale}
+          >
+            <CurrentFlux enabled={showFlux} direction={currentDir} />
+          </group>
         </group>
       )}
     </group>
@@ -89,16 +103,18 @@ function MotorAssembly({ url, omegaRad, rotDir, showFlux, currentDir }) {
 
 /**
  * 코일 주변을 흐르는 전류(Flux) 시각화
+ * — Rotor와 같은 그룹·축(Z) 기준으로 직사각형 루프 (블렌더 코일 와이어와 동일 평면)
  */
 function CurrentFlux({ enabled, direction }) {
-  // 블렌더에서 생성한 새 코일 좌표에 맞춘 완벽한 수평 직사각형 궤적
+  const hw = COIL_HALF_W;
+  const hh = COIL_HALF_H;
+  const z = COIL_PATH_Z;
   const path = [
-    new THREE.Vector3(-0.3, 0, 1.5), // 좌측 브러시/정류자 부근
-    new THREE.Vector3(-0.7, 0, 1.0), // 좌측 하단 꺾임
-    new THREE.Vector3(-1.2, 0, -3.0), // 좌측 상단 끝
-    new THREE.Vector3(1.2, 0, -3.0), // 우측 상단 끝
-    new THREE.Vector3(0.7, 0, 1.0), // 우측 하단 꺾임
-    new THREE.Vector3(0.3, 0, 1.5), // 우측 브러시/정류자 부근
+    new THREE.Vector3(-hw, hh, z),
+    new THREE.Vector3(hw, hh, z),
+    new THREE.Vector3(hw, -hh, z),
+    new THREE.Vector3(-hw, -hh, z),
+    new THREE.Vector3(-hw, hh, z),
   ];
   const particles = 24;
   const refs = useRef([]);
@@ -117,7 +133,7 @@ function CurrentFlux({ enabled, direction }) {
 
   useFrame((_, dt) => {
     if (!enabled) return;
-    phase.current += dt * 0.8 * direction;
+    phase.current += dt * 1.2 * direction;
     for (let i = 0; i < particles; i += 1) {
       const r = refs.current[i];
       if (!r) continue;
@@ -201,10 +217,13 @@ export default function DcCoilMotorWidget({ apiData }) {
     return () => clearTimeout(t);
   }, [currentAmp]);
 
-  // 애니메이션용 데이터 정제
-  const omega = powerOn ? Math.min(12, omegaData.omega_rad_s ?? 0) : 0;
-  const rpm = omegaData.omega_rpm ?? 0;
-  const torque = omegaData.torque_scale_n_m ?? 0;
+  const rawOmega = Math.max(0, omegaData.omega_rad_s ?? 0);
+  const rawTorque = Math.max(0, omegaData.torque_scale_n_m ?? 0);
+
+  // 전원 ON일 때만 회전·표시값 반영 (슬라이더 전류 → API/폴백 omega 가 그대로 반영되도록 상한만 둠)
+  const omega = powerOn ? Math.min(OMEGA_VIS_MAX, rawOmega) : 0;
+  const rpm = powerOn ? (omega * 30) / Math.PI : 0;
+  const torque = powerOn ? rawTorque : 0;
 
   // 로렌츠 힘 방향 = 전류 방향 × 자기장 방향
   const currentDir = currentForward ? 1 : -1;
@@ -269,12 +288,12 @@ export default function DcCoilMotorWidget({ apiData }) {
       </div>
 
       <div style={{ padding: 12, background: C.surface }}>
-        <div style={{ marginBottom: 10, display: "flex", gap: 8 }}>
+        <div style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center" }}>
           <button type="button" onClick={() => setPowerOn((v) => !v)}>
-            {powerOn ? "전원 OFF" : "전원 ON"}
+            {powerOn ? "전원 끄기" : "전원 켜기"}
           </button>
           <span style={{ fontSize: 12, color: powerOn ? "#9cffb5" : C.muted }}>
-            {powerOn ? "전류 공급 중" : "전류 차단"}
+            {powerOn ? "가동 중 (전류·토크 반영)" : "정지 (전원 대기)"}
           </span>
         </div>
         <div style={{ marginBottom: 8 }}>
