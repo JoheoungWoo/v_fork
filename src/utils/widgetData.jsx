@@ -171,6 +171,9 @@ const WIDGET_MAP = {
   dc_rectifier: [
     lazy(() => import("@/components/animations/DcRectificationWidget")),
   ],
+  bridge_diode_rectifier: [
+    lazy(() => import("@/components/animations/DcRectificationWidget")),
+  ],
 
   // ==========================================
   // ⚙️ 전기기기 (Electrical Machines)
