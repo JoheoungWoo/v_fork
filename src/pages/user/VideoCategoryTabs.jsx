@@ -1,5 +1,3 @@
-import { Settings } from "lucide-react";
-
 /**
  * 카테고리 설정 데이터
  */
@@ -8,8 +6,9 @@ const CATEGORIES = [
   { id: "기초 수학", label: "기초 수학", icon: "📐" },
   { id: "회로이론", label: "회로이론", icon: "⚡" },
   { id: "전자기학", label: "전자기학", icon: "🧲" },
-  { id: "전기기기", label: "전기기기", icon: <Settings /> }, // 👈 이 줄을 추가!
-  { id: "제어공학", label: "제어공학", icon: "⚙️" },
+  { id: "전기기기", label: "전기기기", icon: "🔌" }, // 👈 모터/기기를 상징하는 플러그로 변경
+  { id: "제어공학", label: "제어공학", icon: "🎛️" }, // 👈 제어 패널(노브)로 변경하여 차별화
+  { id: "전력공학", label: "전력공학", icon: "🗼" }, // 👈 송전탑으로 변경하여 전력 계통 느낌 팍팍!
   { id: "Vision", label: "Vision", icon: "🚀" },
 ];
 
