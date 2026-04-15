@@ -20,7 +20,7 @@ const PATH_NEGATIVE = [
   new THREE.Vector3(0, -3.4, 0),   new THREE.Vector3(-1.8, -1.8, 0)
 ];
 
-// --- 1. 빛나는 전류 파티클 ---
+// --- 1. 빛나는 전류 파티클 (기존 동일) ---
 function GlowingParticles({ phase, amplitude }) {
   const meshRef = useRef();
   const count = 30;
@@ -55,15 +55,15 @@ function GlowingParticles({ phase, amplitude }) {
   );
 }
 
-// --- 2. 3D 메인 씬 (커패시터 추가) ---
+// --- 2. 3D 메인 씬 (다이오드 표시 방식 수정) ---
 function BridgeScene({ phase, amplitude, capacitorEnabled }) {
   const isPositiveHalf = Math.sin(phase) >= 0;
   const currentIntensity = Math.abs(Math.sin(phase)) * amplitude;
   
-  const activeColor = "#00ff66"; 
-  const idleColor = "#222222";   
+  // 색상 설정 개선: 꺼진 상태를 위한 아주 어두운 회색 추가
+  const activeColor = "#00ff66"; // 켜짐: 형광 녹색광
+  const idleColor = "#1a1a1a";   // 꺼짐: 아주 어두운 회색
   
-  // 평활 커패시터가 켜져 있으면 부하의 발열(빛)이 출렁이지 않고 일정하게 유지됨
   const loadGlowIntensity = capacitorEnabled 
     ? amplitude * 3.5 // 커패시터 ON: 안정적인 전력 공급
     : currentIntensity * 4; // 커패시터 OFF: 맥류에 따른 깜빡임
@@ -78,8 +78,9 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
         <Bloom luminanceThreshold={0.5} mipmapBlur intensity={1.2} radius={0.4} />
       </EffectComposer>
 
-      <Line points={PATH_POSITIVE} color="#444" lineWidth={1} />
-      <Line points={PATH_NEGATIVE} color="#444" lineWidth={1} />
+      {/* 배선 */}
+      <Line points={PATH_POSITIVE} color="#333" lineWidth={1} />
+      <Line points={PATH_NEGATIVE} color="#333" lineWidth={1} />
       <Line points={isPositiveHalf ? PATH_POSITIVE : PATH_NEGATIVE} color="#55aaff" lineWidth={3} toneMapped={false} />
 
       {/* 부하 (Load) */}
@@ -90,22 +91,22 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
         <Text position={[0, 2.9, 0.5]} fontSize={0.35} color="white">Load</Text>
       </group>
 
-      {/* 평활 커패시터 (Capacitor) */}
+      {/* 평활 커패시터 */}
       <group position={[2.5, 0, 0]}>
         <Cylinder args={[0.6, 0.6, 3, 32]}>
           <meshPhysicalMaterial 
-            color={capacitorEnabled ? "#007bff" : "#333333"} 
+            color={capacitorEnabled ? "#007bff" : "#222222"} 
             emissive={capacitorEnabled ? "#00aaff" : "#000000"} 
             emissiveIntensity={capacitorEnabled ? 1.5 : 0} 
+            transparent={true} opacity={capacitorEnabled ? 1.0 : 0.4} // 커패시터 꺼짐 시 투명도 조절
             roughness={0.3} metalness={0.6} toneMapped={false}
           />
         </Cylinder>
-        <Text position={[0, 2.0, 0.5]} fontSize={0.35} color={capacitorEnabled ? "white" : "#777"}>
+        <Text position={[0, 2.0, 0.5]} fontSize={0.35} color={capacitorEnabled ? "white" : "#666"}>
           Capacitor
         </Text>
-        {/* 커패시터 연결선 */}
-        <Line points={[[0, 1.5, 0], [0, 1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#444"} lineWidth={2} toneMapped={false}/>
-        <Line points={[[0, -1.5, 0], [0, -1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#444"} lineWidth={2} toneMapped={false}/>
+        <Line points={[[0, 1.5, 0], [0, 1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#333"} lineWidth={2} toneMapped={false}/>
+        <Line points={[[0, -1.5, 0], [0, -1.8, 0]]} color={capacitorEnabled ? "#55aaff" : "#333"} lineWidth={2} toneMapped={false}/>
       </group>
 
       {/* AC 전원 소스 */}
@@ -116,7 +117,7 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
         <Text position={[0, 2.9, 0.9]} fontSize={0.4} color="white">AC In</Text>
       </group>
 
-      {/* 다이오드들 */}
+      {/* ★ 다이오드 표시 로직 수정 (조건부 렌더링 대신 불투명도 조절 사용) ★ */}
       {[
         { id: "D1", pos: [0, 3.4, 0], rot: [0, 0, -Math.PI / 4], active: isPositiveHalf },
         { id: "D4", pos: [0, -3.4, 0], rot: [0, 0, Math.PI / 4], active: isPositiveHalf },
@@ -125,9 +126,25 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
       ].map((d) => (
         <group position={d.pos} key={d.id}>
           <Box args={[1.2, 0.6, 0.6]} rotation={d.rot}>
-            <meshPhysicalMaterial color={d.active ? activeColor : idleColor} emissive={d.active ? activeColor : "#000"} emissiveIntensity={d.active ? 2 : 0} roughness={0.4} metalness={0.8} toneMapped={false}/>
+            <meshPhysicalMaterial 
+              color={d.active ? activeColor : idleColor} // 색상 변경
+              emissive={d.active ? activeColor : "#000"} // 꺼짐 시 발광 없음
+              emissiveIntensity={d.active ? 2 : 0}
+              transparent={true} // 투명도 활성화
+              opacity={d.active ? 1.0 : 0.15} // ★ 핵심: 꺼진 다이오드는 15% 불투명도로 희미하게 ★
+              roughness={0.4} 
+              metalness={0.8} 
+              toneMapped={false}
+            />
           </Box>
-          <Text position={[0, d.rot[2] > 0 ? -0.8 : 0.8, 0.4]} fontSize={0.35} color="white">{d.id}</Text>
+          {/* 다이오드 라벨도 희미하게 처리 */}
+          <Text 
+            position={[0, d.rot[2] > 0 ? -0.8 : 0.8, 0.4]} 
+            fontSize={0.35} 
+            color={d.active ? "white" : "#444"} // 꺼짐 시 라벨 색상 변경
+          >
+            {d.id}
+          </Text>
         </group>
       ))}
 
@@ -136,7 +153,7 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
   );
 }
 
-// --- 3. 오실로스코프형 하단 파형 패널 (RC 방전 물리 연산) ---
+// --- 3. 오실로스코프형 하단 파형 패널 (기존 동일) ---
 function WaveformPanel({ phase, amplitude, frequency, capacitorEnabled, capacitance }) {
   const width = 1000, height = 180, centerY = 90;
   const ampPx = 60 * amplitude;
@@ -144,42 +161,28 @@ function WaveformPanel({ phase, amplitude, frequency, capacitorEnabled, capacita
   const inPoints = [], outPoints = [];
   
   let markerInputY = centerY, markerOutputY = centerY;
-
-  // 창에 보여질 총 라디안 (2주기 = 4PI)
   const viewWindowRads = Math.PI * 4;
   const dt_angle = viewWindowRads / points; 
-  
-  // RC 시정수(tau) 계산: 용량(C)에 비례. 방전 속도를 결정함
   const tau = capacitance * 0.015; 
-  // 각도 변화량에 따른 실제 시간 변화량 변환
   const dt_sec = dt_angle / (2 * Math.PI * frequency); 
-  const decay = Math.exp(-dt_sec / tau); // e^(-t/RC) 방전 곡선
+  const decay = Math.exp(-dt_sec / tau); 
 
-  let vCap = 0; // 커패시터 현재 전압
-
-  // Steady-state를 찾기 위한 Pre-roll (화면 밖 과거 시간부터 연산)
+  let vCap = 0; 
   for(let i = 0; i < 100; i++) {
     const angle = phase - viewWindowRads - (100 - i) * dt_angle;
     const vAc = Math.abs(Math.sin(angle)) * ampPx;
     if (vAc > vCap) vCap = vAc; else vCap *= decay;
   }
 
-  // 화면에 그릴 파형 포인트 계산 (왼쪽 -> 오른쪽 끝(현재))
   for (let i = 0; i < points; i++) {
     const x = 40 + (i / (points - 1)) * (width - 80);
     const angle = phase - viewWindowRads + i * dt_angle;
-    
     const vAc = Math.abs(Math.sin(angle)) * ampPx;
     const vIn = Math.sin(angle) * ampPx;
-
     inPoints.push(`${x},${centerY - vIn}`);
 
     if (capacitorEnabled) {
-      if (vAc >= vCap) {
-        vCap = vAc; // 입력 전압이 더 높으면 충전
-      } else {
-        vCap = vCap * decay; // 입력 전압이 낮으면 RC 곡선에 따라 자연 방전
-      }
+      if (vAc >= vCap) vCap = vAc; else vCap *= decay;
       outPoints.push(`${x},${centerY - vCap}`);
       if (i === points - 1) markerOutputY = centerY - vCap;
     } else {
@@ -189,7 +192,7 @@ function WaveformPanel({ phase, amplitude, frequency, capacitorEnabled, capacita
     if (i === points - 1) markerInputY = centerY - vIn;
   }
 
-  const markerX = width - 40; // 항상 오른쪽 끝이 현재 시간(Phase)
+  const markerX = width - 40; 
 
   return (
     <div style={{ padding: "20px", background: "#111", color: "#eee", borderTop: "2px solid #333" }}>
@@ -198,15 +201,11 @@ function WaveformPanel({ phase, amplitude, frequency, capacitorEnabled, capacita
         <span style={{ color: "#aaa" }}>{capacitorEnabled ? "맥동률(리플) 감소됨 (충·방전 상태)" : "전파 정류된 맥류 파형 (Pulsating DC)"}</span>
       </div>
       <svg width="100%" viewBox={`0 0 ${width} ${height}`}>
-        <line x1="40" y1={centerY} x2={width - 40} y2={centerY} stroke="#444" strokeWidth="2" strokeDasharray="5,5" />
-        
-        <polyline fill="none" stroke="#007bff" strokeWidth="2" opacity="0.4" points={inPoints.join(" ")} />
+        <line x1="40" y1={centerY} x2={width - 40} y2={centerY} stroke="#333" strokeWidth="2" strokeDasharray="5,5" />
+        <polyline fill="none" stroke="#007bff" strokeWidth="2" opacity="0.3" points={inPoints.join(" ")} />
         <polyline fill="none" stroke="#ff3333" strokeWidth="4" points={outPoints.join(" ")} style={{ transition: 'all 0.1s' }} />
-        
-        {/* 실시간 마커 */}
         <circle cx={markerX} cy={markerInputY} r="5" fill="#007bff" />
         <circle cx={markerX} cy={markerOutputY} r="6" fill="#ffffff" stroke="#ff3333" strokeWidth="2" />
-        
         <text x="50" y="30" fill="#007bff" fontSize="14" fontWeight="bold">입력 AC</text>
         <text x="50" y="55" fill="#ff3333" fontSize="14" fontWeight="bold">출력 DC {capacitorEnabled ? '(평활됨)' : ''}</text>
       </svg>
@@ -214,8 +213,8 @@ function WaveformPanel({ phase, amplitude, frequency, capacitorEnabled, capacita
   );
 }
 
-// --- 4. 메인 위젯 레이아웃 ---
-export default function CapacitorRectifierWidget() {
+// --- 4. 메인 위젯 레이아웃 (기존 동일) ---
+export default function FaintDiodeWidget() {
   const [frequency, setFrequency] = useState(1.0);
   const [amplitude, setAmplitude] = useState(0.8);
   const [capacitorEnabled, setCapacitorEnabled] = useState(false);
@@ -242,21 +241,15 @@ export default function CapacitorRectifierWidget() {
         <h2 style={{ margin: 0, fontSize: "20px", color: "#00ffcc", width: "100%", borderBottom: "1px solid #444", paddingBottom: "10px" }}>
           브리지 정류기 & 평활 회로
         </h2>
-        
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexGrow: 1 }}>
-          <button 
-            onClick={() => setCapacitorEnabled(!capacitorEnabled)}
-            style={{ padding: "10px 20px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", border: "none", borderRadius: "6px", backgroundColor: capacitorEnabled ? "#007bff" : "#555", color: "white", transition: "0.2s" }}
-          >
+          <button onClick={() => setCapacitorEnabled(!capacitorEnabled)} style={{ padding: "10px 20px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", border: "none", borderRadius: "6px", backgroundColor: capacitorEnabled ? "#007bff" : "#555", color: "white", transition: "0.2s" }}>
             {capacitorEnabled ? "커패시터 ON" : "커패시터 OFF"}
           </button>
         </div>
-
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <label style={{ color: capacitorEnabled ? "white" : "#777" }}>용량 (C):</label>
           <input type="range" min="10" max="150" step="5" value={capacitance} disabled={!capacitorEnabled} onChange={(e) => setCapacitance(Number(e.target.value))} style={{ opacity: capacitorEnabled ? 1 : 0.3 }} />
         </div>
-        
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <label>주파수 (Hz):</label>
           <input type="range" min="0.5" max="3.0" step="0.1" value={frequency} onChange={(e) => setFrequency(Number(e.target.value))} />
