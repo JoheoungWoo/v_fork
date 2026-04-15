@@ -5,29 +5,41 @@ import * as THREE from "three";
 
 // --- [1] 모터 컴포넌트 ---
 const Motor = ({ direction, speed }) => {
-  const motorRef = useRef();
+  const rotorRef = useRef();
 
   useFrame(() => {
+    if (!rotorRef.current) return;
     if (direction === "forward") {
-      motorRef.current.rotation.x += speed * 0.05;
+      rotorRef.current.rotation.x += speed * 0.05;
     } else if (direction === "reverse") {
-      motorRef.current.rotation.x -= speed * 0.05;
+      rotorRef.current.rotation.x -= speed * 0.05;
     }
   });
 
   return (
     <group>
-      <Cylinder
-        ref={motorRef}
-        args={[1.2, 1.2, 3, 32]}
-        rotation={[0, 0, Math.PI / 2]}
-      >
-        <meshStandardMaterial color="#0055ff" metalness={0.8} roughness={0.2} />
+      {/* 모터 외형(고정) */}
+      <Cylinder args={[1.2, 1.2, 3, 32]} rotation={[0, 0, Math.PI / 2]}>
+        <meshStandardMaterial color="#1f4eb8" metalness={0.7} roughness={0.25} />
       </Cylinder>
+
+      {/* 회전부(가시성 향상용 허브 + 블레이드) */}
+      <group ref={rotorRef}>
+        <Cylinder args={[0.25, 0.25, 3.4, 24]} rotation={[0, 0, Math.PI / 2]}>
+          <meshStandardMaterial color="#ffd54a" metalness={0.6} roughness={0.35} />
+        </Cylinder>
+        <Box args={[0.12, 0.25, 1.9]} position={[0, 0, 0.85]}>
+          <meshStandardMaterial color="#ffdf74" metalness={0.45} roughness={0.45} />
+        </Box>
+        <Box args={[0.12, 0.25, 1.9]} position={[0, 0, -0.85]} rotation={[Math.PI / 2, 0, 0]}>
+          <meshStandardMaterial color="#ffdf74" metalness={0.45} roughness={0.45} />
+        </Box>
+      </group>
+
       <Text
         position={[0, 0, 1.5]}
         fontSize={0.5}
-        color="white"
+        color="#f5f7ff"
         outlineWidth={0.05}
         outlineColor="black"
       >
@@ -121,14 +133,14 @@ export default function HBridgeSimulation() {
         height: "800px",
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "#111",
+        backgroundColor: "#2a2f3a",
       }}
     >
       {/* 컨트롤 패널 */}
       <div
         style={{
           padding: "20px",
-          backgroundColor: "#222",
+          backgroundColor: "#3a4250",
           color: "white",
           display: "flex",
           gap: "20px",
@@ -191,9 +203,11 @@ export default function HBridgeSimulation() {
       </div>
 
       {/* 3D 캔버스 */}
-      <Canvas camera={{ position: [0, 0, 10], fov: 60 }}>
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
+      <Canvas camera={{ position: [0, 0, 10], fov: 60 }} style={{ background: "#6c7688" }}>
+        <color attach="background" args={["#6c7688"]} />
+        <ambientLight intensity={0.95} />
+        <directionalLight position={[10, 10, 5]} intensity={1.25} />
+        <directionalLight position={[-8, -6, 6]} intensity={0.55} />
         <OrbitControls enablePan={true} enableZoom={true} />
 
         {/* Q1 Switch */}
@@ -261,7 +275,7 @@ export default function HBridgeSimulation() {
             [-3, 3, 0],
             [-1.5, 0, 0],
           ]}
-          color="gray"
+          color="#d0d4dc"
           lineWidth={2}
         />
         <Line
@@ -270,7 +284,7 @@ export default function HBridgeSimulation() {
             [3, 3, 0],
             [1.5, 0, 0],
           ]}
-          color="gray"
+          color="#d0d4dc"
           lineWidth={2}
         />
         <Line
@@ -279,7 +293,7 @@ export default function HBridgeSimulation() {
             [-3, -3, 0],
             [-3, -4, 0],
           ]}
-          color="gray"
+          color="#d0d4dc"
           lineWidth={2}
         />
         <Line
@@ -288,7 +302,7 @@ export default function HBridgeSimulation() {
             [3, -3, 0],
             [3, -4, 0],
           ]}
-          color="gray"
+          color="#d0d4dc"
           lineWidth={2}
         />
       </Canvas>
