@@ -63,10 +63,18 @@ function MotorAssembly({
   showFlux,
   currentDir,
   currentAmp,
+  rotationResetKey,
 }) {
   const { nodes } = useGLTF(url);
   const shaftRef = useRef(null);
   const angleRef = useRef(0);
+
+  useEffect(() => {
+    angleRef.current = 0;
+    if (shaftRef.current) {
+      shaftRef.current.rotation.z = 0;
+    }
+  }, [rotationResetKey]);
 
   useFrame((_, dt) => {
     angleRef.current -= omegaRad * rotDir * dt;
@@ -169,6 +177,7 @@ function CurrentFlux({ enabled, direction, currentAmp }) {
  */
 export default function DcCoilMotorWidget({ apiData }) {
   const [powerOn, setPowerOn] = useState(false);
+  const [rotationResetKey, setRotationResetKey] = useState(0);
   const [currentAmp, setCurrentAmp] = useState(4);
   const [currentForward, setCurrentForward] = useState(true);
   const [bForward, setBForward] = useState(true);
@@ -270,7 +279,8 @@ export default function DcCoilMotorWidget({ apiData }) {
               rotDir={rotDir}
               showFlux={powerOn}
               currentDir={currentDir}
-              currentAmp={currentAmp} // 💡 입자 속도 제어를 위해 전류값 전달
+              currentAmp={currentAmp}
+              rotationResetKey={rotationResetKey}
             />
 
             <Magnet type="N" position={[nPosX, 0, magnetZ]} />
@@ -286,10 +296,18 @@ export default function DcCoilMotorWidget({ apiData }) {
             display: "flex",
             gap: 8,
             alignItems: "center",
+            flexWrap: "wrap",
           }}
         >
           <button type="button" onClick={() => setPowerOn((v) => !v)}>
             {powerOn ? "전원 끄기" : "전원 켜기"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRotationResetKey((k) => k + 1)}
+            title="로터(코일) 회전 각도를 0으로 맞춥니다"
+          >
+            초기화
           </button>
           <span style={{ fontSize: 12, color: powerOn ? "#9cffb5" : C.muted }}>
             {powerOn ? "가동 중 (전류·토크 반영)" : "정지 (전원 대기)"}
