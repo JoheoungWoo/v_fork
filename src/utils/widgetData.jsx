@@ -57,6 +57,7 @@ const WIDGET_MAP = {
   ee_power_triangle: [PowerTrianglePowerFactorLazy],
   /** Supabase 등에서 쓰는 lecture_id 예: power_triangle_lec */
   power_triangle_lec: [PowerTrianglePowerFactorLazy],
+
   // ==========================================
   // 🧲 전자기학 (Electromagnetics)
   // ==========================================
@@ -295,6 +296,17 @@ const WIDGET_MAP = {
   three_phase_induction_motor: [
     lazy(
       () => import("@/components/animations/machines/ThreePhaseinductionMotor"),
+    ),
+  ],
+
+  // ==========================================
+  // ⚡ 전력공학 (Power Engineering)
+  // ==========================================
+  /** 3상 V결선 CT 전류 측정 시뮬레이터 */
+  v_connection_ct_measurement: [
+    lazy(
+      // 실제 컴포넌트를 저장한 폴더 경로에 맞게 수정해주세요. (예: circuits, power 등)
+      () => import("@/components/animations/circuits/VConnectionCTWidget"),
     ),
   ],
 };
