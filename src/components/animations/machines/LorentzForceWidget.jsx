@@ -1,23 +1,17 @@
 /**
  * LorentzForceWidget.jsx
  *
- * 로렌츠 힘(플레밍의 왼손 법칙) 시뮬레이션
- * 전원 ON/OFF 스위치 및 실시간 전류 입자 흐름(Particle) 시각화 추가.
+ * 플레밍의 왼손 법칙 (단일 구리봉 상하 운동 + 전원/입자 시각화 통합 버전)
  */
 
-import { OrbitControls, Text } from "@react-three/drei";
+import { Arrow, OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useRef, useState } from "react";
 import * as THREE from "three";
 
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
-const _dir = new THREE.Vector3();
-const _quat = new THREE.Quaternion();
-
 import "katex/dist/katex.min.css";
 import { BlockMath, InlineMath } from "react-katex";
 
-// 🎨 라이트 테마 색상
 const C = {
   bg: "#ffffff",
   surface: "#f8f9fa",
@@ -25,116 +19,87 @@ const C = {
   border: "#dee2e6",
   text: "#212529",
   muted: "#6c757d",
-  vectorI: "#fd7e14", // 전류: 오렌지
-  vectorB: "#0d6efd", // 자기장: 파랑
-  vectorF: "#198754", // 힘: 초록
-  magnetN: "#dc3545", // N극
-  magnetS: "#0a58ca", // S극
-  copper: "#b87333", // 구리색
-  powerOn: "#198754", // 전원 켜짐
-  powerOff: "#dc3545", // 전원 꺼짐
+  vectorI: "#fd7e14",
+  vectorB: "#0d6efd",
+  vectorF: "#198754",
+  magnetN: "#dc3545",
+  magnetS: "#0a58ca",
+  copper: "#b87333",
+  powerOn: "#198754",
+  powerOff: "#dc3545",
 };
 
 /**
- * drei에는 Arrow가 없음 — 실린더+원뿔(+Y 기준 회전)
+ * 벡터 화살표 컴포넌트
  */
 function VectorArrow({
-  vectorsRef,
-  vectorKey,
+  direction,
   color,
   length,
   label,
   position = [0, 0, 0],
   visible = true,
 }) {
-  const groupRef = useRef(null);
-  const shaftR = length * 0.04;
-  const headLen = length * 0.22;
-  const shaftLen = Math.max(0.05, length - headLen);
-  const tipY = shaftLen / 2 + headLen / 2;
+  const dirVec = useRef(new THREE.Vector3());
 
   useFrame(() => {
-    const d = vectorsRef.current[vectorKey];
-    _dir.set(d[0], d[1], d[2]);
-    if (_dir.lengthSq() < 1e-10) _dir.set(0, 1, 0);
-    _dir.normalize();
-    _quat.setFromUnitVectors(Y_AXIS, _dir);
-    if (groupRef.current) groupRef.current.quaternion.copy(_quat);
+    dirVec.current.set(...direction).normalize();
   });
 
   return (
     <group position={position} visible={visible}>
-      <group ref={groupRef}>
-        <mesh position={[0, shaftLen / 2, 0]} castShadow>
-          <cylinderGeometry args={[shaftR, shaftR, shaftLen, 12]} />
-          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
-        </mesh>
-        <mesh position={[0, shaftLen / 2 + headLen / 2, 0]} castShadow>
-          <coneGeometry args={[shaftR * 2.2, headLen, 12]} />
-          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
-        </mesh>
-        <Text
-          position={[0, tipY + 0.3, 0]}
-          fontSize={0.4}
-          color={color}
-          fontWeight="bold"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {label}
-        </Text>
-      </group>
+      <Arrow
+        args={[dirVec.current, new THREE.Vector3(0, 0, 0), length, color]}
+        headLength={length * 0.3}
+        headWidth={length * 0.15}
+      />
+      <Text
+        position={[
+          direction[0] * length * 1.1,
+          direction[1] * length * 1.1,
+          direction[2] * length * 1.1,
+        ]}
+        fontSize={0.4}
+        color={color}
+        fontWeight="bold"
+      >
+        {label}
+      </Text>
     </group>
   );
 }
 
 /**
- * 💡 새로운 기능: 전류 흐름 입자(Particle) 시각화
- * 전원이 켜지면 레일 -> 구리봉 -> 레일 경로로 노란색 구체들이 흘러갑니다.
+ * 💡 전류 흐름 입자(Particle) 시각화 - 구리봉 내부 관통 (Z축 직선)
  */
-function CurrentParticles({ isPowerOn, currentDir, rodX }) {
-  const particlesCount = 20;
+function CurrentParticles({ isPowerOn, currentDir, rodL, rodY }) {
+  const particlesCount = 15;
   const particleRefs = useRef([]);
   const phase = useRef(0);
 
-  // 입자가 흐를 ㄷ자 형태의 3D 경로 생성
-  const path = [
-    new THREE.Vector3(rodX, -0.15, 3), // 시작 레일 깊은 곳
-    new THREE.Vector3(rodX, -0.15, 1.0), // 앞쪽 레일
-    new THREE.Vector3(rodX, 0, 1.0), // 구리봉 진입
-    new THREE.Vector3(rodX, 0, -1.0), // 구리봉 반대편
-    new THREE.Vector3(rodX, -0.15, -1.0), // 뒤쪽 레일
-    new THREE.Vector3(rodX, -0.15, -3), // 끝 레일 깊은 곳
-  ];
-
-  const sample = (t) => {
-    const segs = path.length - 1;
-    const wrapped = ((t % 1) + 1) % 1;
-    let s = wrapped * segs;
-
-    // 전류 방향이 -Z(앞에서 뒤)면 경로를 반대로(뒤에서 앞) 타야 함
-    if (currentDir === "-Z") {
-      s = segs - s;
-    }
-
-    const i = Math.floor(s);
-    const f = s - i;
-    const a = path[i];
-    const b = path[Math.min(i + 1, path.length - 1)];
-    return a.clone().lerp(b, f);
-  };
+  // 구리봉을 따라 흐르는 직선 경로 (Z축 기준 -3.5 에서 +3.5 정도)
+  const pathStart = -rodL * 0.8;
+  const pathEnd = rodL * 0.8;
 
   useFrame((_, dt) => {
     if (!isPowerOn) return;
 
-    phase.current += dt * 0.5; // 흐르는 속도
+    // 전류 방향에 따라 위상(phase) 증감 방향 설정
+    const dirMult = currentDir === "+Z" ? 1 : -1;
+    phase.current += dt * 0.6 * dirMult;
 
     for (let i = 0; i < particlesCount; i++) {
       const r = particleRefs.current[i];
       if (!r) continue;
-      // 입자들을 경로 위에 일정 간격으로 분산
-      const p = sample(phase.current + i / particlesCount);
-      r.position.set(p.x, p.y, p.z);
+
+      // 0~1 사이로 정규화된 진행도
+      const t = (((phase.current + i / particlesCount) % 1) + 1) % 1;
+
+      // Z축 좌표 계산 (선형 보간)
+      const currentZ = pathStart + (pathEnd - pathStart) * t;
+
+      // 입자 위치 세팅 (Y는 구리봉과 함께 움직임, X=0, Z는 흐름)
+      r.position.set(0, rodY, currentZ);
     }
   });
 
@@ -151,7 +116,7 @@ function CurrentParticles({ isPowerOn, currentDir, rodX }) {
 }
 
 /**
- * 💡 핵심 물리 엔진 및 3D 모델
+ * 💡 핵심 물리 엔진 (상하 운동) 및 3D 모델
  */
 function LorentzSimulation({
   isPowerOn,
@@ -165,128 +130,116 @@ function LorentzSimulation({
   resetFlag,
 }) {
   const rodRef = useRef(null);
-  const vectorsRef = useRef({
-    i: [0, 0, 1],
-    b: [0, -1, 0],
-    f: [1, 0, 0],
-  });
 
-  const positionX = useRef(0);
-  const velocityX = useRef(0);
-  const angleZ = useRef(0);
+  const positionY = useRef(0);
+  const velocityY = useRef(0);
 
   if (resetFlag && rodRef.current) {
-    positionX.current = 0;
-    velocityX.current = 0;
-    angleZ.current = 0;
+    positionY.current = 0;
+    velocityY.current = 0;
   }
 
   useFrame((_, dt) => {
+    // 1. 방향 추출
+    // 전류 I: +Z(앞으로 나옴), -Z(뒤로 들어감)
     const iDir = currentDir === "+Z" ? 1 : -1;
+    // 자기장 B: +X(좌->우), -X(우->좌)
     const bDir = magnetDir === "N→S" ? 1 : -1;
 
-    // 전원이 꺼져있으면 전류(I)는 0이 됨
+    // 전원이 꺼져있으면 실제 흐르는 전류는 0
     const activeCurrent = isPowerOn ? currentI : 0;
 
+    // 2. 힘의 크기 (F = IBL)
     const forceMag = magnetB * activeCurrent * rodL;
+
+    // 3. 힘의 방향 (플레밍의 왼손 법칙: I x B -> Y축)
     const forceDir = iDir * bDir;
-    const accelX = (forceMag * forceDir) / rodM;
 
-    const dragFactor = 0.98; // 약간의 저항
+    // 4. 가속도 (a = F / m)
+    const accelY = (forceMag * forceDir) / rodM;
 
-    velocityX.current += accelX * dt;
-    velocityX.current *= dragFactor;
-    positionX.current += velocityX.current * dt;
+    // 공기 저항(무한 가속 방지)
+    const dragFactor = 0.95;
 
-    if (Math.abs(positionX.current) > 4.5) {
-      velocityX.current = 0;
-      positionX.current = Math.sign(positionX.current) * 4.5;
+    // 5. 속도 및 위치 적분
+    velocityY.current += accelY * dt;
+    velocityY.current *= dragFactor;
+    positionY.current += velocityY.current * dt;
+
+    // 6. 상하 한계점 (자석을 뚫고 나가지 않게)
+    if (Math.abs(positionY.current) > 2.5) {
+      velocityY.current = 0;
+      positionY.current = Math.sign(positionY.current) * 2.5;
     }
 
+    // 7. 모델 위치 업데이트
     if (rodRef.current) {
-      rodRef.current.position.x = positionX.current;
-
-      if (Math.abs(velocityX.current) > 0.01) {
-        angleZ.current -= (velocityX.current * dt) / 0.15; // 반지름에 맞춘 회전
-        rodRef.current.rotation.z = angleZ.current;
-      }
+      rodRef.current.position.y = positionY.current;
     }
 
-    const iVector = [0, 0, iDir];
-    const bVector = [0, bDir * -1, 0];
-    const fVector = [forceDir, 0, 0];
-    vectorsRef.current = { i: iVector, b: bVector, f: fVector };
-
+    // 8. 패널용 데이터 전달
     setMetrics({
-      activeI: activeCurrent, // 현재 실제 흐르는 전류 (0 또는 설정값)
+      activeI: activeCurrent,
       F: forceMag * forceDir,
-      a: accelX,
-      x: positionX.current,
-      iVector,
-      bVector,
-      fVector,
+      a: accelY,
+      y: positionY.current,
+      iVector: [0, 0, iDir],
+      bVector: [bDir, 0, 0],
+      fVector: [0, forceDir, 0],
     });
   });
 
-  const isNTop = magnetDir === "N→S";
+  const isNLeft = magnetDir === "N→S";
 
   return (
     <group>
-      {/* 금속 레일 */}
-      <mesh position={[0, -0.15, 1.0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.05, 0.05, 10, 16]} />
-        <meshStandardMaterial color="#adb5bd" metalness={0.6} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, -0.15, -1.0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.05, 0.05, 10, 16]} />
-        <meshStandardMaterial color="#adb5bd" metalness={0.6} roughness={0.3} />
-      </mesh>
-
-      {/* 자석 */}
-      <mesh position={[0, 2.5, 0]}>
-        <boxGeometry args={[4, 2, 3]} />
+      {/* 왼쪽 자석 */}
+      <mesh position={[-2.5, 0, 0]}>
+        <boxGeometry args={[1.5, 3, 3]} />
         <meshStandardMaterial
-          color={isNTop ? C.magnetN : C.magnetS}
+          color={isNLeft ? C.magnetN : C.magnetS}
           metalness={0.2}
           roughness={0.8}
         />
         <Text
-          position={[2.1, 0, 0]}
+          position={[0.8, 0, 0]}
           rotation={[0, Math.PI / 2, 0]}
           fontSize={1}
           color="white"
           fontWeight="bold"
         >
-          {isNTop ? "N" : "S"}
+          {isNLeft ? "N" : "S"}
         </Text>
       </mesh>
-      <mesh position={[0, -2.5, 0]}>
-        <boxGeometry args={[4, 2, 3]} />
+
+      {/* 오른쪽 자석 */}
+      <mesh position={[2.5, 0, 0]}>
+        <boxGeometry args={[1.5, 3, 3]} />
         <meshStandardMaterial
-          color={isNTop ? C.magnetS : C.magnetN}
+          color={isNLeft ? C.magnetS : C.magnetN}
           metalness={0.2}
           roughness={0.8}
         />
         <Text
-          position={[2.1, 0, 0]}
-          rotation={[0, Math.PI / 2, 0]}
+          position={[-0.8, 0, 0]}
+          rotation={[0, -Math.PI / 2, 0]}
           fontSize={1}
           color="white"
           fontWeight="bold"
         >
-          {isNTop ? "S" : "N"}
+          {isNLeft ? "S" : "N"}
         </Text>
       </mesh>
 
-      {/* 전류 입자 애니메이션 (전원 ON 시 표시됨) */}
-      {/* 구리봉의 현재 X 좌표를 전달하여 입자가 봉을 따라 흐르도록 함 */}
+      {/* 전류 입자 애니메이션 (전원 ON 시 구리봉과 함께 Y축 상하 이동) */}
       <CurrentParticles
         isPowerOn={isPowerOn}
         currentDir={currentDir}
-        rodX={rodRef.current ? rodRef.current.position.x : 0}
+        rodL={rodL}
+        rodY={rodRef.current ? rodRef.current.position.y : 0}
       />
 
-      {/* 구리봉 */}
+      {/* 단일 구리봉 (Z축으로 평행) */}
       <mesh
         ref={rodRef}
         position={[0, 0, 0]}
@@ -303,24 +256,22 @@ function LorentzSimulation({
         {/* 벡터 화살표 */}
         <Suspense fallback={null}>
           <VectorArrow
-            vectorsRef={vectorsRef}
-            vectorKey="b"
+            direction={setMetrics.bVector || [1, 0, 0]}
             color={C.vectorB}
             length={1.5}
             label="자기장(B)"
           />
+          {/* 전원 꺼지면 전류, 힘 화살표 숨김 */}
           <VectorArrow
-            vectorsRef={vectorsRef}
-            vectorKey="i"
+            direction={setMetrics.iVector || [0, 0, 1]}
             color={C.vectorI}
             length={1.5}
             label="전류(I)"
-            position={[0, rodL / 2 + 0.3, 0]}
+            position={[0, rodL / 2, 0]}
             visible={isPowerOn}
           />
           <VectorArrow
-            vectorsRef={vectorsRef}
-            vectorKey="f"
+            direction={setMetrics.fVector || [0, 1, 0]}
             color={C.vectorF}
             length={1.5}
             label="힘(F)"
@@ -333,24 +284,24 @@ function LorentzSimulation({
 }
 
 export default function LorentzForceWidget() {
-  const [isPowerOn, setIsPowerOn] = useState(false); // 💡 전원 상태
+  const [isPowerOn, setIsPowerOn] = useState(false);
   const [currentI, setCurrentI] = useState(5.0);
   const [currentDir, setCurrentDir] = useState("+Z");
   const [magnetB, setMagnetB] = useState(1.0);
   const [magnetDir, setMagnetDir] = useState("N→S");
   const [resetFlag, setResetFlag] = useState(false);
 
-  const rodL = 2.0;
+  const rodL = 4.0; // 💡 길이 연장
   const rodM = 0.5;
 
   const [metrics, setMetrics] = useState({
     activeI: 0,
     F: 0,
     a: 0,
-    x: 0,
+    y: 0,
     iVector: [0, 0, 1],
-    bVector: [0, -1, 0],
-    fVector: [1, 0, 0],
+    bVector: [1, 0, 0],
+    fVector: [0, 1, 0],
   });
 
   const handleReset = () => {
@@ -381,7 +332,7 @@ export default function LorentzForceWidget() {
           alignItems: "center",
         }}
       >
-        <span>로렌츠 힘 시뮬레이션 (전원 제어 및 입자 시각화)</span>
+        <span>로렌츠 힘 (플레밍의 왼손 법칙) 상하 운동 시뮬레이션</span>
         <span style={{ fontSize: 14, color: C.muted, fontWeight: "normal" }}>
           <InlineMath math="\vec{F} = I(\vec{L} \times \vec{B})" />
         </span>
@@ -389,8 +340,9 @@ export default function LorentzForceWidget() {
 
       {/* 3D 캔버스 */}
       <div style={{ height: 400, position: "relative" }}>
+        {/* 카메라 위치 약간 수정 (상하 운동이 잘 보이도록) */}
         <Canvas
-          camera={{ position: [5, 4, 6], fov: 50 }}
+          camera={{ position: [5, 5, 8], fov: 50 }}
           shadows
           gl={{ antialias: true }}
         >
@@ -417,7 +369,7 @@ export default function LorentzForceWidget() {
           </Suspense>
         </Canvas>
 
-        {/* 💡 캔버스 우측 하단에 메인 전원 스위치 오버레이 */}
+        {/* 💡 전원 스위치 오버레이 */}
         <div
           style={{
             position: "absolute",
@@ -484,7 +436,7 @@ export default function LorentzForceWidget() {
               onClick={handleReset}
               style={{ fontSize: 12, padding: "2px 8px", cursor: "pointer" }}
             >
-              초기 위치로
+              가운데로 초기화
             </button>
           </div>
           <input
@@ -574,7 +526,7 @@ export default function LorentzForceWidget() {
                 borderRadius: "4px",
               }}
             >
-              N 위, S 아래 (↓B)
+              N(좌) → S(우)
             </button>
             <button
               onClick={() => setMagnetDir("S→N")}
@@ -589,7 +541,7 @@ export default function LorentzForceWidget() {
                 borderRadius: "4px",
               }}
             >
-              S 위, N 아래 (↑B)
+              S(좌) ← N(우)
             </button>
           </div>
         </div>
@@ -661,9 +613,13 @@ export default function LorentzForceWidget() {
             <br />
             엄지(<strong style={{ color: C.vectorF }}>F</strong>)가 가리키는{" "}
             <strong>
-              {metrics.F > 0 ? "+X 방향 (오른쪽)" : "-X 방향 (왼쪽)"}
-            </strong>
-            으로 구리봉이 힘을 받습니다.
+              {metrics.F > 0
+                ? "위쪽 (상승)"
+                : metrics.F < 0
+                  ? "아래쪽 (하강)"
+                  : "정지"}
+            </strong>{" "}
+            방향으로 구리봉이 힘을 받아 이동합니다.
           </div>
         ) : (
           <div
