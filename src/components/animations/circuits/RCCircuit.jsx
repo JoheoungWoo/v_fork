@@ -47,6 +47,7 @@ const RCCircuit = () => {
   const mathFormula = isCharging
     ? `V_c(t) = ${v0} \\left( 1 - e^{-\\frac{t}{${tau}}} \\right)`
     : `V_c(t) = ${v0} e^{-\\frac{t}{${tau}}}`;
+  const activeColor = isCharging ? "#2563eb" : "#dc2626";
 
   return (
     <div
@@ -61,7 +62,7 @@ const RCCircuit = () => {
         RC 회로 시정수 시뮬레이터
       </h2>
 
-      {/* 컨트롤 패널 및 컴포넌트 SVG 영역 */}
+      {/* 기존 컨트롤 패널 */}
       <div
         style={{
           display: "flex",
@@ -76,7 +77,6 @@ const RCCircuit = () => {
         {/* 저항 컨트롤 */}
         <div style={{ textAlign: "center" }}>
           <svg width="80" height="40" viewBox="0 0 80 40">
-            {/* 이쁜 저항(Resistor) SVG */}
             <path
               d="M 0 20 L 15 20 L 20 5 L 30 35 L 40 5 L 50 35 L 60 5 L 65 20 L 80 20"
               stroke="#d35400"
@@ -98,7 +98,7 @@ const RCCircuit = () => {
           </div>
         </div>
 
-        {/* 모드 전환 버튼 */}
+        {/* 기존 충전/방전 토글 */}
         <div style={{ textAlign: "center" }}>
           <button
             onClick={() => setIsCharging(!isCharging)}
@@ -119,14 +119,13 @@ const RCCircuit = () => {
           <div
             style={{ marginTop: "10px", fontSize: "18px", fontWeight: "bold" }}
           >
-            시정수 ($\tau$): <span style={{ color: "#27ae60" }}>{tau} ms</span>
+            시정수 (τ): <span style={{ color: "#27ae60" }}>{tau} ms</span>
           </div>
         </div>
 
         {/* 커패시터 컨트롤 */}
         <div style={{ textAlign: "center" }}>
           <svg width="80" height="40" viewBox="0 0 80 40">
-            {/* 이쁜 커패시터(Capacitor) SVG */}
             <path
               d="M 0 20 L 35 20 M 35 5 L 35 35 M 45 5 L 45 35 M 45 20 L 80 20"
               stroke="#2980b9"
@@ -144,6 +143,95 @@ const RCCircuit = () => {
               value={c}
               onChange={(e) => setC(Number(e.target.value))}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* 추가 기능: A/B 접점 회로도 */}
+      <div
+        style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px",
+          padding: "16px",
+          marginBottom: "20px",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "10px" }}>
+          <button
+            onClick={() => setIsCharging(true)}
+            style={{
+              padding: "8px 14px",
+              fontSize: "14px",
+              fontWeight: "bold",
+              backgroundColor: isCharging ? "#2563eb" : "#cbd5e1",
+              color: isCharging ? "white" : "#334155",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            A 접점 연결
+          </button>
+          <button
+            onClick={() => setIsCharging(false)}
+            style={{
+              padding: "8px 14px",
+              fontSize: "14px",
+              fontWeight: "bold",
+              backgroundColor: !isCharging ? "#dc2626" : "#cbd5e1",
+              color: !isCharging ? "white" : "#334155",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            B 접점 연결
+          </button>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "8px" }}>
+          <svg viewBox="0 0 620 230" width="100%" height="220">
+            <line x1="60" y1="185" x2="560" y2="185" stroke="#1f2937" strokeWidth="3" />
+            <line x1="60" y1="185" x2="60" y2="60" stroke="#1f2937" strokeWidth="3" />
+            <line x1="35" y1="110" x2="60" y2="110" stroke="#1f2937" strokeWidth="5" />
+            <line x1="42" y1="126" x2="60" y2="126" stroke="#1f2937" strokeWidth="3" />
+            <text x="28" y="96" fontSize="20" fontWeight="bold">+</text>
+            <text x="30" y="146" fontSize="20" fontWeight="bold">-</text>
+            <text x="16" y="170" fontSize="20">ε</text>
+            <circle cx="165" cy="60" r="6" fill="#111827" />
+            <circle cx="260" cy="60" r="6" fill="#111827" />
+            <circle cx="195" cy="120" r="6" fill="#111827" />
+            <text x="154" y="44" fontSize="20" fontStyle="italic">A</text>
+            <text x="184" y="110" fontSize="20" fontStyle="italic">B</text>
+            <line x1="60" y1="60" x2="165" y2="60" stroke={isCharging ? activeColor : "#1f2937"} strokeWidth="3" />
+            <line
+              x1="225"
+              y1="75"
+              x2={isCharging ? "170" : "198"}
+              y2={isCharging ? "62" : "118"}
+              stroke={activeColor}
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+            <line x1="195" y1="120" x2="195" y2="185" stroke={!isCharging ? activeColor : "#1f2937"} strokeWidth="3" />
+            <line x1="260" y1="60" x2="295" y2="60" stroke="#1f2937" strokeWidth="3" />
+            <path
+              d="M 295 60 L 312 48 L 329 72 L 346 48 L 363 72 L 380 48 L 397 72 L 414 60"
+              stroke="#1f2937"
+              strokeWidth="3"
+              fill="none"
+              strokeLinejoin="round"
+            />
+            <text x="350" y="40" fontSize="30" fontStyle="italic">R</text>
+            <line x1="414" y1="60" x2="525" y2="60" stroke="#1f2937" strokeWidth="3" />
+            <line x1="525" y1="45" x2="525" y2="95" stroke="#1f2937" strokeWidth="4" />
+            <line x1="545" y1="45" x2="545" y2="95" stroke="#1f2937" strokeWidth="4" />
+            <line x1="545" y1="60" x2="560" y2="60" stroke="#1f2937" strokeWidth="3" />
+            <line x1="560" y1="60" x2="560" y2="185" stroke="#1f2937" strokeWidth="3" />
+            <text x="555" y="118" fontSize="32" fontStyle="italic">C</text>
+          </svg>
+          <div style={{ textAlign: "center", marginTop: "6px", color: activeColor, fontWeight: 700 }}>
+            현재 연결: {isCharging ? "A 접점 (충전 곡선 상승)" : "B 접점 (방전 곡선 하강)"}
           </div>
         </div>
       </div>
