@@ -24,17 +24,11 @@ const C = {
   muted: "#7a7872",
 };
 
-/** Blender `dc_motor_blender.py` 사각 코일과 동일 비율 (회전축 = 로컬 Z, 루프는 XY 평면) */
-const COIL_HALF_W = 0.6;
-const COIL_HALF_H = 0.7;
-const COIL_PATH_Z = 0;
-
-/** API/폴백에서 나온 각속도 상한 (rad/s) — 시각화만 제한, 물리식과 무관 */
-const OMEGA_VIS_MAX = 120;
+/** 💡 120이면 모니터 주사율 한계로 멈춰보입니다. 시각적 부드러움을 위해 15로 조정 */
+const OMEGA_VIS_MAX = 15;
 
 /**
  * 영구자석 (N극 / S극)
- * - 자석은 자기장 방향 전환 시 좌우 위치가 바뀌어야 하므로 React에서 코드로 렌더링합니다.
  */
 function Magnet({ type, position }) {
   const isN = type === "N";
@@ -60,41 +54,42 @@ function Magnet({ type, position }) {
 }
 
 /**
- * 💡 새롭게 적용된 통합 모터 어셈블리 (Rotor + Stator)
- * 블렌더에서 만든 'dc_motor_full.glb' 파일의 구조를 분해하여 렌더링합니다.
+ * 모터 어셈블리 (Rotor + Stator)
  */
-function MotorAssembly({ url, omegaRad, rotDir, showFlux, currentDir }) {
-  // scene 전체가 아니라 내부 노드(nodes)를 가져옵니다.
+function MotorAssembly({
+  url,
+  omegaRad,
+  rotDir,
+  showFlux,
+  currentDir,
+  currentAmp,
+}) {
   const { nodes } = useGLTF(url);
   const shaftRef = useRef(null);
   const angleRef = useRef(0);
 
   useFrame((_, dt) => {
-    // rotDir이 0이면(전원 OFF) 회전 중지
     angleRef.current -= omegaRad * rotDir * dt;
     if (shaftRef.current) {
-      // Z축(모터 샤프트 방향)을 기준으로 회전
       shaftRef.current.rotation.z = angleRef.current;
     }
   });
 
   return (
     <group>
-      {/* 1. 고정부 (Stator: 배터리, 전선, 브러시) - 회전하지 않음 */}
       {nodes.Stator && <primitive object={nodes.Stator} />}
 
-      {/* 2. 회전부 (Rotor: 축, 코일, 정류자) - shaftRef에 의해 동적으로 회전함 */}
       {nodes.Rotor && (
         <group ref={shaftRef}>
+          {/* 💡 primitive 자체를 shaftRef 안에 바로 넣어야 완벽히 일치합니다. */}
           <primitive object={nodes.Rotor} />
-          {/* GLTF Rotor 루트의 로컬 변환과 동일하게 맞춰 코일 와이어와 겹침 */}
-          <group
-            position={nodes.Rotor.position}
-            quaternion={nodes.Rotor.quaternion}
-            scale={nodes.Rotor.scale}
-          >
-            <CurrentFlux enabled={showFlux} direction={currentDir} />
-          </group>
+
+          {/* 💡 추가 래퍼 없이 같은 로컬 좌표계에서 전류 렌더링 */}
+          <CurrentFlux
+            enabled={showFlux}
+            direction={currentDir}
+            currentAmp={currentAmp}
+          />
         </group>
       )}
     </group>
@@ -103,19 +98,18 @@ function MotorAssembly({ url, omegaRad, rotDir, showFlux, currentDir }) {
 
 /**
  * 코일 주변을 흐르는 전류(Flux) 시각화
- * — Rotor와 같은 그룹·축(Z) 기준으로 직사각형 루프 (블렌더 코일 와이어와 동일 평면)
  */
-function CurrentFlux({ enabled, direction }) {
-  const hw = COIL_HALF_W;
-  const hh = COIL_HALF_H;
-  const z = COIL_PATH_Z;
+function CurrentFlux({ enabled, direction, currentAmp }) {
+  // 💡 블렌더 모델과 소수점까지 일치하는 완벽한 궤적 좌표
   const path = [
-    new THREE.Vector3(-hw, hh, z),
-    new THREE.Vector3(hw, hh, z),
-    new THREE.Vector3(hw, -hh, z),
-    new THREE.Vector3(-hw, -hh, z),
-    new THREE.Vector3(-hw, hh, z),
+    new THREE.Vector3(0.2, -1.5, 0), // 우측 브러시
+    new THREE.Vector3(1.2, -1.0, 0), // 우측 하단
+    new THREE.Vector3(1.2, 3.0, 0), // 우측 상단
+    new THREE.Vector3(-1.2, 3.0, 0), // 좌측 상단
+    new THREE.Vector3(-1.2, -1.0, 0), // 좌측 하단
+    new THREE.Vector3(-0.2, -1.5, 0), // 좌측 브러시
   ];
+
   const particles = 24;
   const refs = useRef([]);
   const phase = useRef(0);
@@ -133,7 +127,11 @@ function CurrentFlux({ enabled, direction }) {
 
   useFrame((_, dt) => {
     if (!enabled) return;
-    phase.current += dt * 1.2 * direction;
+
+    // 💡 전류 크기(currentAmp)에 비례해서 입자의 시각적 이동 속도도 증가!
+    const visualSpeed = 0.5 + currentAmp * 0.15;
+    phase.current += dt * visualSpeed * direction;
+
     for (let i = 0; i < particles; i += 1) {
       const r = refs.current[i];
       if (!r) continue;
@@ -181,25 +179,20 @@ export default function DcCoilMotorWidget({ apiData }) {
     rotation_direction: 1,
   });
 
-  // 💡 주의: 새로 만든 통합 모델 파일의 이름으로 URL을 지정합니다.
   const motorGlbUrl = apiData?.coil_model_url ?? DEFAULT_DC_MOTOR_GLB;
 
   useEffect(() => {
     const t = setTimeout(async () => {
       try {
-        // apiClient(Axios)를 사용하여 파라미터를 안전하게 전송
         const res = await apiClient.get("/api/machine/dc_coil_motor/omega", {
           params: {
             current_a: Math.abs(currentAmp),
             b_t: 0.8,
           },
         });
-
-        // Axios는 응답 본문을 res.data에 담습니다.
         setOmegaData(res.data);
       } catch (error) {
         console.error("Failed to fetch omega data:", error);
-        // API 실패 시 물리 경험식으로 임시 계산 (안정성을 위한 Fallback)
         const i = Math.abs(currentAmp);
         const b = 0.8;
         const omega = Math.min(
@@ -220,21 +213,21 @@ export default function DcCoilMotorWidget({ apiData }) {
   const rawOmega = Math.max(0, omegaData.omega_rad_s ?? 0);
   const rawTorque = Math.max(0, omegaData.torque_scale_n_m ?? 0);
 
-  // 전원 ON일 때만 회전·표시값 반영 (슬라이더 전류 → API/폴백 omega 가 그대로 반영되도록 상한만 둠)
+  // 💡 회전 속도를 OMEGA_VIS_MAX(15)로 제한하여 부드러운 애니메이션 확보
   const omega = powerOn ? Math.min(OMEGA_VIS_MAX, rawOmega) : 0;
-  const rpm = powerOn ? (omega * 30) / Math.PI : 0;
-  const torque = powerOn ? rawTorque : 0;
 
-  // 로렌츠 힘 방향 = 전류 방향 × 자기장 방향
+  // 하단 수치는 제한 없이 실제 물리 값(rawOmega)을 기반으로 정확하게 표시
+  const displayRpm = powerOn ? (rawOmega * 30) / Math.PI : 0;
+  const displayTorque = powerOn ? rawTorque : 0;
+
   const currentDir = currentForward ? 1 : -1;
   const bDir = bForward ? 1 : -1;
   const rotDir = powerOn ? currentDir * bDir : 0;
 
-  // 자석 배치 (bDir에 따라 좌우 위치 스왑)
   const magnetGap = 1.8;
   const nPosX = bDir >= 0 ? -magnetGap : magnetGap;
   const sPosX = -nPosX;
-  const magnetZ = -1.0; // 코일 중심에 맞게 깊이 조정
+  const magnetZ = -1.0;
 
   return (
     <div
@@ -254,7 +247,7 @@ export default function DcCoilMotorWidget({ apiData }) {
           fontWeight: 600,
         }}
       >
-        DC 모터 시뮬레이션 (통합 모델 제어)
+        DC 모터 시뮬레이션 (동기화 및 동적 속도 반영)
       </div>
 
       <div style={{ height: 480 }}>
@@ -266,21 +259,20 @@ export default function DcCoilMotorWidget({ apiData }) {
           <ambientLight intensity={0.75} />
           <directionalLight position={[4, 6, 5]} intensity={1.4} castShadow />
           <OrbitControls
-            target={[0, 0, -1.0]} // 카메라가 모터 중심을 바라보게 조정
+            target={[0, 0, -1.0]}
             minDistance={3}
             maxDistance={20}
           />
           <Suspense fallback={null}>
-            {/* 💡 새로운 통합 모델 컴포넌트 호출 */}
             <MotorAssembly
               url={motorGlbUrl}
               omegaRad={omega}
               rotDir={rotDir}
               showFlux={powerOn}
               currentDir={currentDir}
+              currentAmp={currentAmp} // 💡 입자 속도 제어를 위해 전류값 전달
             />
 
-            {/* 자석 렌더링 (방향 토글 시 위치 변경) */}
             <Magnet type="N" position={[nPosX, 0, magnetZ]} />
             <Magnet type="S" position={[sPosX, 0, magnetZ]} />
           </Suspense>
@@ -288,7 +280,14 @@ export default function DcCoilMotorWidget({ apiData }) {
       </div>
 
       <div style={{ padding: 12, background: C.surface }}>
-        <div style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center" }}>
+        <div
+          style={{
+            marginBottom: 10,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+          }}
+        >
           <button type="button" onClick={() => setPowerOn((v) => !v)}>
             {powerOn ? "전원 끄기" : "전원 켜기"}
           </button>
@@ -318,13 +317,12 @@ export default function DcCoilMotorWidget({ apiData }) {
         </div>
 
         <div style={{ marginTop: 6, fontSize: 13, color: C.muted }}>
-          omega: {omega.toFixed(2)} rad/s | rpm: {Math.round(rpm)} | torque:{" "}
-          {torque.toFixed(3)} N·m
+          omega: {rawOmega.toFixed(2)} rad/s | rpm: {Math.round(displayRpm)} |
+          torque: {displayTorque.toFixed(3)} N·m
         </div>
       </div>
     </div>
   );
 }
 
-// 💡 R3F 성능 최적화: 모델 미리 불러오기 (경로는 본인 프로젝트에 맞게 수정)
 useGLTF.preload(DEFAULT_DC_MOTOR_GLB);
