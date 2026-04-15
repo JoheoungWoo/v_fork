@@ -286,6 +286,9 @@ const WIDGET_MAP = {
   lorentz_force: [
     lazy(() => import("@/components/animations/machines/LorentzForceWidget")),
   ],
+  h_bridge_control: [
+    lazy(() => import("@/components/animations/machines/HBridgeSimulation")),
+  ],
 };
 
 export default WIDGET_MAP;

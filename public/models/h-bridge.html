@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>H-Bridge GLB 생성기</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #222;
+        color: white;
+      }
+      button {
+        padding: 15px 30px;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      p {
+        margin-top: 20px;
+        color: #ccc;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+  </head>
+  <body>
+    <h2>H-브리지 3D 모델 생성기</h2>
+    <button id="exportBtn">H-Bridge.glb 다운로드</button>
+    <p>
+      버튼을 클릭하면 4개의 스위치와 1개의 모터가 포함된 3D 파일이
+      다운로드됩니다.
+    </p>
+
+    <script>
+      // 1. 씬(Scene) 생성
+      const scene = new THREE.Scene();
+
+      // 2. 재질(Material) 설정
+      const switchMaterial = new THREE.MeshStandardMaterial({
+        color: 0x555555,
+        roughness: 0.7,
+        metalness: 0.3,
+      });
+      const motorMaterial = new THREE.MeshStandardMaterial({
+        color: 0x0055ff,
+        roughness: 0.5,
+        metalness: 0.8,
+      });
+
+      // 3. 기하학적 형태(Geometry) 설정
+      const switchGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5); // 스위치를 나타내는 정육면체
+
+      const motorRadius = 1.2;
+      const motorLength = 3;
+      const motorGeo = new THREE.CylinderGeometry(
+        motorRadius,
+        motorRadius,
+        motorLength,
+        32,
+      );
+      motorGeo.rotateZ(Math.PI / 2); // 모터 원통을 가로로 눕힘
+
+      // 4. 객체 생성 및 배치 (H-브리지 레이아웃)
+      // Q1 (좌측 상단)
+      const q1 = new THREE.Mesh(switchGeo, switchMaterial);
+      q1.position.set(-3, 3, 0);
+      q1.name = "Switch_Q1";
+      scene.add(q1);
+
+      // Q2 (좌측 하단)
+      const q2 = new THREE.Mesh(switchGeo, switchMaterial);
+      q2.position.set(-3, -3, 0);
+      q2.name = "Switch_Q2";
+      scene.add(q2);
+
+      // Q3 (우측 상단)
+      const q3 = new THREE.Mesh(switchGeo, switchMaterial);
+      q3.position.set(3, 3, 0);
+      q3.name = "Switch_Q3";
+      scene.add(q3);
+
+      // Q4 (우측 하단)
+      const q4 = new THREE.Mesh(switchGeo, switchMaterial);
+      q4.position.set(3, -3, 0);
+      q4.name = "Switch_Q4";
+      scene.add(q4);
+
+      // Motor (중앙)
+      const motor = new THREE.Mesh(motorGeo, motorMaterial);
+      motor.position.set(0, 0, 0);
+      motor.name = "DC_Motor";
+      scene.add(motor);
+
+      // 5. GLTF 내보내기 함수 설정
+      document
+        .getElementById("exportBtn")
+        .addEventListener("click", function () {
+          const exporter = new THREE.GLTFExporter();
+
+          // scene 전체를 파싱하여 GLB 형식으로 변환
+          exporter.parse(
+            scene,
+            function (gltf) {
+              // 바이너리 데이터(Blob) 생성
+              const blob = new Blob([gltf], {
+                type: "application/octet-stream",
+              });
+
+              // 임시 다운로드 링크 생성 및 클릭 이벤트 발생
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.style.display = "none";
+              link.href = url;
+              link.download = "H_Bridge_Model.glb";
+              document.body.appendChild(link);
+
+              link.click(); // 다운로드 트리거
+
+              // 메모리 정리
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            },
+            { binary: true },
+          ); // binary 옵션을 true로 주면 .gltf 대신 .glb가 생성됩니다.
+        });
+    </script>
+  </body>
+</html>
