@@ -176,31 +176,37 @@ const WIDGET_MAP = {
   // ==========================================
   "1_induction_motor": [
     lazy(() =>
-      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
-        default: function InductionMotorFromApiPage() {
-          return <m.default widgetHandlerId="machine_induction_motor" />;
-        },
-      })),
+      import("@/components/animations/machines/MachineWidgetPage").then(
+        (m) => ({
+          default: function InductionMotorFromApiPage() {
+            return <m.default widgetHandlerId="machine_induction_motor" />;
+          },
+        }),
+      ),
     ),
   ],
   /** Skin effect 3D — backend handler machine_skin_effect */
   skin_effect_ac: [
     lazy(() =>
-      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
-        default: function SkinEffectFromApiPage() {
-          return <m.default widgetHandlerId="machine_skin_effect" />;
-        },
-      })),
+      import("@/components/animations/machines/MachineWidgetPage").then(
+        (m) => ({
+          default: function SkinEffectFromApiPage() {
+            return <m.default widgetHandlerId="machine_skin_effect" />;
+          },
+        }),
+      ),
     ),
   ],
   /** DC rectangular coil + N/S poles — handler machine_dc_coil_motor */
   dc_coil_motor_3d: [
     lazy(() =>
-      import("@/components/animations/machines/MachineWidgetPage").then((m) => ({
-        default: function DcCoilMotorFromApiPage() {
-          return <m.default widgetHandlerId="machine_dc_coil_motor" />;
-        },
-      })),
+      import("@/components/animations/machines/MachineWidgetPage").then(
+        (m) => ({
+          default: function DcCoilMotorFromApiPage() {
+            return <m.default widgetHandlerId="machine_dc_coil_motor" />;
+          },
+        }),
+      ),
     ),
   ],
   "2_induction_motor": [
@@ -268,6 +274,11 @@ const WIDGET_MAP = {
   "9_flemming_right_hand_3d": [
     lazy(
       () => import("@/components/animations/magnetics/FlemingRightHandWidget"),
+    ),
+  ],
+  dc_coil_motor_3d_assembly: [
+    lazy(
+      () => import("@/components/animations/machines/DcCoilMotorAssemblyWidget"),
     ),
   ],
 };
