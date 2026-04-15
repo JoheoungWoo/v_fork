@@ -298,7 +298,13 @@ const WIDGET_MAP = {
       () => import("@/components/animations/machines/ThreePhaseinductionMotor"),
     ),
   ],
-
+  // 👇 여기에 방금 만든 직류 분권 발전기 위젯을 추가하세요! 👇
+  dc_shunt_generator: [
+    lazy(
+      // 실제 컴포넌트를 저장한 파일 경로로 맞춰주세요.
+      () => import("@/components/animations/machines/ShuntGeneratorSimulator"),
+    ),
+  ],
   // ==========================================
   // ⚡ 전력공학 (Power Engineering)
   // ==========================================
