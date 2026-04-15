@@ -207,10 +207,10 @@ const RCCircuit = () => {
             <text x="184" y="110" fontSize="20" fontStyle="italic">B</text>
             <line x1="60" y1="60" x2="165" y2="60" stroke={isCharging ? activeColor : "#1f2937"} strokeWidth="3" />
             <line
-              x1="225"
-              y1="75"
-              x2={isCharging ? "170" : "198"}
-              y2={isCharging ? "62" : "118"}
+              x1="260"
+              y1="60"
+              x2={isCharging ? "165" : "195"}
+              y2={isCharging ? "60" : "120"}
               stroke={activeColor}
               strokeWidth="4"
               strokeLinecap="round"
