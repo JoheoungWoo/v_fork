@@ -50,6 +50,8 @@ const RCCircuit = () => {
   const activeColor = isCharging ? "#2563eb" : "#dc2626";
   const chargeWaveColor = "#22c55e";
   const dischargeWaveColor = "#ef4444";
+  const bulbFill = isCharging ? "#fde047" : "#e5e7eb";
+  const bulbStroke = isCharging ? "#f59e0b" : "#9ca3af";
 
   return (
     <div
@@ -277,6 +279,25 @@ const RCCircuit = () => {
           </svg>
           <div style={{ textAlign: "center", marginTop: "6px", color: activeColor, fontWeight: 700 }}>
             현재 연결: {isCharging ? "A 접점 (충전 곡선 상승)" : "B 접점 (방전 곡선 하강)"}
+          </div>
+          <div
+            style={{
+              marginTop: "10px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <svg width="72" height="88" viewBox="0 0 72 88">
+              <circle cx="36" cy="30" r="22" fill={bulbFill} stroke={bulbStroke} strokeWidth="3" />
+              <path d="M 26 28 L 32 34 L 40 24 L 46 30" stroke={bulbStroke} strokeWidth="3" fill="none" />
+              <rect x="28" y="52" width="16" height="12" rx="2" fill="#94a3b8" />
+              <rect x="26" y="64" width="20" height="10" rx="2" fill="#64748b" />
+            </svg>
+            <div style={{ fontWeight: 700, color: isCharging ? "#ca8a04" : "#6b7280" }}>
+              전구(다마) {isCharging ? "ON" : "OFF"}
+            </div>
           </div>
         </div>
       </div>
