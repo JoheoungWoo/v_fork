@@ -5,7 +5,7 @@
  * 플레밍의 왼손 법칙을 3D와 LaTeX로 학습합니다.
  */
 
-import { Arrow, OrbitControls, Text } from "@react-three/drei";
+import { OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useRef, useState } from "react";
 import * as THREE from "three";
@@ -18,6 +18,7 @@ import { BlockMath, InlineMath } from "react-katex";
 const C = {
   bg: "#ffffff",
   surface: "#f8f9fa",
+  surfaceLight: "#f1f3f5",
   border: "#dee2e6",
   text: "#212529",
   muted: "#6c757d",
@@ -29,45 +30,61 @@ const C = {
   copper: "#b87333", // 구리 색
 };
 
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const _dir = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+
 /**
- * 💡 벡터 화살표Helper 컴포넌트 (I, B, F 방향 표시)
+ * drei에 없는 Arrow 대체: 로컬 +Y 축을 direction으로 맞춘 실린더+원뿔
  */
 function VectorArrow({
-  direction,
+  vectorsRef,
+  vectorKey,
   color,
   length,
   label,
   position = [0, 0, 0],
 }) {
-  const dirVec = useRef(new THREE.Vector3());
+  const groupRef = useRef(null);
+  const shaftR = length * 0.04;
+  const headLen = length * 0.22;
+  const shaftLen = Math.max(0.05, length - headLen);
 
   useFrame(() => {
-    // direction 프로프([x,y,z])에 따라 화살표 방향 업데이트
-    dirVec.current.set(...direction).normalize();
+    const d = vectorsRef.current[vectorKey];
+    _dir.set(d[0], d[1], d[2]);
+    if (_dir.lengthSq() < 1e-10) _dir.set(0, 1, 0);
+    _dir.normalize();
+    _quat.setFromUnitVectors(Y_AXIS, _dir);
+    if (groupRef.current) {
+      groupRef.current.quaternion.copy(_quat);
+    }
   });
+
+  const tipY = shaftLen / 2 + headLen / 2;
 
   return (
     <group position={position}>
-      <Arrow
-        args={[dirVec.current, new THREE.Vector3(0, 0, 0), length, color]}
-        headLength={length * 0.2}
-        headWidth={length * 0.1}
-      />
-      {/* 화살표 라벨 */}
-      <Text
-        position={[
-          direction[0] * length,
-          direction[1] * length,
-          direction[2] * length,
-        ]}
-        fontSize={0.3}
-        color={color}
-        fontWeight="bold"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {label}
-      </Text>
+      <group ref={groupRef}>
+        <mesh position={[0, shaftLen / 2, 0]} castShadow>
+          <cylinderGeometry args={[shaftR, shaftR, shaftLen, 12]} />
+          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, shaftLen / 2 + headLen / 2, 0]} castShadow>
+          <coneGeometry args={[shaftR * 2.2, headLen, 12]} />
+          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
+        </mesh>
+        <Text
+          position={[0, tipY + 0.25, 0]}
+          fontSize={0.3}
+          color={color}
+          fontWeight="bold"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {label}
+        </Text>
+      </group>
     </group>
   );
 }
@@ -86,6 +103,11 @@ function LorentzSimulation({
   resetFlag,
 }) {
   const rodRef = useRef(null);
+  const vectorsRef = useRef({
+    i: [0, 0, 1],
+    b: [0, -1, 0],
+    f: [1, 0, 0],
+  });
 
   // 물리 상태 저장 ref (빠른 계산을 위해 useFrame 내에서 사용)
   const positionX = useRef(0);
@@ -144,15 +166,20 @@ function LorentzSimulation({
       }
     }
 
+    const iVector = [0, 0, iDir];
+    const bVector = [0, bDir * -1, 0];
+    const fVector = [forceDir, 0, 0];
+    vectorsRef.current = { i: iVector, b: bVector, f: fVector };
+
     // 10. 하단 수식 패널 업데이트를 위해 상위 컴포넌트로 값 전달
     setMetrics({
       F: forceMag * forceDir,
       a: accelX,
       v: velocityX.current,
       x: positionX.current,
-      iVector: [0, 0, iDir], // 전류 벡터 방향
-      bVector: [0, bDir * -1, 0], // 자기장 벡터 방향 (-Y=N위S아래, +Y=S위N아래)
-      fVector: [forceDir, 0, 0], // 힘 벡터 방향
+      iVector,
+      bVector,
+      fVector,
     });
   });
 
@@ -226,20 +253,23 @@ function LorentzSimulation({
         {/* 💡 구리봉 중심에서 뻗어나오는 벡터 화살표Helper */}
         <Suspense fallback={null}>
           <VectorArrow
-            direction={setMetrics.iVector || [0, 0, 1]}
+            vectorsRef={vectorsRef}
+            vectorKey="i"
             color={C.vectorI}
             length={1.5}
             label="I"
             position={[0, rodL / 2 + 0.2, 0]}
           />
           <VectorArrow
-            direction={setMetrics.bVector || [0, -1, 0]}
+            vectorsRef={vectorsRef}
+            vectorKey="b"
             color={C.vectorB}
             length={1.5}
             label="B"
           />
           <VectorArrow
-            direction={setMetrics.fVector || [1, 0, 0]}
+            vectorsRef={vectorsRef}
+            vectorKey="f"
             color={C.vectorF}
             length={1.5}
             label="F"
