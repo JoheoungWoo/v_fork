@@ -48,7 +48,8 @@ const RCCircuit = () => {
     ? `V_c(t) = ${v0} \\left( 1 - e^{-\\frac{t}{${tau}}} \\right)`
     : `V_c(t) = ${v0} e^{-\\frac{t}{${tau}}}`;
   const activeColor = isCharging ? "#2563eb" : "#dc2626";
-  const currentWaveColor = "#22c55e";
+  const chargeWaveColor = "#22c55e";
+  const dischargeWaveColor = "#ef4444";
 
   return (
     <div
@@ -237,7 +238,7 @@ const RCCircuit = () => {
                 <path
                   d="M 60 60 L 165 60 L 260 60 L 414 60 L 560 60 L 560 185 L 60 185 L 60 60"
                   fill="none"
-                  stroke={currentWaveColor}
+                  stroke={chargeWaveColor}
                   strokeWidth="4"
                   strokeLinecap="round"
                   strokeDasharray="4 10"
@@ -255,9 +256,9 @@ const RCCircuit = () => {
             ) : (
               <>
                 <path
-                  d="M 260 60 L 414 60 L 560 60 L 560 185 L 195 185 L 195 120"
+                  d="M 195 120 L 195 185 L 560 185 L 560 60 L 414 60 L 260 60"
                   fill="none"
-                  stroke={currentWaveColor}
+                  stroke={dischargeWaveColor}
                   strokeWidth="4"
                   strokeLinecap="round"
                   strokeDasharray="4 10"
@@ -266,7 +267,7 @@ const RCCircuit = () => {
                   <animate
                     attributeName="stroke-dashoffset"
                     from="0"
-                    to="-70"
+                    to="-80"
                     dur="1.2s"
                     repeatCount="indefinite"
                   />
