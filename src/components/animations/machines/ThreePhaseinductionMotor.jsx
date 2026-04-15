@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react"; // 이 줄이 추가되었습니다.
 import * as THREE from "three";
 
 // 고정자의 코일(상)을 렌더링하는 컴포넌트
