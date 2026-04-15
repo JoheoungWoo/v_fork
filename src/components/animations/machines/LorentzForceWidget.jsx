@@ -13,6 +13,16 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const _dir = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
 
+/** 플레밍 왼손: 로컬 +X=검지(B), +Y=엄지(F), +Z=중지(I) 기준으로 GLB 자세 보정 */
+const _handMat = new THREE.Matrix4();
+const _handQuatAlign = new THREE.Quaternion();
+const _handQuatOffset = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(0.12, -0.72, 0, "XYZ"),
+);
+const _bHat = new THREE.Vector3();
+const _iHat = new THREE.Vector3();
+const _fHat = new THREE.Vector3();
+
 import "katex/dist/katex.min.css";
 import { BlockMath, InlineMath } from "react-katex";
 
@@ -122,6 +132,32 @@ function CurrentParticles({ isPowerOn, currentDir, rodL, rodYRef }) {
           <meshBasicMaterial color="#ffe66d" />
         </mesh>
       ))}
+    </group>
+  );
+}
+
+/**
+ * left_finger.glb: 시뮬의 단위벡터 B, I, F에 맞춰 회전 (전류·자기장 버튼과 동기).
+ * 물리와 동일하게 F ∥ I×B.
+ */
+function FlemingHandAligned({ vectorsRef }) {
+  const groupRef = useRef(null);
+
+  useFrame(() => {
+    const g = groupRef.current;
+    if (!g) return;
+    const { b, i, f } = vectorsRef.current;
+    _bHat.set(b[0], b[1], b[2]).normalize();
+    _iHat.set(i[0], i[1], i[2]).normalize();
+    _fHat.set(f[0], f[1], f[2]).normalize();
+    _handMat.makeBasis(_bHat, _fHat, _iHat);
+    _handQuatAlign.setFromRotationMatrix(_handMat);
+    g.quaternion.copy(_handQuatAlign).multiply(_handQuatOffset);
+  });
+
+  return (
+    <group ref={groupRef} position={[2.0, 0.38, 2.35]} scale={2.0}>
+      <LeftHandModel values={{}} />
     </group>
   );
 }
@@ -302,6 +338,10 @@ function LorentzSimulation({
           />
         </Suspense>
       </mesh>
+
+      <Suspense fallback={null}>
+        <FlemingHandAligned vectorsRef={vectorsRef} />
+      </Suspense>
     </group>
   );
 }
@@ -389,10 +429,6 @@ export default function LorentzForceWidget() {
               setMetrics={setMetrics}
               resetFlag={resetFlag}
             />
-            {/* 플레밍 왼손 참고: LeftHandModel → public/models/left_finger.glb */}
-            <group position={[3.6, 0.6, 3.4]} rotation={[0.12, -0.72, 0]} scale={4.2}>
-              <LeftHandModel values={{}} />
-            </group>
           </Suspense>
         </Canvas>
 
