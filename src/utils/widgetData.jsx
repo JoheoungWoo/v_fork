@@ -311,6 +311,13 @@ const WIDGET_MAP = {
       () => import("@/components/animations/machines/InductionMotorLearningHub"),
     ),
   ],
+  /** 동기기 허브: 동기발전기/동기전동기 분류와 등가 모델 학습 */
+  synchronous_machine_learning_hub: [
+    lazy(
+      () =>
+        import("@/components/animations/machines/SynchronousMachineLearningHub"),
+    ),
+  ],
   // ==========================================
   // ⚡ 전력공학 (Power Engineering)
   // ==========================================
