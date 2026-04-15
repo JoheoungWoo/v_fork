@@ -4,10 +4,14 @@
  * 플레밍의 왼손 법칙 (단일 구리봉 상하 운동 + 전원/입자 시각화 통합 버전)
  */
 
-import { Arrow, OrbitControls, Text } from "@react-three/drei";
+import { OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useRef, useState } from "react";
 import * as THREE from "three";
+
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const _dir = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
 
 import "katex/dist/katex.min.css";
 import { BlockMath, InlineMath } from "react-katex";
@@ -29,42 +33,53 @@ const C = {
   powerOff: "#dc3545",
 };
 
-/**
- * 벡터 화살표 컴포넌트
- */
+/** drei에는 Arrow 없음 — +Y 축 메시 화살표 */
 function VectorArrow({
-  direction,
+  vectorsRef,
+  vectorKey,
   color,
   length,
   label,
   position = [0, 0, 0],
   visible = true,
 }) {
-  const dirVec = useRef(new THREE.Vector3());
+  const groupRef = useRef(null);
+  const shaftR = length * 0.04;
+  const headLen = length * 0.22;
+  const shaftLen = Math.max(0.05, length - headLen);
+  const tipY = shaftLen / 2 + headLen / 2;
 
   useFrame(() => {
-    dirVec.current.set(...direction).normalize();
+    const d = vectorsRef.current[vectorKey];
+    _dir.set(d[0], d[1], d[2]);
+    if (_dir.lengthSq() < 1e-10) _dir.set(0, 1, 0);
+    _dir.normalize();
+    _quat.setFromUnitVectors(Y_AXIS, _dir);
+    if (groupRef.current) groupRef.current.quaternion.copy(_quat);
   });
 
   return (
     <group position={position} visible={visible}>
-      <Arrow
-        args={[dirVec.current, new THREE.Vector3(0, 0, 0), length, color]}
-        headLength={length * 0.3}
-        headWidth={length * 0.15}
-      />
-      <Text
-        position={[
-          direction[0] * length * 1.1,
-          direction[1] * length * 1.1,
-          direction[2] * length * 1.1,
-        ]}
-        fontSize={0.4}
-        color={color}
-        fontWeight="bold"
-      >
-        {label}
-      </Text>
+      <group ref={groupRef}>
+        <mesh position={[0, shaftLen / 2, 0]} castShadow>
+          <cylinderGeometry args={[shaftR, shaftR, shaftLen, 12]} />
+          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, shaftLen / 2 + headLen / 2, 0]} castShadow>
+          <coneGeometry args={[shaftR * 2.2, headLen, 12]} />
+          <meshStandardMaterial color={color} metalness={0.2} roughness={0.5} />
+        </mesh>
+        <Text
+          position={[0, tipY + 0.3, 0]}
+          fontSize={0.4}
+          color={color}
+          fontWeight="bold"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {label}
+        </Text>
+      </group>
     </group>
   );
 }
@@ -72,33 +87,27 @@ function VectorArrow({
 /**
  * 💡 전류 흐름 입자(Particle) 시각화 - 구리봉 내부 관통 (Z축 직선)
  */
-function CurrentParticles({ isPowerOn, currentDir, rodL, rodY }) {
+function CurrentParticles({ isPowerOn, currentDir, rodL, rodYRef }) {
   const particlesCount = 15;
   const particleRefs = useRef([]);
   const phase = useRef(0);
 
-  // 구리봉을 따라 흐르는 직선 경로 (Z축 기준 -3.5 에서 +3.5 정도)
-  const pathStart = -rodL * 0.8;
-  const pathEnd = rodL * 0.8;
+  const pathStart = -rodL * 0.45;
+  const pathEnd = rodL * 0.45;
 
   useFrame((_, dt) => {
     if (!isPowerOn) return;
 
-    // 전류 방향에 따라 위상(phase) 증감 방향 설정
     const dirMult = currentDir === "+Z" ? 1 : -1;
     phase.current += dt * 0.6 * dirMult;
+    const rodY = rodYRef.current;
 
     for (let i = 0; i < particlesCount; i++) {
       const r = particleRefs.current[i];
       if (!r) continue;
 
-      // 0~1 사이로 정규화된 진행도
       const t = (((phase.current + i / particlesCount) % 1) + 1) % 1;
-
-      // Z축 좌표 계산 (선형 보간)
       const currentZ = pathStart + (pathEnd - pathStart) * t;
-
-      // 입자 위치 세팅 (Y는 구리봉과 함께 움직임, X=0, Z는 흐름)
       r.position.set(0, rodY, currentZ);
     }
   });
@@ -130,6 +139,12 @@ function LorentzSimulation({
   resetFlag,
 }) {
   const rodRef = useRef(null);
+  const rodYRef = useRef(0);
+  const vectorsRef = useRef({
+    i: [0, 0, 1],
+    b: [1, 0, 0],
+    f: [0, 1, 0],
+  });
 
   const positionY = useRef(0);
   const velocityY = useRef(0);
@@ -172,20 +187,24 @@ function LorentzSimulation({
       positionY.current = Math.sign(positionY.current) * 2.5;
     }
 
-    // 7. 모델 위치 업데이트
     if (rodRef.current) {
       rodRef.current.position.y = positionY.current;
     }
+    rodYRef.current = positionY.current;
 
-    // 8. 패널용 데이터 전달
+    const iVector = [0, 0, iDir];
+    const bVector = [bDir, 0, 0];
+    const fVector = [0, forceDir, 0];
+    vectorsRef.current = { i: iVector, b: bVector, f: fVector };
+
     setMetrics({
       activeI: activeCurrent,
       F: forceMag * forceDir,
       a: accelY,
       y: positionY.current,
-      iVector: [0, 0, iDir],
-      bVector: [bDir, 0, 0],
-      fVector: [0, forceDir, 0],
+      iVector,
+      bVector,
+      fVector,
     });
   });
 
@@ -236,7 +255,7 @@ function LorentzSimulation({
         isPowerOn={isPowerOn}
         currentDir={currentDir}
         rodL={rodL}
-        rodY={rodRef.current ? rodRef.current.position.y : 0}
+        rodYRef={rodYRef}
       />
 
       {/* 단일 구리봉 (Z축으로 평행) */}
@@ -256,14 +275,15 @@ function LorentzSimulation({
         {/* 벡터 화살표 */}
         <Suspense fallback={null}>
           <VectorArrow
-            direction={setMetrics.bVector || [1, 0, 0]}
+            vectorsRef={vectorsRef}
+            vectorKey="b"
             color={C.vectorB}
             length={1.5}
             label="자기장(B)"
           />
-          {/* 전원 꺼지면 전류, 힘 화살표 숨김 */}
           <VectorArrow
-            direction={setMetrics.iVector || [0, 0, 1]}
+            vectorsRef={vectorsRef}
+            vectorKey="i"
             color={C.vectorI}
             length={1.5}
             label="전류(I)"
@@ -271,7 +291,8 @@ function LorentzSimulation({
             visible={isPowerOn}
           />
           <VectorArrow
-            direction={setMetrics.fVector || [0, 1, 0]}
+            vectorsRef={vectorsRef}
+            vectorKey="f"
             color={C.vectorF}
             length={1.5}
             label="힘(F)"
