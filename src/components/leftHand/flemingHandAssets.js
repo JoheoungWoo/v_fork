@@ -5,7 +5,8 @@
  * `public/` 기준으로 로드해 GLB 대신 평면에 표시합니다.
  * 빈 문자열이면 left_finger.glb + 손가락 슬라이더만 사용합니다.
  */
-export const FLEMING_LEFT_HAND_IMAGE_URL = "/images/fleming-left-hand.png";
+/** 비우면 `left_finger.glb`(LeftHandModel)만 사용 — PNG를 쓰면 GLB는 그리지 않음 */
+export const FLEMING_LEFT_HAND_IMAGE_URL = "";
 
 /** 부모 group의 scale 적용 전, 로컬 단위에서 이미지 세로 높이 */
 export const FLEMING_HAND_IMAGE_BASE_HEIGHT = 0.11;

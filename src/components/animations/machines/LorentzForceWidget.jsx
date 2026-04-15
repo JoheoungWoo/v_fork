@@ -16,6 +16,8 @@ const _quat = new THREE.Quaternion();
 import "katex/dist/katex.min.css";
 import { BlockMath, InlineMath } from "react-katex";
 
+import LeftHandModel from "@/components/leftHand/LeftHandModel.jsx";
+
 const C = {
   bg: "#ffffff",
   surface: "#f8f9fa",
@@ -387,6 +389,10 @@ export default function LorentzForceWidget() {
               setMetrics={setMetrics}
               resetFlag={resetFlag}
             />
+            {/* 플레밍 왼손 참고: LeftHandModel → public/models/left_finger.glb */}
+            <group position={[3.6, 0.6, 3.4]} rotation={[0.12, -0.72, 0]} scale={4.2}>
+              <LeftHandModel values={{}} />
+            </group>
           </Suspense>
         </Canvas>
 
