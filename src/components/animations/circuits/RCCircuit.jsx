@@ -234,6 +234,12 @@ const RCCircuit = () => {
             <line x1="560" y1="60" x2="560" y2="185" stroke="#1f2937" strokeWidth="3" />
             <text x="555" y="118" fontSize="32" fontStyle="italic">C</text>
 
+            {/* 전구(다마): B 아래 세로선 직렬 위치 */}
+            <line x1="195" y1="120" x2="195" y2="140" stroke={!isCharging ? activeColor : "#1f2937"} strokeWidth="3" />
+            <line x1="195" y1="190" x2="195" y2="185" stroke={!isCharging ? activeColor : "#1f2937"} strokeWidth="3" />
+            <circle cx="195" cy="165" r="24" fill={bulbFill} stroke={bulbStroke} strokeWidth="3" />
+            <path d="M 181 165 L 190 173 L 200 157 L 210 165" stroke={bulbStroke} strokeWidth="3" fill="none" />
+
             {/* 전류 흐름(초록 물결): 접점 상태에 따라 경로 변경 */}
             {isCharging ? (
               <>
@@ -280,24 +286,8 @@ const RCCircuit = () => {
           <div style={{ textAlign: "center", marginTop: "6px", color: activeColor, fontWeight: 700 }}>
             현재 연결: {isCharging ? "A 접점 (충전 곡선 상승)" : "B 접점 (방전 곡선 하강)"}
           </div>
-          <div
-            style={{
-              marginTop: "10px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            <svg width="72" height="88" viewBox="0 0 72 88">
-              <circle cx="36" cy="30" r="22" fill={bulbFill} stroke={bulbStroke} strokeWidth="3" />
-              <path d="M 26 28 L 32 34 L 40 24 L 46 30" stroke={bulbStroke} strokeWidth="3" fill="none" />
-              <rect x="28" y="52" width="16" height="12" rx="2" fill="#94a3b8" />
-              <rect x="26" y="64" width="20" height="10" rx="2" fill="#64748b" />
-            </svg>
-            <div style={{ fontWeight: 700, color: isCharging ? "#ca8a04" : "#6b7280" }}>
-              전구(다마) {isCharging ? "ON" : "OFF"}
-            </div>
+          <div style={{ marginTop: "8px", textAlign: "center", fontWeight: 700, color: isCharging ? "#ca8a04" : "#6b7280" }}>
+            전구(다마) {isCharging ? "ON" : "OFF"}
           </div>
         </div>
       </div>
