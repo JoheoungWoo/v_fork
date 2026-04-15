@@ -306,7 +306,7 @@ const WIDGET_MAP = {
   v_connection_ct_measurement: [
     lazy(
       // 실제 컴포넌트를 저장한 폴더 경로에 맞게 수정해주세요. (예: circuits, power 등)
-      () => import("@/components/animations/circuits/VConnectionCTWidget"),
+      () => import("@/components/animations/powers/VConnectionCT"),
     ),
   ],
 };
