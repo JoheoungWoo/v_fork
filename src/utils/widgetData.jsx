@@ -278,8 +278,12 @@ const WIDGET_MAP = {
   ],
   dc_coil_motor_3d_assembly: [
     lazy(
-      () => import("@/components/animations/machines/DcCoilMotorAssemblyWidget"),
+      () =>
+        import("@/components/animations/machines/DcCoilMotorAssemblyWidget"),
     ),
+  ],
+  lorentz_force: [
+    lazy(() => import("@/components/animations/machines/LorentzForceWidget")),
   ],
 };
 
