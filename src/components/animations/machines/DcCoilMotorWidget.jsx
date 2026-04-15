@@ -7,7 +7,7 @@
 
 import { Line, OrbitControls, Text, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 // 💡 프로젝트 경로에 맞게 apiClient를 불러옵니다.
@@ -22,6 +22,8 @@ const C = {
   border: "#2a2e3e",
   text: "#e2e0d8",
   muted: "#7a7872",
+  btnSecondary: "#252a38",
+  fieldLine: "#6eb7ff",
 };
 
 /** 💡 120이면 모니터 주사율 한계로 멈춰보입니다. 시각적 부드러움을 위해 15로 조정 */
@@ -49,6 +51,49 @@ function Magnet({ type, position }) {
       >
         {type}
       </Text>
+    </group>
+  );
+}
+
+/**
+ * N–S 사이 자기력선 (B가 클수록 시각적으로는 선 개수를 줄여 ‘촘촘한 유속’ 느낌을 단순화)
+ */
+function MagneticFieldLines({ magnetB, bDir, nPosX, sPosX, zPlane, visible }) {
+  const lineCount = useMemo(() => {
+    const b = Math.min(2, Math.max(0.1, magnetB));
+    return Math.max(3, Math.min(16, Math.round(22 - 10 * (b / 2))));
+  }, [magnetB]);
+
+  const lineGroups = useMemo(() => {
+    const ySpan = 2.8;
+    const lines = [];
+    const xN = bDir >= 0 ? nPosX + 0.32 : sPosX - 0.32;
+    const xS = bDir >= 0 ? sPosX - 0.32 : nPosX + 0.32;
+    for (let i = 0; i < lineCount; i += 1) {
+      const t = lineCount <= 1 ? 0.5 : i / (lineCount - 1);
+      const y = -ySpan / 2 + t * ySpan;
+      lines.push([
+        new THREE.Vector3(xN, y, zPlane),
+        new THREE.Vector3(xS, y, zPlane),
+      ]);
+    }
+    return lines;
+  }, [lineCount, bDir, nPosX, sPosX, zPlane]);
+
+  if (!visible) return null;
+
+  return (
+    <group>
+      {lineGroups.map((pts, idx) => (
+        <Line
+          key={idx}
+          points={pts}
+          color={C.fieldLine}
+          lineWidth={1.5}
+          transparent
+          opacity={0.55}
+        />
+      ))}
     </group>
   );
 }
@@ -108,7 +153,6 @@ function MotorAssembly({
  * 코일 주변을 흐르는 전류(Flux) 시각화
  */
 function CurrentFlux({ enabled, direction, currentAmp }) {
-  // 💡 블렌더 모델과 소수점까지 일치하는 완벽한 궤적 좌표
   const path = [
     new THREE.Vector3(0.2, -1.5, 0), // 우측 브러시
     new THREE.Vector3(1.2, -1.0, 0), // 우측 하단
@@ -136,8 +180,9 @@ function CurrentFlux({ enabled, direction, currentAmp }) {
   useFrame((_, dt) => {
     if (!enabled) return;
 
-    // 💡 전류 크기(currentAmp)에 비례해서 입자의 시각적 이동 속도도 증가!
-    const visualSpeed = 0.5 + currentAmp * 0.15;
+    const I = Math.max(0, Math.abs(currentAmp));
+    // 전류가 작을수록 흐름이 느리게 보이도록 (I≈0 에 가깝게 매우 느림)
+    const visualSpeed = 0.04 + 0.32 * I;
     phase.current += dt * visualSpeed * direction;
 
     for (let i = 0; i < particles; i += 1) {
@@ -179,6 +224,8 @@ export default function DcCoilMotorWidget({ apiData }) {
   const [powerOn, setPowerOn] = useState(false);
   const [rotationResetKey, setRotationResetKey] = useState(0);
   const [currentAmp, setCurrentAmp] = useState(4);
+  /** 자기장 세기 (T) — API b_t 및 자기력선 개수에 사용 */
+  const [magnetB, setMagnetB] = useState(0.8);
   const [currentForward, setCurrentForward] = useState(true);
   const [bForward, setBForward] = useState(true);
   const [omegaData, setOmegaData] = useState({
@@ -196,14 +243,14 @@ export default function DcCoilMotorWidget({ apiData }) {
         const res = await apiClient.get("/api/machine/dc_coil_motor/omega", {
           params: {
             current_a: Math.abs(currentAmp),
-            b_t: 0.8,
+            b_t: magnetB,
           },
         });
         setOmegaData(res.data);
       } catch (error) {
         console.error("Failed to fetch omega data:", error);
         const i = Math.abs(currentAmp);
-        const b = 0.8;
+        const b = magnetB;
         const omega = Math.min(
           72,
           (380 * 12 * 0.012 * i * b) / (1 + 0.18 * i * b + 0.05 * i * i),
@@ -217,7 +264,7 @@ export default function DcCoilMotorWidget({ apiData }) {
       }
     }, 180);
     return () => clearTimeout(t);
-  }, [currentAmp]);
+  }, [currentAmp, magnetB]);
 
   const rawOmega = Math.max(0, omegaData.omega_rad_s ?? 0);
   const rawTorque = Math.max(0, omegaData.torque_scale_n_m ?? 0);
@@ -273,6 +320,14 @@ export default function DcCoilMotorWidget({ apiData }) {
             maxDistance={20}
           />
           <Suspense fallback={null}>
+            <MagneticFieldLines
+              magnetB={magnetB}
+              bDir={bDir}
+              nPosX={nPosX}
+              sPosX={sPosX}
+              zPlane={magnetZ}
+              visible
+            />
             <MotorAssembly
               url={motorGlbUrl}
               omegaRad={omega}
@@ -306,6 +361,16 @@ export default function DcCoilMotorWidget({ apiData }) {
             type="button"
             onClick={() => setRotationResetKey((k) => k + 1)}
             title="로터(코일) 회전 각도를 0으로 맞춥니다"
+            style={{
+              padding: "6px 14px",
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+              background: C.btnSecondary,
+              color: C.text,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+            }}
           >
             초기화
           </button>
@@ -313,6 +378,22 @@ export default function DcCoilMotorWidget({ apiData }) {
             {powerOn ? "가동 중 (전류·토크 반영)" : "정지 (전원 대기)"}
           </span>
         </div>
+        <div style={{ marginBottom: 6, fontSize: 12, color: C.muted }}>
+          파란 선: 자기력선(B↑) · 노란 선/입자: 전류(I) — B가 클수록 자기력선 개수는
+          적게 표시, I가 작을수록 전류 흐름은 느리게 표시됩니다.
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          자기장 B: {magnetB.toFixed(2)} T
+        </div>
+        <input
+          type="range"
+          min={0.1}
+          max={2}
+          step={0.05}
+          value={magnetB}
+          onChange={(e) => setMagnetB(Number(e.target.value))}
+          style={{ width: "100%", marginBottom: 10, accentColor: "#4d9fff" }}
+        />
         <div style={{ marginBottom: 8 }}>
           전류 크기 I: {currentAmp.toFixed(2)} A
         </div>
@@ -323,7 +404,7 @@ export default function DcCoilMotorWidget({ apiData }) {
           step={0.1}
           value={currentAmp}
           onChange={(e) => setCurrentAmp(Number(e.target.value))}
-          style={{ width: "100%", marginBottom: 10 }}
+          style={{ width: "100%", marginBottom: 10, accentColor: "#fd7e14" }}
         />
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
           <button type="button" onClick={() => setCurrentForward((v) => !v)}>
