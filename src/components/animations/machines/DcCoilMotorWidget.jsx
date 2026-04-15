@@ -56,29 +56,33 @@ function Magnet({ type, position }) {
 }
 
 /**
- * N–S 사이 자기력선 (B가 클수록 시각적으로는 선 개수를 줄여 ‘촘촘한 유속’ 느낌을 단순화)
+ * N극에서 S극으로 향하는 자기력선(flux). |B|가 클수록 그리는 선 개수 증가.
  */
-function MagneticFieldLines({ magnetB, bDir, nPosX, sPosX, zPlane, visible }) {
+function MagneticFieldLines({ magnetB, nPosX, sPosX, zPlane, visible }) {
   const lineCount = useMemo(() => {
     const b = Math.min(2, Math.max(0.1, magnetB));
-    return Math.max(3, Math.min(16, Math.round(22 - 10 * (b / 2))));
+    return Math.max(4, Math.min(22, Math.round(4 + 9 * (b / 2))));
   }, [magnetB]);
 
   const lineGroups = useMemo(() => {
     const ySpan = 2.8;
     const lines = [];
-    const xN = bDir >= 0 ? nPosX + 0.32 : sPosX - 0.32;
-    const xS = bDir >= 0 ? sPosX - 0.32 : nPosX + 0.32;
+    /** 자석 중심에서 갭(원점) 쪽 면 — N에서 S로 이어질 때 항상 N측 → S측 순서 */
+    const innerTowardGap = (magnetCenterX) =>
+      magnetCenterX < 0 ? magnetCenterX + 0.34 : magnetCenterX - 0.34;
+    const xFromN = innerTowardGap(nPosX);
+    const xFromS = innerTowardGap(sPosX);
+
     for (let i = 0; i < lineCount; i += 1) {
       const t = lineCount <= 1 ? 0.5 : i / (lineCount - 1);
       const y = -ySpan / 2 + t * ySpan;
       lines.push([
-        new THREE.Vector3(xN, y, zPlane),
-        new THREE.Vector3(xS, y, zPlane),
+        new THREE.Vector3(xFromN, y, zPlane),
+        new THREE.Vector3(xFromS, y, zPlane),
       ]);
     }
     return lines;
-  }, [lineCount, bDir, nPosX, sPosX, zPlane]);
+  }, [lineCount, nPosX, sPosX, zPlane]);
 
   if (!visible) return null;
 
@@ -322,7 +326,6 @@ export default function DcCoilMotorWidget({ apiData }) {
           <Suspense fallback={null}>
             <MagneticFieldLines
               magnetB={magnetB}
-              bDir={bDir}
               nPosX={nPosX}
               sPosX={sPosX}
               zPlane={magnetZ}
@@ -379,8 +382,8 @@ export default function DcCoilMotorWidget({ apiData }) {
           </span>
         </div>
         <div style={{ marginBottom: 6, fontSize: 12, color: C.muted }}>
-          파란 선: 자기력선(B↑) · 노란 선/입자: 전류(I) — B가 클수록 자기력선 개수는
-          적게 표시, I가 작을수록 전류 흐름은 느리게 표시됩니다.
+          파란 선: N→S 자기력선(flux) · 노란 선/입자: 전류(I) — 자기장 B가 클수록
+          자기력선 개수가 많아지며, I가 작을수록 전류 흐름은 느리게 보입니다.
         </div>
         <div style={{ marginBottom: 8 }}>
           자기장 B: {magnetB.toFixed(2)} T
