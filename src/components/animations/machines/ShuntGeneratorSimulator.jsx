@@ -2,6 +2,7 @@ import { Billboard, OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useRef, useState } from "react";
 import * as THREE from "three";
+import DcGeneratorTypeDiagram from "./diagrams/DcGeneratorTypeDiagram";
 
 // ==========================================
 // [1] 3D 분권 발전기 모델 컴포넌트
@@ -282,6 +283,8 @@ export default function ShuntGeneratorSimulator() {
           </button>
         </div>
       </div>
+
+      <DcGeneratorTypeDiagram />
 
       <div style={{ display: "flex", flexWrap: "wrap" }}>
         {/* 상단/좌측: 3D 모델 */}
