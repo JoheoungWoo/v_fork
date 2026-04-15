@@ -3,41 +3,87 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-// ==========================================
-// 공통 물리 & 애니메이션 로직
-// ==========================================
-const useMotorPhysics = (frequency, phaseA, phaseB, phaseC) => {
-  const angles = useMemo(() => [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3], []);
-  // 시각적으로 너무 빠르지 않게 스케일링
+// --- [공통 물리 로직] ---
+const useMotorState = (frequency, phaseA, phaseB, phaseC) => {
+  const angles = useMemo(
+    () => [
+      Math.PI / 2,
+      Math.PI / 2 - (2 * Math.PI) / 3,
+      Math.PI / 2 - (4 * Math.PI) / 3,
+    ],
+    [],
+  );
   const visualSpeed = frequency * 0.08;
   return { angles, visualSpeed };
 };
 
 // ==========================================
-// [상단 뷰] 물리적 구조 (고정자 & 회전자)
+// [상단 뷰] 실제 권선 구조 (Detailed Winding)
 // ==========================================
 
-const StatorPole = ({ angle, color, intensity }) => {
-  const radius = 2.8;
+const WindingPole = ({ angle, color, intensity, label }) => {
+  const radius = 2.7;
   const x = Math.cos(angle) * radius;
   const y = Math.sin(angle) * radius;
 
   return (
     <group position={[x, y, 0]} rotation={[0, 0, angle]}>
-      {/* 철심 */}
-      <mesh position={[-0.4, 0, 0]}>
-        <boxGeometry args={[1.2, 0.8, 1.8]} />
-        <meshStandardMaterial color="#4a4f59" metalness={0.7} roughness={0.4} />
+      {/* 고정자 철심 슬롯 */}
+      <mesh position={[-0.5, 0, 0]}>
+        <boxGeometry args={[1.0, 0.7, 2.0]} />
+        <meshStandardMaterial color="#3d444d" metalness={0.8} roughness={0.3} />
       </mesh>
-      {/* 구리 코일 (전류에 따라 밝기 변화) */}
-      <mesh position={[-0.4, 0, 0]}>
-        <boxGeometry args={[0.9, 0.95, 1.9]} />
+
+      {/* 촘촘한 코일 질감 (Torus 반복으로 권선 표현) */}
+      <group position={[-0.4, 0, 0]}>
+        {[...Array(6)].map((_, i) => (
+          <mesh
+            key={i}
+            position={[0, 0, -0.75 + i * 0.3]}
+            rotation={[0, Math.PI / 2, 0]}
+          >
+            <torusGeometry args={[0.35, 0.06, 8, 24]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={intensity * 1.2}
+              metalness={0.8}
+              roughness={0.2}
+            />
+          </mesh>
+        ))}
+      </group>
+
+      {/* 극성 표시 (N/S) */}
+      <Billboard position={[0.2, 0, 0]}>
+        <Text fontSize={0.3} color="white" fontWeight="bold">
+          {intensity > 0.1 ? label : ""}
+        </Text>
+      </Billboard>
+    </group>
+  );
+};
+
+// 마주보는 코일을 연결하는 엔드 와인딩 (End Winding Link)
+const EndWindingLink = ({ angle, color, intensity }) => {
+  return (
+    <group rotation={[0, 0, angle]}>
+      {/* 전면 연결부 */}
+      <mesh position={[0, 0, 1.05]} rotation={[0, 0, 0]}>
+        <torusGeometry args={[2.7, 0.05, 8, 40, Math.PI]} />
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={intensity * 0.9}
-          metalness={0.6}
-          roughness={0.4}
+          emissiveIntensity={intensity * 0.5}
+        />
+      </mesh>
+      {/* 후면 연결부 */}
+      <mesh position={[0, 0, -1.05]} rotation={[0, 0, 0]}>
+        <torusGeometry args={[2.7, 0.05, 8, 40, Math.PI]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={intensity * 0.5}
         />
       </mesh>
     </group>
@@ -46,8 +92,9 @@ const StatorPole = ({ angle, color, intensity }) => {
 
 const PhysicalScene = ({ frequency, phaseA, phaseB, phaseC }) => {
   const rotorRef = useRef();
-  const [coilIntensity, setCoilIntensity] = useState({ a: 0, b: 0, c: 0 });
-  const { angles, visualSpeed } = useMotorPhysics(
+  const [intensities, setIntensities] = useState({ a: 0, b: 0, c: 0 });
+  const [polarities, setPolarities] = useState({ a: "N", b: "N", c: "N" });
+  const { angles, visualSpeed } = useMotorState(
     frequency,
     phaseA,
     phaseB,
@@ -56,132 +103,126 @@ const PhysicalScene = ({ frequency, phaseA, phaseB, phaseC }) => {
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime() * visualSpeed;
+    const iA = phaseA ? Math.sin(t) : 0;
+    const iB = phaseB ? Math.sin(t - (2 * Math.PI) / 3) : 0;
+    const iC = phaseC ? Math.sin(t - (4 * Math.PI) / 3) : 0;
 
-    const magA = phaseA ? Math.sin(t) : 0;
-    const magB = phaseB ? Math.sin(t - angles[1]) : 0;
-    const magC = phaseC ? Math.sin(t - angles[2]) : 0;
-
-    const x =
-      magA * Math.cos(angles[0]) +
-      magB * Math.cos(angles[1]) +
-      magC * Math.cos(angles[2]);
-    const y =
-      magA * Math.sin(angles[0]) +
-      magB * Math.sin(angles[1]) +
-      magC * Math.sin(angles[2]);
-    const length = Math.sqrt(x * x + y * y);
-
-    setCoilIntensity({
-      a: Math.abs(magA),
-      b: Math.abs(magB),
-      c: Math.abs(magC),
+    setIntensities({ a: Math.abs(iA), b: Math.abs(iB), c: Math.abs(iC) });
+    setPolarities({
+      a: iA > 0 ? "N" : "S",
+      b: iB > 0 ? "N" : "S",
+      c: iC > 0 ? "N" : "S",
     });
 
-    // 회전자 회전 로직 (결상 시 덜덜거림 구현)
+    // 회전자 회전 (슬립 적용)
+    const totalMag = Math.sqrt(iA ** 2 + iB ** 2 + iC ** 2);
     if (rotorRef.current) {
-      if (length > 0.5) {
-        // 정상 회전
-        rotorRef.current.rotation.z -= visualSpeed * length * 0.015;
-      } else {
-        // 결상 시 멈칫/진동
-        rotorRef.current.rotation.z += Math.sin(t * 10) * 0.01;
-      }
+      if (totalMag > 0.5)
+        rotorRef.current.rotation.z -= visualSpeed * 0.02 * totalMag;
+      else rotorRef.current.rotation.z += Math.sin(t * 10) * 0.005; // 결상 진동
     }
   });
 
   return (
     <group>
-      {/* 고정자 외부 프레임 */}
+      {/* 고정자 프레임 */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <tubeGeometry
-          args={[new THREE.EllipseCurve(0, 0, 3.6, 3.6), 64, 0.5, 16]}
+          args={[new THREE.EllipseCurve(0, 0, 3.5, 3.5), 64, 0.3, 16]}
         />
-        <meshStandardMaterial color="#2d3436" metalness={0.4} roughness={0.7} />
+        <meshStandardMaterial color="#222" metalness={0.6} />
       </mesh>
 
-      {/* 6극 코일 (마주보는 극끼리 같은 상) */}
-      <StatorPole
+      {/* 3상 권선 및 연결 */}
+      {/* A상 (Red) */}
+      <WindingPole
         angle={angles[0]}
-        color="#ff4757"
-        intensity={coilIntensity.a}
+        color="#ff4d4d"
+        intensity={intensities.a}
+        label={polarities.a}
       />
-      <StatorPole
+      <WindingPole
         angle={angles[0] + Math.PI}
-        color="#ff4757"
-        intensity={coilIntensity.a}
+        color="#ff4d4d"
+        intensity={intensities.a}
+        label={polarities.a === "N" ? "S" : "N"}
       />
-      <StatorPole
-        angle={angles[1]}
-        color="#2ed573"
-        intensity={coilIntensity.b}
-      />
-      <StatorPole
-        angle={angles[1] + Math.PI}
-        color="#2ed573"
-        intensity={coilIntensity.b}
-      />
-      <StatorPole
-        angle={angles[2]}
-        color="#1e90ff"
-        intensity={coilIntensity.c}
-      />
-      <StatorPole
-        angle={angles[2] + Math.PI}
-        color="#1e90ff"
-        intensity={coilIntensity.c}
+      <EndWindingLink
+        angle={angles[0] - Math.PI / 2}
+        color="#ff4d4d"
+        intensity={intensities.a}
       />
 
-      {/* 농형 회전자 (다람쥐 쳇바퀴) */}
+      {/* B상 (Green) */}
+      <WindingPole
+        angle={angles[1]}
+        color="#44ff44"
+        intensity={intensities.b}
+        label={polarities.b}
+      />
+      <WindingPole
+        angle={angles[1] + Math.PI}
+        color="#44ff44"
+        intensity={intensities.b}
+        label={polarities.b === "N" ? "S" : "N"}
+      />
+      <EndWindingLink
+        angle={angles[1] - Math.PI / 2}
+        color="#44ff44"
+        intensity={intensities.b}
+      />
+
+      {/* C상 (Blue) */}
+      <WindingPole
+        angle={angles[2]}
+        color="#44aaff"
+        intensity={intensities.c}
+        label={polarities.c}
+      />
+      <WindingPole
+        angle={angles[2] + Math.PI}
+        color="#44aaff"
+        intensity={intensities.c}
+        label={polarities.c === "N" ? "S" : "N"}
+      />
+      <EndWindingLink
+        angle={angles[2] - Math.PI / 2}
+        color="#44aaff"
+        intensity={intensities.c}
+      />
+
+      {/* 농형 회전자 */}
       <group ref={rotorRef}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[1.5, 1.5, 1.8, 32]} />
-          <meshStandardMaterial
-            color="#6a7282"
-            metalness={0.6}
-            roughness={0.5}
-          />
+          <cylinderGeometry args={[1.4, 1.4, 1.8, 32]} />
+          <meshStandardMaterial color="#555" metalness={0.8} />
         </mesh>
-        {Array.from({ length: 18 }).map((_, i) => {
-          const angle = (i / 18) * Math.PI * 2;
-          return (
-            <mesh
-              key={i}
-              position={[Math.cos(angle) * 1.45, Math.sin(angle) * 1.45, 0]}
-              rotation={[Math.PI / 2, 0, 0]}
-            >
-              <cylinderGeometry args={[0.08, 0.08, 1.85, 8]} />
-              <meshStandardMaterial
-                color="#dcdde1"
-                metalness={0.9}
-                roughness={0.1}
-              />
-            </mesh>
-          );
-        })}
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.3, 0.3, 3.5, 16]} />
-          <meshStandardMaterial
-            color="#b0b5c0"
-            metalness={0.8}
-            roughness={0.2}
-          />
-        </mesh>
+        {[...Array(12)].map((_, i) => (
+          <mesh
+            key={i}
+            position={[
+              Math.cos((i / 12) * Math.PI * 2) * 1.3,
+              Math.sin((i / 12) * Math.PI * 2) * 1.3,
+              0,
+            ]}
+            rotation={[Math.PI / 2, 0, 0]}
+          >
+            <cylinderGeometry args={[0.05, 0.05, 2.0]} />
+            <meshStandardMaterial color="#aaa" />
+          </mesh>
+        ))}
       </group>
     </group>
   );
 };
 
 // ==========================================
-// [하단 뷰] 추상적 자기장 시각화
+// [하단 뷰] 추상적 자기장 시각화 (Flux)
 // ==========================================
 
 const AbstractScene = ({ frequency, phaseA, phaseB, phaseC }) => {
-  const magneticFieldRef = useRef();
-  const nPoleRef = useRef();
-  const sPoleRef = useRef();
-  const fluxLinesRef = useRef();
-
-  const { angles, visualSpeed } = useMotorPhysics(
+  const groupRef = useRef();
+  const { angles, visualSpeed } = useMotorState(
     frequency,
     phaseA,
     phaseB,
@@ -190,162 +231,66 @@ const AbstractScene = ({ frequency, phaseA, phaseB, phaseC }) => {
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime() * visualSpeed;
-
-    const magA = phaseA ? Math.sin(t) : 0;
-    const magB = phaseB ? Math.sin(t - angles[1]) : 0;
-    const magC = phaseC ? Math.sin(t - angles[2]) : 0;
+    const iA = phaseA ? Math.sin(t) : 0;
+    const iB = phaseB ? Math.sin(t - (2 * Math.PI) / 3) : 0;
+    const iC = phaseC ? Math.sin(t - (4 * Math.PI) / 3) : 0;
 
     const x =
-      magA * Math.cos(angles[0]) +
-      magB * Math.cos(angles[1]) +
-      magC * Math.cos(angles[2]);
+      iA * Math.cos(angles[0]) +
+      iB * Math.cos(angles[1]) +
+      iC * Math.cos(angles[2]);
     const y =
-      magA * Math.sin(angles[0]) +
-      magB * Math.sin(angles[1]) +
-      magC * Math.sin(angles[2]);
+      iA * Math.sin(angles[0]) +
+      iB * Math.sin(angles[1]) +
+      iC * Math.sin(angles[2]);
 
-    const length = Math.sqrt(x * x + y * y);
-    const fieldAngle = Math.atan2(y, x);
-
-    if (magneticFieldRef.current) {
-      if (length > 0.1) {
-        magneticFieldRef.current.visible = true;
-        magneticFieldRef.current.rotation.z = fieldAngle;
-
-        // 결상 시 자기장이 찌그러지는 현상 반영
-        const scaleStrength = length / 1.5;
-        fluxLinesRef.current.scale.set(scaleStrength, scaleStrength, 1);
-        nPoleRef.current.position.x = 2.5 * scaleStrength;
-        sPoleRef.current.position.x = -2.5 * scaleStrength;
-
-        // 자기력선 출렁임
-        const pulse = Math.sin(t * 10) * 0.1;
-        fluxLinesRef.current.scale.y = length / 1.5 + pulse;
-      } else {
-        magneticFieldRef.current.visible = false;
-      }
+    if (groupRef.current) {
+      const angle = Math.atan2(y, x);
+      const mag = Math.sqrt(x * x + y * y);
+      groupRef.current.rotation.z = angle;
+      groupRef.current.scale.setScalar(0.5 + mag * 0.5);
+      groupRef.current.visible = mag > 0.05;
     }
   });
 
   return (
-    <group>
-      {/* 120도 위상차 가이드라인 */}
-      <mesh rotation={[0, 0, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 7]} />
-        <meshBasicMaterial color="#333" />
+    <group ref={groupRef}>
+      {/* N/S 구체 */}
+      <mesh position={[2.5, 0, 0]}>
+        <sphereGeometry args={[0.4]} />
+        <meshBasicMaterial color="#3a86ff" />
       </mesh>
-      <mesh rotation={[0, 0, Math.PI / 3]}>
-        <cylinderGeometry args={[0.02, 0.02, 7]} />
-        <meshBasicMaterial color="#333" />
-      </mesh>
-      <mesh rotation={[0, 0, -Math.PI / 3]}>
-        <cylinderGeometry args={[0.02, 0.02, 7]} />
-        <meshBasicMaterial color="#333" />
-      </mesh>
-      <mesh>
-        <ringGeometry args={[3.4, 3.45, 64]} />
-        <meshBasicMaterial color="#333" transparent opacity={0.5} />
+      <mesh position={[-2.5, 0, 0]}>
+        <sphereGeometry args={[0.4]} />
+        <meshBasicMaterial color="#ff006e" />
       </mesh>
 
-      {/* 동적 자기장 */}
-      <group ref={magneticFieldRef}>
-        {/* N극 */}
-        <group ref={nPoleRef}>
-          <mesh>
-            <sphereGeometry args={[0.4, 32, 32]} />
-            <meshBasicMaterial color="#3a86ff" />
-          </mesh>
-          <Billboard follow={true}>
-            <Text
-              position={[0, 0, 0.5]}
-              fontSize={0.4}
-              color="white"
-              fontWeight="bold"
-            >
-              N
-            </Text>
-          </Billboard>
-        </group>
-
-        {/* S극 */}
-        <group ref={sPoleRef}>
-          <mesh>
-            <sphereGeometry args={[0.4, 32, 32]} />
-            <meshBasicMaterial color="#ff006e" />
-          </mesh>
-          <Billboard follow={true}>
-            <Text
-              position={[0, 0, 0.5]}
-              fontSize={0.4}
-              color="white"
-              fontWeight="bold"
-            >
-              S
-            </Text>
-          </Billboard>
-        </group>
-
-        {/* 굽이치는 자기력선 */}
-        <group ref={fluxLinesRef}>
-          <mesh>
-            <torusGeometry args={[1.5, 0.03, 16, 50, Math.PI]} />
-            <meshBasicMaterial
-              color="#00f5d4"
-              transparent
-              opacity={0.7}
-              side={THREE.DoubleSide}
-            />
+      {/* 자기력선 */}
+      {[1, 1.5, 2].map((r, i) => (
+        <group key={i}>
+          <mesh rotation={[0, 0, 0]}>
+            <torusGeometry args={[r, 0.02, 8, 40, Math.PI]} />
+            <meshBasicMaterial color="#00f5d4" transparent opacity={0.4} />
           </mesh>
           <mesh rotation={[0, 0, Math.PI]}>
-            <torusGeometry args={[1.5, 0.03, 16, 50, Math.PI]} />
-            <meshBasicMaterial
-              color="#00f5d4"
-              transparent
-              opacity={0.7}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          <mesh>
-            <torusGeometry args={[2.0, 0.05, 16, 50, Math.PI]} />
-            <meshBasicMaterial
-              color="#fca311"
-              transparent
-              opacity={0.4}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          <mesh rotation={[0, 0, Math.PI]}>
-            <torusGeometry args={[2.0, 0.05, 16, 50, Math.PI]} />
-            <meshBasicMaterial
-              color="#fca311"
-              transparent
-              opacity={0.4}
-              side={THREE.DoubleSide}
-            />
+            <torusGeometry args={[r, 0.02, 8, 40, Math.PI]} />
+            <meshBasicMaterial color="#00f5d4" transparent opacity={0.4} />
           </mesh>
         </group>
-      </group>
+      ))}
     </group>
   );
 };
 
 // ==========================================
-// 메인 앱: 상하 분할 레이아웃 및 상태 관리
+// [메인 컴포넌트]
 // ==========================================
 
 export default function App() {
-  const [frequency, setFrequency] = useState(60);
-  const [phaseA, setPhaseA] = useState(true);
-  const [phaseB, setPhaseB] = useState(true);
-  const [phaseC, setPhaseC] = useState(true);
-
-  // 동기 속도 Ns = 120 * f / P (극수 P=2로 가정)
-  const syncSpeedRPM = frequency * 60;
-  const isHealthy = phaseA && phaseB && phaseC;
-  // 슬립(Slip) 적용 실제 속도 (정상 95%, 결상 시 10% 급감)
-  const actualSpeedRPM = isHealthy
-    ? Math.round(syncSpeedRPM * 0.95)
-    : Math.round(syncSpeedRPM * 0.1);
+  const [freq, setFreq] = useState(60);
+  const [pa, setPa] = useState(true);
+  const [pb, setPb] = useState(true);
+  const [pc, setPc] = useState(true);
 
   return (
     <div
@@ -354,208 +299,85 @@ export default function App() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "#0f1115",
-        fontFamily: "sans-serif",
+        backgroundColor: "#111",
+        color: "white",
       }}
     >
-      {/* 1. 상단 UI 컨트롤 패널 */}
+      {/* 상단 컨트롤러 */}
       <div
         style={{
-          padding: "15px 25px",
-          color: "white",
-          backgroundColor: "#1e2128",
+          padding: "20px",
           display: "flex",
-          flexWrap: "wrap",
-          gap: "25px",
+          gap: "20px",
           alignItems: "center",
-          borderBottom: "1px solid #333",
-          zIndex: 10,
+          borderBottom: "1px solid #444",
         }}
       >
-        <h3 style={{ margin: 0 }}>3상 유도 전동기 시뮬레이터</h3>
-
-        <label
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "5px",
-            fontSize: "14px",
-          }}
+        <h2 style={{ margin: 0 }}>3상 유도 전동기 권선 시뮬레이터</h2>
+        <input
+          type="range"
+          min="0"
+          max="120"
+          value={freq}
+          onChange={(e) => setFreq(Number(e.target.value))}
+        />
+        <span>{freq} Hz</span>
+        <button
+          onClick={() => setPa(!pa)}
+          style={{ background: pa ? "#ff4d4d" : "#333" }}
         >
-          <span>
-            회전 속도 (주파수): <strong>{frequency} Hz</strong>
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="120"
-            step="1"
-            value={frequency}
-            onChange={(e) => setFrequency(Number(e.target.value))}
-            style={{ width: "150px" }}
-          />
-        </label>
-
-        <div
-          style={{
-            display: "flex",
-            gap: "15px",
-            borderLeft: "1px solid #555",
-            paddingLeft: "20px",
-          }}
+          A상
+        </button>
+        <button
+          onClick={() => setPb(!pb)}
+          style={{ background: pb ? "#44ff44" : "#333" }}
         >
-          <label
-            style={{
-              color: "#ff4757",
-              fontWeight: "bold",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={phaseA}
-              onChange={(e) => setPhaseA(e.target.checked)}
-            />{" "}
-            A상
-          </label>
-          <label
-            style={{
-              color: "#2ed573",
-              fontWeight: "bold",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={phaseB}
-              onChange={(e) => setPhaseB(e.target.checked)}
-            />{" "}
-            B상
-          </label>
-          <label
-            style={{
-              color: "#1e90ff",
-              fontWeight: "bold",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={phaseC}
-              onChange={(e) => setPhaseC(e.target.checked)}
-            />{" "}
-            C상
-          </label>
-        </div>
-
-        <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            gap: "20px",
-            fontSize: "14px",
-            backgroundColor: "#000",
-            padding: "8px 15px",
-            borderRadius: "8px",
-          }}
+          B상
+        </button>
+        <button
+          onClick={() => setPc(!pc)}
+          style={{ background: pc ? "#44aaff" : "#333" }}
         >
-          <div>
-            동기 속도:{" "}
-            <span style={{ color: "#fca311" }}>{syncSpeedRPM} RPM</span>
-          </div>
-          <div>
-            실제 속도:{" "}
-            <span style={{ color: isHealthy ? "#00f5d4" : "#ff4757" }}>
-              {actualSpeedRPM} RPM {!isHealthy && "(결상/맥동)"}
-            </span>
-          </div>
-        </div>
+          C상
+        </button>
       </div>
 
-      {/* 2. 화면 분할 (상: 물리 3D / 하: 추상 3D) */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          overflow: "hidden",
-        }}
-      >
-        {/* 상단 캔버스: 물리적 구조 */}
-        <div
-          style={{
-            flex: 1,
-            position: "relative",
-            borderBottom: "2px solid #333",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: "15px",
-              left: "20px",
-              color: "white",
-              fontSize: "16px",
-              fontWeight: "bold",
-              zIndex: 5,
-              background: "rgba(0,0,0,0.6)",
-              padding: "5px 10px",
-              borderRadius: "5px",
-            }}
-          >
-            [1] 3D 기계 구조 (Stator & Rotor)
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* 상단: 물리적 권선 구조 */}
+        <div style={{ flex: 1, position: "relative" }}>
+          <div style={{ position: "absolute", top: 10, left: 10, zIndex: 1 }}>
+            [1] 실제 권선 및 엔드 와인딩 구조
           </div>
-          <Canvas camera={{ position: [0, -5, 7], fov: 45 }}>
-            <color attach="background" args={["#15171e"]} />
-            <ambientLight intensity={0.6} />
-            <directionalLight position={[10, 10, 15]} intensity={1.5} />
+          <Canvas camera={{ position: [0, -5, 8], fov: 45 }}>
+            <color attach="background" args={["#151515"]} />
+            <ambientLight intensity={0.5} />
+            <pointLight position={[10, 10, 10]} intensity={1} />
             <PhysicalScene
-              frequency={frequency}
-              phaseA={phaseA}
-              phaseB={phaseB}
-              phaseC={phaseC}
+              frequency={freq}
+              phaseA={pa}
+              phaseB={pb}
+              phaseC={pc}
             />
-            <OrbitControls enableZoom={true} />
+            <OrbitControls />
           </Canvas>
         </div>
 
-        {/* 하단 캔버스: 추상적 자기장 */}
-        <div style={{ flex: 1, position: "relative" }}>
-          <div
-            style={{
-              position: "absolute",
-              top: "15px",
-              left: "20px",
-              color: "white",
-              fontSize: "16px",
-              fontWeight: "bold",
-              zIndex: 5,
-              background: "rgba(0,0,0,0.6)",
-              padding: "5px 10px",
-              borderRadius: "5px",
-            }}
-          >
-            [2] 회전 자기장 파동 (Magnetic Field)
+        {/* 하단: 추상적 자기장 */}
+        <div
+          style={{ flex: 1, position: "relative", borderTop: "2px solid #444" }}
+        >
+          <div style={{ position: "absolute", top: 10, left: 10, zIndex: 1 }}>
+            [2] 회전 자기장 (추상 시각화)
           </div>
-          <Canvas camera={{ position: [0, 0, 9], fov: 50 }}>
-            <color attach="background" args={["#0a0b0e"]} />
-            <ambientLight intensity={1.0} />
+          <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
+            <color attach="background" args={["#0a0a0a"]} />
             <AbstractScene
-              frequency={frequency}
-              phaseA={phaseA}
-              phaseB={phaseB}
-              phaseC={phaseC}
+              frequency={freq}
+              phaseA={pa}
+              phaseB={pb}
+              phaseC={pc}
             />
-            <OrbitControls enableZoom={true} enableRotate={true} />
+            <OrbitControls enableRotate={false} />
           </Canvas>
         </div>
       </div>
