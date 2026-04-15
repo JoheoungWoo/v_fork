@@ -1,18 +1,20 @@
 import DcGeneratorTypeDiagram from "./diagrams/DcGeneratorTypeDiagram";
 import DcGeneratorTypeContent from "./diagrams/DcGeneratorTypeContent";
+import DcGeneratorEquivalentCircuitSvg from "./shunt-generator/DcGeneratorEquivalentCircuitSvg";
 import DcGeneratorTypeExecutionPanel from "./shunt-generator/DcGeneratorTypeExecutionPanel";
+import { calculateDcGeneratorOperatingPoint } from "./shunt-generator/dcGeneratorCalculations";
 import ShuntCalculationPanel from "./shunt-generator/ShuntCalculationPanel";
 import ShuntEquivalentCircuit from "./shunt-generator/ShuntEquivalentCircuit";
 import ShuntGenerator3DModel from "./shunt-generator/ShuntGenerator3DModel";
 import ShuntGeneratorControls from "./shunt-generator/ShuntGeneratorControls";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export default function ShuntGeneratorSimulator() {
-  const [E, setE] = useState(110); // 유기기전력
-  const [Ra, setRa] = useState(0.5); // 전기자 저항
-  const [Rf, setRf] = useState(55); // 계자 저항
-  const [RL, setRL] = useState(10); // 부하 저항
-  const [isLoad, setIsLoad] = useState(true); // 부하 유무 스위치
+  const [E, setE] = useState(110);
+  const [Ra, setRa] = useState(0.5);
+  const [Rf, setRf] = useState(55);
+  const [RL, setRL] = useState(10);
+  const [isLoad, setIsLoad] = useState(true);
   const [selectedType, setSelectedType] = useState("shunt");
 
   const loadConductance = isLoad ? 1 / RL : 0;
@@ -21,6 +23,18 @@ export default function ShuntGeneratorSimulator() {
   const I = isLoad ? V / RL : 0;
   const Ia = I + If;
   const vDrop = Ia * Ra;
+
+  const operatingPoint = useMemo(
+    () =>
+      calculateDcGeneratorOperatingPoint(selectedType, {
+        E,
+        Ra,
+        Rf,
+        RL,
+        isLoad,
+      }),
+    [selectedType, E, Ra, Rf, RL, isLoad],
+  );
 
   return (
     <div
@@ -50,15 +64,18 @@ export default function ShuntGeneratorSimulator() {
       />
 
       <DcGeneratorTypeDiagram />
-      <DcGeneratorTypeContent
-        activeType={selectedType}
-        onSelectType={setSelectedType}
-      />
+      <DcGeneratorTypeContent activeType={selectedType} onSelectType={setSelectedType} />
 
       {selectedType === "shunt" ? (
         <>
           <div style={{ display: "flex", flexWrap: "wrap" }}>
-            <ShuntGenerator3DModel speed={E} Ia={Ia} If={If} />
+            <ShuntGenerator3DModel
+              speed={E}
+              Ia={Ia}
+              If={If}
+              Ise={operatingPoint.Ise}
+              topology="shunt"
+            />
             <ShuntEquivalentCircuit isLoad={isLoad} />
           </div>
 
@@ -78,25 +95,42 @@ export default function ShuntGeneratorSimulator() {
       ) : (
         <>
           <div style={{ display: "flex", flexWrap: "wrap" }}>
-            <ShuntGenerator3DModel speed={E} Ia={Ia} If={If} />
+            <ShuntGenerator3DModel
+              speed={E}
+              Ia={operatingPoint.Ia}
+              If={operatingPoint.If}
+              Ise={operatingPoint.Ise}
+              topology={selectedType}
+            />
             <div
               style={{
                 flex: "1 1 400px",
                 minHeight: "350px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
                 backgroundColor: "#1c1f26",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
                 borderLeft: "1px solid #3d424b",
-                color: "#bcd0e8",
-                fontSize: "16px",
-                padding: "18px",
-                textAlign: "center",
-                lineHeight: 1.7,
               }}
             >
-              선택 타입 실행 모드입니다. 아래 패널에서 해당 타입의 연결 방식과 계산
-              결과를 확인하세요.
+              <div
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  zIndex: 1,
+                  color: "#fff",
+                  background: "#000a",
+                  padding: "5px 10px",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                }}
+              >
+                [등가회로] 타입별 토폴로지 (연결 구조가 서로 다름)
+              </div>
+              <div style={{ flex: 1, padding: "44px 8px 8px", overflow: "auto" }}>
+                <DcGeneratorEquivalentCircuitSvg type={selectedType} isLoad={isLoad} />
+              </div>
             </div>
           </div>
 
@@ -107,6 +141,7 @@ export default function ShuntGeneratorSimulator() {
             Rf={Rf}
             RL={RL}
             isLoad={isLoad}
+            showDiagram={false}
           />
         </>
       )}
