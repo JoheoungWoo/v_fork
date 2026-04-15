@@ -226,10 +226,10 @@ export default function VConnectionCT() {
             ({primaryCurrent}A)
           </text>
 
-          {/* 지그재그 코일 (CT 1차측) - 사각형 대신 정교한 지그재그 패스 사용 */}
+          {/* ⚡ 촘촘해진 지그재그 코일 (CT 1차측 저항 기호) ⚡ */}
           {/* A상 지그재그 */}
           <path
-            d="M 100 150 L 85 165 L 115 195 L 85 225 L 100 240 L 100 250"
+            d="M 100 150 L 85 155 L 115 165 L 85 175 L 115 185 L 85 195 L 115 205 L 85 215 L 115 225 L 85 235 L 100 240 L 100 250"
             fill="none"
             stroke="#fff"
             strokeWidth="3"
@@ -237,7 +237,7 @@ export default function VConnectionCT() {
           />
           {/* C상 지그재그 */}
           <path
-            d="M 400 150 L 385 165 L 415 195 L 385 225 L 400 240 L 400 250"
+            d="M 400 150 L 385 155 L 415 165 L 385 175 L 415 185 L 385 195 L 415 205 L 385 215 L 415 225 L 385 235 L 400 240 L 400 250"
             fill="none"
             stroke="#fff"
             strokeWidth="3"
