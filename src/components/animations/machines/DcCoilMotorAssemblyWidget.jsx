@@ -1,9 +1,7 @@
 /**
  * DcMotorDynamicsWidget.jsx
  *
- * React Three Fiber(R3F)를 활용하여 직류 전동기의 기계적 부하 시스템(동역학)을
- * 시각화하고, 실시간으로 변화하는 변수들이 운동 방정식에 어떻게 대입되는지
- * 수식 풀이 과정을 함께 보여주는 시뮬레이션 위젯입니다.
+ * 조명(Lighting)과 재질(Material)을 밝게 개선한 직류 전동기 동역학 시뮬레이션
  */
 
 import { OrbitControls, Text } from "@react-three/drei";
@@ -23,9 +21,6 @@ const C = {
   highlight: "#ffe66d",
 };
 
-/**
- * 💡 회전 확인을 위해 표면에 마커(줄무늬)를 추가한 3D 원통 컴포넌트
- */
 function StripedCylinder({ args, color, position, nameText }) {
   const [radius, height, radialSegments] = args;
   const markerCount = 8;
@@ -44,21 +39,19 @@ function StripedCylinder({ args, color, position, nameText }) {
         rotation={[angle, 0, 0]}
       >
         <boxGeometry args={[height + 0.05, 0.05, 0.1]} />
-        <meshStandardMaterial color="#ffffff" />
+        <meshStandardMaterial color="#ffffff" emissive="#333333" />
       </mesh>,
     );
   }
 
   return (
     <group position={position}>
-      {/* 본체 */}
       <mesh rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[radius, radius, height, radialSegments]} />
-        <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} />
+        {/* 💡 metalness를 낮추고 roughness를 높여 빛 반사를 부드럽게(밝게) 만듦 */}
+        <meshStandardMaterial color={color} metalness={0.2} roughness={0.6} />
       </mesh>
-      {/* 회전 마커 */}
       {markers}
-      {/* 3D 라벨 (부품 이름) */}
       <Text position={[0, radius + 0.6, 0]} fontSize={0.4} color="white">
         {nameText}
       </Text>
@@ -66,9 +59,6 @@ function StripedCylinder({ args, color, position, nameText }) {
   );
 }
 
-/**
- * 💡 핵심: 물리 엔진 및 모델 렌더링 (dω/dt 계산)
- */
 function DynamicsSimulation({
   currentI,
   kt,
@@ -78,45 +68,30 @@ function DynamicsSimulation({
   setMetrics,
 }) {
   const systemRef = useRef(null);
-
-  // 상태 대신 Ref를 사용하여 useFrame 내에서 빠르게 적분 계산
   const omega = useRef(0);
   const angle = useRef(0);
 
   useFrame((_, dt) => {
-    // 1. 발생 토크 (Te)
     const Te = kt * currentI;
-
-    // 2. 마찰 손실 토크 (Tf)
     const Tf = frictionB * omega.current;
-
-    // 3. 알짜 토크 (T_net)
     let netTorque = Te - loadTl - Tf;
     let alpha = 0;
 
-    // 모터가 정지 상태(또는 매우 느린 상태)이고 부하(Tl)를 이길 힘이 없는 경우 기동 실패
     if (omega.current < 0.05 && Te <= loadTl) {
       alpha = 0;
       omega.current = 0;
       netTorque = 0;
     } else {
-      // 4. 각가속도 (alpha = T_net / J)
       alpha = netTorque / inertiaJ;
-
-      // 5. 각속도 적분
       omega.current += alpha * dt;
-
-      // (단순화를 위해 부하가 모터를 거꾸로 돌리는 역회전은 없다고 가정)
       if (omega.current < 0) omega.current = 0;
     }
 
-    // 6. 회전 각도 업데이트
     angle.current += omega.current * dt;
     if (systemRef.current) {
       systemRef.current.rotation.x = angle.current;
     }
 
-    // 7. 실시간 풀이 과정 패널 업데이트를 위해 상위 컴포넌트로 값 전달
     setMetrics({
       Te: Te,
       Tf: Tf,
@@ -129,27 +104,26 @@ function DynamicsSimulation({
 
   return (
     <group ref={systemRef}>
-      {/* 전동기 측 */}
+      {/* 💡 색상을 더 밝은 파란색(#3399ff)으로 변경 */}
       <StripedCylinder
         args={[1.0, 2.0, 32]}
-        color="#007aff"
+        color="#3399ff"
         position={[-2, 0, 0]}
         nameText="전동기 (Motor)"
       />
 
-      {/* 연결 축 */}
       <mesh rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.2, 0.2, 3, 16]} />
-        <meshStandardMaterial color="#aaaaaa" metalness={0.8} roughness={0.2} />
+        <meshStandardMaterial color="#dddddd" metalness={0.5} roughness={0.3} />
       </mesh>
-      <Text position={[0, 0.5, 0]} fontSize={0.3} color="#cccccc">
+      <Text position={[0, 0.5, 0]} fontSize={0.3} color="#eeeeee">
         축 (Shaft)
       </Text>
 
-      {/* 부하 측 */}
+      {/* 💡 색상을 더 밝은 회색(#888888)으로 변경 */}
       <StripedCylinder
         args={[1.2, 2.0, 32]}
-        color="#555555"
+        color="#888888"
         position={[2, 0, 0]}
         nameText="부하 (Load)"
       />
@@ -157,18 +131,13 @@ function DynamicsSimulation({
   );
 }
 
-/**
- * 메인 위젯 컴포넌트
- */
 export default function DcMotorDynamicsWidget() {
-  // 슬라이더 입력 상태
   const [currentI, setCurrentI] = useState(5.0);
   const [kt, setKt] = useState(1.0);
   const [inertiaJ, setInertiaJ] = useState(2.0);
   const [frictionB, setFrictionB] = useState(0.5);
   const [loadTl, setLoadTl] = useState(2.0);
 
-  // 물리 시뮬레이션에서 계산되어 올라오는 실시간 지표
   const [metrics, setMetrics] = useState({
     Te: 0,
     Tf: 0,
@@ -189,7 +158,6 @@ export default function DcMotorDynamicsWidget() {
         fontFamily: "Segoe UI, sans-serif",
       }}
     >
-      {/* 헤더 */}
       <div
         style={{
           padding: 12,
@@ -206,15 +174,29 @@ export default function DcMotorDynamicsWidget() {
         </span>
       </div>
 
-      {/* 1. 3D 캔버스 영역 */}
       <div style={{ height: 350 }}>
         <Canvas
           camera={{ position: [0, 4, 8], fov: 50 }}
           shadows
           gl={{ antialias: true }}
         >
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[5, 10, 5]} intensity={1.5} castShadow />
+          {/* 💡 3D 캔버스 배경색을 추가하여 공간이 너무 까맣지 않게 만듦 */}
+          <color attach="background" args={["#1a1f2e"]} />
+
+          {/* 💡 조명 세팅 대폭 강화 */}
+          <ambientLight intensity={1.5} />
+          <hemisphereLight
+            skyColor="#ffffff"
+            groundColor="#444444"
+            intensity={1.0}
+          />
+          <directionalLight
+            position={[10, 15, 10]}
+            intensity={2.0}
+            castShadow
+          />
+          <directionalLight position={[-10, 5, -10]} intensity={1.2} />
+
           <OrbitControls target={[0, 0, 0]} minDistance={3} maxDistance={20} />
           <Suspense fallback={null}>
             <DynamicsSimulation
@@ -229,7 +211,6 @@ export default function DcMotorDynamicsWidget() {
         </Canvas>
       </div>
 
-      {/* 2. 주요 결과 요약 대시보드 */}
       <div
         style={{
           padding: "12px 20px",
@@ -277,7 +258,6 @@ export default function DcMotorDynamicsWidget() {
         </div>
       </div>
 
-      {/* 3. 컨트롤 패널 (입력 파라미터) */}
       <div
         style={{
           padding: 16,
@@ -288,7 +268,6 @@ export default function DcMotorDynamicsWidget() {
           gap: "16px",
         }}
       >
-        {/* 전류 (Ia) */}
         <div>
           <div
             style={{
@@ -317,8 +296,6 @@ export default function DcMotorDynamicsWidget() {
             style={{ width: "100%", accentColor: C.accent }}
           />
         </div>
-
-        {/* 부하 토크 (Tl) */}
         <div>
           <div
             style={{
@@ -347,8 +324,6 @@ export default function DcMotorDynamicsWidget() {
             style={{ width: "100%", accentColor: C.danger }}
           />
         </div>
-
-        {/* 관성 (J) */}
         <div>
           <div
             style={{
@@ -373,8 +348,6 @@ export default function DcMotorDynamicsWidget() {
             style={{ width: "100%" }}
           />
         </div>
-
-        {/* 마찰 (B) */}
         <div>
           <div
             style={{
@@ -401,7 +374,6 @@ export default function DcMotorDynamicsWidget() {
         </div>
       </div>
 
-      {/* 4. 💡 실시간 수식 풀이 과정 (NEW) */}
       <div
         style={{
           padding: 16,
@@ -423,7 +395,6 @@ export default function DcMotorDynamicsWidget() {
         >
           [실시간 운동 방정식 풀이 과정]
         </div>
-
         <div style={{ marginBottom: 8 }}>
           <span style={{ color: C.muted }}>① 모터 발생 토크 (Te):</span>
           <br />
@@ -436,7 +407,6 @@ export default function DcMotorDynamicsWidget() {
           <span style={{ color: C.accent }}>{currentI.toFixed(2)}</span> ={" "}
           <strong>{metrics.Te.toFixed(2)} Nm</strong>
         </div>
-
         <div style={{ marginBottom: 8 }}>
           <span style={{ color: C.muted }}>② 마찰 손실 토크 (Tf):</span>
           <br />
@@ -445,7 +415,6 @@ export default function DcMotorDynamicsWidget() {
           {metrics.omega.toFixed(2)} ={" "}
           <strong>{metrics.Tf.toFixed(2)} Nm</strong>
         </div>
-
         <div style={{ marginBottom: 8 }}>
           <span style={{ color: C.muted }}>③ 알짜 토크 (T_net = 남은 힘):</span>
           <br />
@@ -460,7 +429,6 @@ export default function DcMotorDynamicsWidget() {
           {metrics.Tf.toFixed(2)} ={" "}
           <strong>{metrics.netTorque.toFixed(2)} Nm</strong>
         </div>
-
         <div>
           <span style={{ color: C.muted }}>④ 가속력 (각가속도 α):</span>
           <br />
