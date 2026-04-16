@@ -11,74 +11,42 @@ import "katex/dist/katex.min.css";
 import useMove from "@/hooks/useMove";
 import { BookOpen, Calculator, PenTool, Play, X } from "lucide-react";
 
-// ----------------------------------------------------------------------
-// 1. 과목 상수 데이터 (SUBJECTS) - 💡 기초수학 추가 완료!
-// ----------------------------------------------------------------------
-const SUBJECTS = [
-  {
-    id: "기초수학", // 백엔드 DB 과목명과 일치해야 합니다
-    label: "기초수학",
-    icon: "📐",
-    color: "from-pink-500 to-rose-500",
-    borderColor: "border-pink-500",
-    bgColor: "bg-pink-500",
-    themeColor: "#ec4899",
-  },
-  {
-    id: "전자기학",
-    label: "전자기학",
-    icon: "⚡",
-    color: "from-amber-500 to-orange-500",
-    borderColor: "border-amber-500",
-    bgColor: "bg-amber-500",
-    themeColor: "#f59e0b",
-  },
-  {
-    id: "전력공학",
-    label: "전력공학",
-    icon: "🏭",
-    color: "from-red-500 to-rose-500",
-    borderColor: "border-red-500",
-    bgColor: "bg-red-500",
-    themeColor: "#ef4444",
-  },
-  {
-    id: "전기기기",
-    label: "전기기기",
-    icon: "⚙️",
-    color: "from-blue-500 to-indigo-500",
-    borderColor: "border-blue-500",
-    bgColor: "bg-blue-500",
-    themeColor: "#3b82f6",
-  },
-  {
-    id: "회로이론",
-    label: "회로이론",
-    icon: "🔄",
-    color: "from-emerald-500 to-teal-500",
-    borderColor: "border-emerald-500",
-    bgColor: "bg-emerald-500",
-    themeColor: "#10b981",
-  },
-  {
-    id: "제어공학",
-    label: "제어공학",
-    icon: "🎛️",
-    color: "from-cyan-500 to-sky-500",
-    borderColor: "border-cyan-500",
-    bgColor: "bg-cyan-500",
-    themeColor: "#06b6d4",
-  },
-  {
-    id: "전기설비기술기준",
-    label: "설비기준",
-    icon: "📜",
-    color: "from-violet-500 to-purple-500",
-    borderColor: "border-violet-500",
-    bgColor: "bg-violet-500",
-    themeColor: "#8b5cf6",
-  },
-];
+const SUBJECT_THEME = {
+  기초수학: { icon: "📐", color: "from-pink-500 to-rose-500", themeColor: "#ec4899" },
+  전기자기학: { icon: "⚡", color: "from-amber-500 to-orange-500", themeColor: "#f59e0b" },
+  전력공학: { icon: "🏭", color: "from-red-500 to-rose-500", themeColor: "#ef4444" },
+  전기기기: { icon: "⚙️", color: "from-blue-500 to-indigo-500", themeColor: "#3b82f6" },
+  "회로이론 및 제어공학": { icon: "🔄", color: "from-emerald-500 to-teal-500", themeColor: "#10b981" },
+};
+
+const DEFAULT_SUBJECTS = [
+  "기초수학",
+  "회로이론 및 제어공학",
+  "전기자기학",
+  "전기기기",
+  "전력공학",
+].map((id) => ({
+  id,
+  label: id,
+  icon: SUBJECT_THEME[id]?.icon || "📘",
+  color: SUBJECT_THEME[id]?.color || "from-slate-500 to-slate-600",
+  themeColor: SUBJECT_THEME[id]?.themeColor || "#64748b",
+}));
+
+const LEGACY_SUBJECT_TO_NEW = {
+  전자기학: "전기자기학",
+  회로이론: "회로이론 및 제어공학",
+  제어공학: "회로이론 및 제어공학",
+};
+
+const mapSubjectToGraphKey = (subjectId) => {
+  // 그래프 DB가 구 과목명을 쓰는 경우도 호환
+  const reverseMap = {
+    전기자기학: "전자기학",
+    "회로이론 및 제어공학": "회로이론",
+  };
+  return reverseMap[subjectId] || subjectId;
+};
 
 // ✅ 노드 이름과 실제 강의 ID 매핑 객체 (모든 강의 완벽 연결!)
 const NODE_TO_LECTURE_MAP = {
@@ -216,12 +184,42 @@ export default function SubjectMapPage() {
   const move = useMove("/user/videos");
 
   // 상태 관리
-  const [selectedSubject, setSelectedSubject] = useState(SUBJECTS[0]);
+  const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS);
+  const [selectedSubject, setSelectedSubject] = useState(DEFAULT_SUBJECTS[0]);
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ nodes: 0, links: 0 });
   const [selectedNode, setSelectedNode] = useState(null);
   const [focusNodes, setFocusNodes] = useState([]);
+
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      try {
+        const res = await apiClient.get("/api/lectures/subjects");
+        const rows = Array.isArray(res.data) ? res.data : [];
+        const normalized = rows
+          .map((s) => LEGACY_SUBJECT_TO_NEW[String(s || "").trim()] || String(s || "").trim())
+          .filter((s, idx, arr) => s && arr.indexOf(s) === idx)
+          .map((id) => ({
+            id,
+            label: id,
+            icon: SUBJECT_THEME[id]?.icon || "📘",
+            color: SUBJECT_THEME[id]?.color || "from-slate-500 to-slate-600",
+            themeColor: SUBJECT_THEME[id]?.themeColor || "#64748b",
+          }));
+
+        if (normalized.length > 0) {
+          setSubjects(normalized);
+          setSelectedSubject((prev) =>
+            normalized.find((s) => s.id === prev?.id) || normalized[0],
+          );
+        }
+      } catch (err) {
+        console.warn("과목 목록 로드 실패(기본 과목 사용):", err);
+      }
+    };
+    fetchSubjects();
+  }, []);
 
   const normalizeName = (value) =>
     String(value || "")
@@ -281,7 +279,7 @@ export default function SubjectMapPage() {
 
       try {
         const res = await apiClient.get(
-          `/api/graph/full-map/${encodeURIComponent(selectedSubject.id)}?include_formulas=true`,
+          `/api/graph/full-map/${encodeURIComponent(mapSubjectToGraphKey(selectedSubject.id))}?include_formulas=true`,
         );
 
         setGraphData(res.data);
@@ -391,7 +389,7 @@ export default function SubjectMapPage() {
           params: {
             name: selectedNode.name,
             group: selectedNode.group,
-            subject: selectedSubject.id,
+            subject: mapSubjectToGraphKey(selectedSubject.id),
           },
         });
         lectureId = res?.data?.lecture_id || null;
@@ -471,15 +469,20 @@ export default function SubjectMapPage() {
         </div>
 
         <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto scrollbar-hide border-t border-white/5 bg-slate-950/50">
-          {SUBJECTS.map((sub) => (
+          {subjects.map((sub) => (
             <button
               key={sub.id}
               onClick={() => setSelectedSubject(sub)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap border ${
                 selectedSubject.id === sub.id
-                  ? `bg-slate-800 border-${sub.borderColor.split("-")[1]}-500 text-white shadow-[0_0_15px_${sub.themeColor}40]`
+                  ? "bg-slate-800 border-slate-500 text-white"
                   : "bg-transparent border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5"
               }`}
+              style={
+                selectedSubject.id === sub.id
+                  ? { boxShadow: `0 0 15px ${sub.themeColor}40` }
+                  : undefined
+              }
             >
               <span>{sub.icon}</span>
               <span>{sub.label}</span>

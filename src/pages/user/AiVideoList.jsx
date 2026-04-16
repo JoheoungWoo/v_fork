@@ -9,18 +9,15 @@ import HeroBanner from "./HeroBanner";
 import VideoCard from "./VideoCard";
 import VideoCategoryTabs from "./VideoCategoryTabs";
 
-/**
- * Supabase `lectures_tbl.subject` 값 → VideoCategoryTabs 의 탭 id
- * (DB에 넣은 문자열과 동일해야 함)
- */
-const SUBJECT_TO_CATEGORY_TAB = {
-  기초수학: "기초 수학",
-  회로이론: "회로이론",
-  전자기학: "전자기학",
-  전기기기: "전기기기",
-  전력공학: "전력공학",
-  제어공학: "제어공학",
-  "AI Company": "Vision",
+const LEGACY_SUBJECT_ALIAS = {
+  전자기학: "전기자기학",
+  회로이론: "회로이론 및 제어공학",
+  제어공학: "회로이론 및 제어공학",
+};
+
+const normalizeSubject = (subjectRaw) => {
+  const s = String(subjectRaw || "").trim();
+  return LEGACY_SUBJECT_ALIAS[s] || s || "기타";
 };
 
 // 🌟 DB의 subject가 null이더라도 ID를 기반으로 카테고리를 유추하는 강력한 분류기
@@ -29,13 +26,12 @@ const getCategory = (video) => {
   // 🌟 [핵심 방어막] video 객체 자체가 없으면 에러 내지 말고 "기타" 반환!
   if (!video) return "기타";
 
-  const subjectRaw = (video.subject || "").trim();
-  if (SUBJECT_TO_CATEGORY_TAB[subjectRaw]) {
-    return SUBJECT_TO_CATEGORY_TAB[subjectRaw];
+  const subject = normalizeSubject(video.subject);
+  if (subject && subject !== "기타") {
+    return subject;
   }
 
   // 이제 안전하게 subject와 lecture_id를 추출할 수 있습니다.
-  const subject = video.subject || "";
   const idStr = String(video.lecture_id || video.id || "").toLowerCase();
 
   // 🌟 1. 전자기학 (우선순위 최상단으로 이동: vector_calculus 방어)
@@ -48,7 +44,7 @@ const getCategory = (video) => {
     idStr.includes("flemming") ||
     idStr.includes("vector_calculus") // 전자기학 벡터 미적분
   )
-    return "전자기학";
+    return "전기자기학";
 
   // 🌟 2. 전기기기
   if (
@@ -70,7 +66,7 @@ const getCategory = (video) => {
     idStr.includes("voltage") ||
     idStr.includes("reactance")
   )
-    return "회로이론";
+    return "회로이론 및 제어공학";
 
   // 🌟 4. 전력공학
   if (
@@ -91,7 +87,7 @@ const getCategory = (video) => {
     idStr.includes("time_constant") ||
     idStr.includes("angular_velocity")
   )
-    return "제어공학";
+    return "회로이론 및 제어공학";
 
   // 🌟 6. 기초 수학 (전자기학/회로 등에서 안 걸러진 나머지 일반 수학)
   if (
@@ -105,15 +101,7 @@ const getCategory = (video) => {
     idStr.includes("intersection") ||
     idStr.includes("calculus")
   )
-    return "기초 수학";
-
-  // 🌟 7. Vision
-  if (
-    subject.includes("Vision") ||
-    subject.includes("AI") ||
-    idStr.includes("vision")
-  )
-    return "Vision";
+    return "기초수학";
 
   return "기타"; // 매칭되지 않는 영상
 };
@@ -169,10 +157,35 @@ export default function AiVideoList() {
 
   const [activeTab, setActiveTab] = useState("전체");
   const [allLectures, setAllLectures] = useState([]);
+  const [subjectTabs, setSubjectTabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  // 1. 전체 목록 1회 로드 — 탭 전환은 클라이언트에서만 필터(API subject 미적용·구버전 서버에도 탭이 맞게 동작)
+  // 1. 과목 탭 로드 (신규 API)
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      try {
+        const res = await apiClient.get("/api/lectures/subjects");
+        const rows = Array.isArray(res.data) ? res.data : [];
+        const normalized = rows
+          .map((s) => normalizeSubject(s))
+          .filter((s, idx, arr) => s && s !== "기타" && arr.indexOf(s) === idx);
+        setSubjectTabs(normalized);
+      } catch (err) {
+        console.warn("과목 목록 로드 실패(기본 탭 사용):", err);
+        setSubjectTabs([
+          "기초수학",
+          "회로이론 및 제어공학",
+          "전기자기학",
+          "전기기기",
+          "전력공학",
+        ]);
+      }
+    };
+    fetchSubjects();
+  }, []);
+
+  // 2. 전체 목록 1회 로드 — 탭 전환은 클라이언트에서 필터
   useEffect(() => {
     const fetchLectures = async () => {
       try {
@@ -184,6 +197,7 @@ export default function AiVideoList() {
 
         const categorizedArray = rawArray.map((video) => ({
           ...video,
+          subject: normalizeSubject(video.subject),
           category: getCategory(video),
         }));
         setAllLectures(categorizedArray);
@@ -197,7 +211,7 @@ export default function AiVideoList() {
     fetchLectures();
   }, []);
 
-  // 2. 활성 탭 ↔ category 일치로만 목록 구성(연동 보장)
+  // 3. 활성 탭 ↔ category 일치로만 목록 구성(연동 보장)
   const filteredVideos = useMemo(() => {
     if (!allLectures || allLectures.length === 0) return [];
 
@@ -210,7 +224,7 @@ export default function AiVideoList() {
     return sortVideosForList(filtered);
   }, [allLectures, activeTab]);
 
-  // 3. 페이지네이션 범위 계산
+  // 4. 페이지네이션 범위 계산
   const total = filteredVideos.length;
   const totalPages = Math.ceil(total / size) || 1;
   const currentList = filteredVideos.slice((page - 1) * size, page * size);
@@ -231,6 +245,10 @@ export default function AiVideoList() {
       {/* 카테고리 탭 컴포넌트 */}
       <VideoCategoryTabs
         activeTab={activeTab}
+        categories={[
+          { id: "전체", label: "전체보기", icon: "🌟" },
+          ...subjectTabs.map((s) => ({ id: s, label: s })),
+        ]}
         onTabChange={(id) => {
           setActiveTab(id);
           moveToList({ page: 1, size }); // 탭 변경 시 무조건 1페이지로 강제 이동

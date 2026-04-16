@@ -1,26 +1,32 @@
-/**
- * 카테고리 설정 데이터
- */
-const CATEGORIES = [
-  { id: "전체", label: "전체보기", icon: "🌟" },
-  { id: "기초 수학", label: "기초 수학", icon: "📐" },
-  { id: "회로이론", label: "회로이론", icon: "⚡" },
-  { id: "전자기학", label: "전자기학", icon: "🧲" },
-  { id: "전기기기", label: "전기기기", icon: "🔌" }, // 👈 모터/기기를 상징하는 플러그로 변경
-  { id: "제어공학", label: "제어공학", icon: "🎛️" }, // 👈 제어 패널(노브)로 변경하여 차별화
-  { id: "전력공학", label: "전력공학", icon: "🗼" }, // 👈 송전탑으로 변경하여 전력 계통 느낌 팍팍!
-  { id: "Vision", label: "Vision", icon: "🚀" },
-];
+const SUBJECT_ICONS = {
+  기초수학: "📐",
+  "회로이론 및 제어공학": "⚡",
+  전기자기학: "🧲",
+  전기기기: "🔌",
+  전력공학: "🗼",
+};
 
 /**
  * @param {string} activeTab - 현재 활성화된 카테고리 ID
  * @param {function} onTabChange - 탭 클릭 시 실행될 핸들러 함수
+ * @param {Array<{id:string,label:string}>} categories - 동적 카테고리 목록
  */
-export default function VideoCategoryTabs({ activeTab, onTabChange }) {
+export default function VideoCategoryTabs({
+  activeTab,
+  onTabChange,
+  categories = [],
+}) {
+  const normalizedCategories =
+    categories.length > 0
+      ? categories
+      : [{ id: "전체", label: "전체보기", icon: "🌟" }];
+
   return (
     <div className="flex flex-wrap items-center justify-start gap-4 mb-10">
-      {CATEGORIES.map((cat) => {
+      {normalizedCategories.map((cat) => {
         const isActive = activeTab === cat.id;
+        const icon =
+          cat.icon || SUBJECT_ICONS[cat.id] || SUBJECT_ICONS[cat.label] || "📘";
 
         return (
           <button
@@ -36,7 +42,7 @@ export default function VideoCategoryTabs({ activeTab, onTabChange }) {
             `}
           >
             <span className="text-xl" role="img" aria-label={cat.label}>
-              {cat.icon}
+              {icon}
             </span>
             <span className="text-sm md:text-base">{cat.label}</span>
           </button>
