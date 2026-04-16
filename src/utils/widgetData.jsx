@@ -325,6 +325,12 @@ const WIDGET_MAP = {
         import("@/components/animations/machines/induction-motor/RotatingMagneticFieldApp"),
     ),
   ],
+  induction_machine_powerflow_hub: [
+    lazy(
+      () =>
+        import("@/components/animations/machines/induction-motor/InductionPowerFlowApp"),
+    ),
+  ],
   // ==========================================
   // ⚡ 전력공학 (Power Engineering)
   // ==========================================
