@@ -345,6 +345,16 @@ const LocalQuizCard = (props) => {
     setSelectedIndex(index);
     setIsCorrect(correct);
     setShowSolution(true);
+
+    // 오답 시 상위 화면(AiVideoWatch)에서 widget 탭으로 전환할 수 있도록 이벤트 전달
+    if (!correct && typeof props.onWrongAnswer === "function") {
+      props.onWrongAnswer({
+        targetId,
+        subject: subjectName,
+        problemText,
+      });
+    }
+
     try {
       await recordAnswer(targetId, subjectName, correct, index, problemText);
     } catch (e) {

@@ -161,6 +161,11 @@ export default function AiVideoWatch() {
                   <LocalQuizCard
                     id={videoInfo.lecture_id}
                     subject={videoInfo.subject} /* 🌟 요기를 추가! */
+                    onWrongAnswer={() => {
+                      if (WidgetComponents.length > 0) {
+                        handleTabChange("widget");
+                      }
+                    }}
                   />
                 )}
 
