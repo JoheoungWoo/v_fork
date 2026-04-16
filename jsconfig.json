@@ -5,5 +5,8 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "src/components/animations/circuits/BridgeRectifierSimulator/.jsx"
+  ]
 }

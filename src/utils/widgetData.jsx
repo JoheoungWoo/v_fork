@@ -179,8 +179,7 @@ const WIDGET_MAP = {
   bridge_diode_rectifier: [
     lazy(() => import("@/components/animations/DcRectificationWidget")),
     lazy(
-      () =>
-        import("@/components/animations/circuits/BridgeRectifierFlowCompareWidget"),
+      () => import("@/components/animations/circuits/BridgeRectifierSimulator"),
     ),
     lazy(
       () => import("@/components/animations/circuits/BatteryCurrentFlowWidget"),
