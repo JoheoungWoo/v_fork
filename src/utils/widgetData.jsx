@@ -182,6 +182,9 @@ const WIDGET_MAP = {
       () =>
         import("@/components/animations/circuits/BridgeRectifierFlowCompareWidget"),
     ),
+    lazy(
+      () => import("@/components/animations/circuits/BatteryCurrentFlowWidget"),
+    ),
   ],
 
   // ==========================================
