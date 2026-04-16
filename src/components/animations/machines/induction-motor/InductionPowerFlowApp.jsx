@@ -7,22 +7,16 @@ export default function InductionPowerFlowApp() {
   // 공극 전력(P2)을 100으로 기준 잡음
   const P2 = 100;
 
-  // 1. 전기적 전력 (고정자와 전원 사이)
-  // 전동기/플러깅(s > 0): 전원 -> 고정자 (양수)
-  // 발전기(s < 0): 고정자 -> 전원 (음수)
+  // 1. 전기적 전력
   const Pelec = slip > 0 ? P2 : -P2;
 
-  // 2. 기계적 전력 (회전자와 기계 부하 사이)
-  // P_mech = P2 * (1 - s)
-  // 양수: 회전자 -> 부하 (일을 함)
-  // 음수: 부하 -> 회전자 (외부에서 동력 공급 받음, 또는 관성에 의한 제동 에너지)
+  // 2. 기계적 전력
   const Pmech = P2 * (1 - slip);
 
   // 3. 회전자 동손 (열 손실)
-  // P_loss = s * P2 (항상 회전자에서 빠져나가는 열로 소모되므로 절대값 처리)
   const Ploss = Math.abs(slip * P2);
 
-  // 상태 요약 텍스트 결정
+  // 모드 텍스트 로직
   let modeTitle = "";
   let description = "";
   if (slip === 0) {
@@ -35,17 +29,18 @@ export default function InductionPowerFlowApp() {
   } else if (slip < 0) {
     modeTitle = "발전기 작용 (Generating)";
     description =
-      "부하(원동기)로부터 기계적 에너지를 받아 전기에너지로 변환 후 전원으로 역송(회생)합니다.";
+      "부하로부터 기계적 에너지를 받아 전기에너지로 변환 후 전원으로 역송(회생)합니다.";
   } else {
     modeTitle = "플러깅 / 역상 제동 (Plugging)";
     description =
-      "회전계자의 방향이 반대로 되어, 전원과 기계부하 양쪽에서 에너지가 회전자로 밀려들어와 막대한 열(동손)로 소모되며 급격히 제동됩니다.";
+      "전원과 기계부하 양쪽에서 에너지가 회전자로 밀려들어와 막대한 열로 소모되며 급격히 제동됩니다.";
   }
 
-  // 선 굵기 계산 (최소 2px)
-  const getStrokeWidth = (val) => Math.max(2, Math.abs(val) / 10);
+  // 선 굵기 계산 (시인성을 위해 가중치 대폭 증가)
+  // 전력 100일 때 25px, 150일 때 35px 두께
+  const getStrokeWidth = (val) => Math.max(8, (Math.abs(val) / 100) * 20 + 5);
 
-  // 흐름 애니메이션 방향 클래스
+  // 흐름 방향 클래스
   const getFlowClass = (val, isRightToLeft = false) => {
     if (val === 0) return "";
     const forward = isRightToLeft ? val < 0 : val > 0;
@@ -56,7 +51,7 @@ export default function InductionPowerFlowApp() {
     <div
       style={{
         width: "100%",
-        maxWidth: "900px",
+        maxWidth: "1000px",
         margin: "0 auto",
         fontFamily: "sans-serif",
         backgroundColor: "#1e1e1e",
@@ -66,24 +61,34 @@ export default function InductionPowerFlowApp() {
       }}
     >
       <style>{`
-        @keyframes flowFwd { to { stroke-dashoffset: -20; } }
-        @keyframes flowRev { to { stroke-dashoffset: 20; } }
-        .flow-forward { animation: flowFwd 0.5s linear infinite; }
-        .flow-reverse { animation: flowRev 0.5s linear infinite; }
-        .power-line { stroke: #4ade80; stroke-dasharray: 10, 5; stroke-linecap: round; }
+        /* 애니메이션 이동 거리(대시 배열 크기)를 늘려 시원시원하게 움직이도록 수정 */
+        @keyframes flowFwd { to { stroke-dashoffset: -40; } }
+        @keyframes flowRev { to { stroke-dashoffset: 40; } }
+        .flow-forward { animation: flowFwd 0.6s linear infinite; }
+        .flow-reverse { animation: flowRev 0.6s linear infinite; }
+        
+        /* 대시(점선)의 길이와 간격을 키움 (20px 선, 20px 공백) */
+        .power-line { 
+          stroke: #4ade80; 
+          stroke-dasharray: 20, 20; 
+          stroke-linecap: round; 
+          transition: stroke-width 0.3s ease;
+        }
         .power-line.reverse { stroke: #3b82f6; }
         .power-line.heat { stroke: #ef4444; }
       `}</style>
 
-      <h2 style={{ textAlign: "center", margin: "0 0 20px 0" }}>
-        유도기 동작 모드별 전력 흐름 다이어그램
+      <h2
+        style={{ textAlign: "center", margin: "0 0 20px 0", fontSize: "24px" }}
+      >
+        유도기 동작 모드별 전력 흐름
       </h2>
 
       {/* 컨트롤 패널 */}
       <div
         style={{
           backgroundColor: "#2d2d2d",
-          padding: "15px",
+          padding: "20px",
           borderRadius: "8px",
           marginBottom: "20px",
         }}
@@ -93,51 +98,57 @@ export default function InductionPowerFlowApp() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "15px",
+            marginBottom: "20px",
           }}
         >
-          <label style={{ fontWeight: "bold", fontSize: "18px" }}>
+          <label style={{ fontWeight: "bold", fontSize: "20px" }}>
             슬립 (s): {slip.toFixed(2)}
           </label>
           <div style={{ display: "flex", gap: "10px" }}>
             <button
               onClick={() => setSlip(-0.5)}
               style={{
-                padding: "8px 12px",
+                padding: "10px 16px",
+                fontSize: "16px",
+                fontWeight: "bold",
                 cursor: "pointer",
                 backgroundColor: slip < 0 ? "#3b82f6" : "#444",
                 color: "white",
                 border: "none",
-                borderRadius: "4px",
+                borderRadius: "6px",
               }}
             >
-              발전기 (s = -0.5)
+              발전기 (-0.5)
             </button>
             <button
               onClick={() => setSlip(0.5)}
               style={{
-                padding: "8px 12px",
+                padding: "10px 16px",
+                fontSize: "16px",
+                fontWeight: "bold",
                 cursor: "pointer",
                 backgroundColor: slip > 0 && slip < 1 ? "#4ade80" : "#444",
                 color: "white",
                 border: "none",
-                borderRadius: "4px",
+                borderRadius: "6px",
               }}
             >
-              전동기 (s = 0.5)
+              전동기 (0.5)
             </button>
             <button
               onClick={() => setSlip(1.5)}
               style={{
-                padding: "8px 12px",
+                padding: "10px 16px",
+                fontSize: "16px",
+                fontWeight: "bold",
                 cursor: "pointer",
                 backgroundColor: slip > 1 ? "#ef4444" : "#444",
                 color: "white",
                 border: "none",
-                borderRadius: "4px",
+                borderRadius: "6px",
               }}
             >
-              플러깅 (s = 1.5)
+              플러깅 (1.5)
             </button>
           </div>
         </div>
@@ -148,21 +159,22 @@ export default function InductionPowerFlowApp() {
           step="0.1"
           value={slip}
           onChange={(e) => setSlip(parseFloat(e.target.value))}
-          style={{ width: "100%", cursor: "pointer" }}
+          style={{ width: "100%", cursor: "pointer", height: "8px" }}
         />
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            fontSize: "12px",
+            fontSize: "14px",
             color: "#aaa",
-            marginTop: "5px",
+            marginTop: "10px",
+            fontWeight: "bold",
           }}
         >
-          <span>-1.0 (발전기)</span>
+          <span>-1.0 (발전)</span>
           <span>0 (동기속도)</span>
           <span>1.0 (정지)</span>
-          <span>2.0 (플러깅/역전)</span>
+          <span>2.0 (제동/역전)</span>
         </div>
       </div>
 
@@ -171,227 +183,306 @@ export default function InductionPowerFlowApp() {
         style={{
           textAlign: "center",
           marginBottom: "30px",
-          padding: "15px",
+          padding: "20px",
           backgroundColor: "#333",
           borderRadius: "8px",
-          minHeight: "80px",
+          minHeight: "90px",
         }}
       >
-        <h3 style={{ margin: "0 0 10px 0", color: "#facc15" }}>{modeTitle}</h3>
-        <p style={{ margin: 0, fontSize: "15px", lineHeight: "1.5" }}>
+        <h3
+          style={{ margin: "0 0 10px 0", color: "#facc15", fontSize: "22px" }}
+        >
+          {modeTitle}
+        </h3>
+        <p style={{ margin: 0, fontSize: "18px", lineHeight: "1.5" }}>
           {description}
         </p>
       </div>
 
-      {/* SVG 블록 다이어그램 */}
-      <div style={{ width: "100%", overflowX: "auto" }}>
-        <svg viewBox="0 0 800 350" style={{ width: "100%", height: "auto" }}>
-          {/* 블록 정의 */}
-          <g transform="translate(50, 100)">
+      {/* 대폭 확대된 SVG 블록 다이어그램 */}
+      <div
+        style={{
+          width: "100%",
+          overflowX: "auto",
+          backgroundColor: "#1a1a1a",
+          padding: "20px 0",
+          borderRadius: "12px",
+        }}
+      >
+        <svg
+          viewBox="0 0 1200 500"
+          style={{ width: "100%", height: "auto", display: "block" }}
+        >
+          {/* 블록 정의 (크기 대폭 확대: 180x100) */}
+          <g transform="translate(40, 100)">
             <rect
-              width="120"
-              height="80"
-              rx="8"
+              width="180"
+              height="100"
+              rx="12"
               fill="#374151"
               stroke="#9ca3af"
-              strokeWidth="2"
+              strokeWidth="3"
             />
             <text
-              x="60"
+              x="90"
               y="45"
               fill="white"
               textAnchor="middle"
-              fontSize="16"
+              fontSize="22"
               fontWeight="bold"
             >
-              전원 (Grid)
+              전원
+            </text>
+            <text
+              x="90"
+              y="75"
+              fill="#d1d5db"
+              textAnchor="middle"
+              fontSize="18"
+            >
+              (Grid)
             </text>
           </g>
 
-          <g transform="translate(260, 100)">
+          <g transform="translate(360, 100)">
             <rect
-              width="120"
-              height="80"
-              rx="8"
+              width="180"
+              height="100"
+              rx="12"
               fill="#4b5563"
               stroke="#9ca3af"
-              strokeWidth="2"
+              strokeWidth="3"
             />
             <text
-              x="60"
-              y="35"
+              x="90"
+              y="45"
               fill="white"
               textAnchor="middle"
-              fontSize="16"
+              fontSize="22"
               fontWeight="bold"
             >
               고정자
             </text>
             <text
-              x="60"
-              y="55"
+              x="90"
+              y="75"
               fill="#d1d5db"
               textAnchor="middle"
-              fontSize="12"
+              fontSize="18"
             >
               (Stator)
             </text>
           </g>
 
-          <g transform="translate(470, 100)">
+          <g transform="translate(680, 100)">
             <rect
-              width="120"
-              height="80"
-              rx="8"
+              width="180"
+              height="100"
+              rx="12"
               fill="#4b5563"
               stroke="#9ca3af"
-              strokeWidth="2"
+              strokeWidth="3"
             />
             <text
-              x="60"
-              y="35"
+              x="90"
+              y="45"
               fill="white"
               textAnchor="middle"
-              fontSize="16"
+              fontSize="22"
               fontWeight="bold"
             >
               회전자
             </text>
             <text
-              x="60"
-              y="55"
+              x="90"
+              y="75"
               fill="#d1d5db"
               textAnchor="middle"
-              fontSize="12"
+              fontSize="18"
             >
               (Rotor)
             </text>
           </g>
 
-          <g transform="translate(680, 100)">
+          <g transform="translate(1000, 100)">
             <rect
-              width="120"
-              height="80"
-              rx="8"
+              width="180"
+              height="100"
+              rx="12"
               fill="#374151"
               stroke="#9ca3af"
-              strokeWidth="2"
+              strokeWidth="3"
             />
             <text
-              x="60"
-              y="35"
+              x="90"
+              y="45"
               fill="white"
               textAnchor="middle"
-              fontSize="16"
+              fontSize="22"
               fontWeight="bold"
             >
               기계 부하
             </text>
             <text
-              x="60"
-              y="55"
+              x="90"
+              y="75"
               fill="#d1d5db"
               textAnchor="middle"
-              fontSize="12"
+              fontSize="18"
             >
               (Load)
             </text>
           </g>
 
-          <g transform="translate(470, 260)">
+          <g transform="translate(680, 360)">
             <rect
-              width="120"
-              height="60"
-              rx="8"
+              width="180"
+              height="80"
+              rx="12"
               fill="#7f1d1d"
               stroke="#fca5a5"
-              strokeWidth="2"
+              strokeWidth="3"
             />
             <text
-              x="60"
-              y="35"
+              x="90"
+              y="48"
               fill="white"
               textAnchor="middle"
-              fontSize="16"
+              fontSize="24"
               fontWeight="bold"
             >
-              열 손실 (Heat)
+              열 손실
             </text>
           </g>
 
-          {/* 연결선 및 전력 화살표 애니메이션 */}
-          {/* 전원 <-> 고정자 (P_elec) */}
+          {/* ============ 전력 흐름 선 & 텍스트 ============ */}
+          {/* 선의 Y축 중심은 150 (블록의 세로 중앙) */}
+
+          {/* 1. 전원 <-> 고정자 (P_elec) */}
           <line
-            x1="170"
-            y1="140"
-            x2="260"
-            y2="140"
+            x1="220"
+            y1="150"
+            x2="360"
+            y2="150"
             className={`power-line ${Pelec < 0 ? "reverse" : ""} ${getFlowClass(Pelec)}`}
             strokeWidth={getStrokeWidth(Pelec)}
           />
-          <text x="215" y="125" fill="white" textAnchor="middle" fontSize="14">
+          <text
+            x="290"
+            y="110"
+            fill="white"
+            textAnchor="middle"
+            fontSize="22"
+            fontWeight="bold"
+          >
             P_elec = {Math.abs(Pelec).toFixed(0)}
           </text>
-          <text x="215" y="165" fill="#aaa" textAnchor="middle" fontSize="12">
-            {Pelec > 0 ? "전력 공급 ➔" : "역송(회생) ⬅"}
+          <text
+            x="290"
+            y="195"
+            fill={Pelec > 0 ? "#4ade80" : "#3b82f6"}
+            textAnchor="middle"
+            fontSize="20"
+            fontWeight="bold"
+          >
+            {Pelec > 0 ? "전력 공급 ➔" : "⬅ 회생 반환"}
           </text>
 
-          {/* 고정자 <-> 회전자 (P2, 공극 전력) */}
+          {/* 2. 고정자 <-> 회전자 (P2) */}
           <line
-            x1="380"
-            y1="140"
-            x2="470"
-            y2="140"
+            x1="540"
+            y1="150"
+            x2="680"
+            y2="150"
             className={`power-line ${Pelec < 0 ? "reverse" : ""} ${getFlowClass(Pelec)}`}
             strokeWidth={getStrokeWidth(P2)}
           />
-          <text x="425" y="125" fill="white" textAnchor="middle" fontSize="14">
+          <text
+            x="610"
+            y="110"
+            fill="white"
+            textAnchor="middle"
+            fontSize="22"
+            fontWeight="bold"
+          >
             P2 = {Math.abs(P2).toFixed(0)}
           </text>
-          <text x="425" y="165" fill="#aaa" textAnchor="middle" fontSize="12">
-            {Pelec > 0 ? "공극 전력 ➔" : "공극 전력 ⬅"}
+          <text
+            x="610"
+            y="195"
+            fill={Pelec > 0 ? "#4ade80" : "#3b82f6"}
+            textAnchor="middle"
+            fontSize="20"
+            fontWeight="bold"
+          >
+            {Pelec > 0 ? "공극 전력 ➔" : "⬅ 공극 전력"}
           </text>
 
-          {/* 회전자 <-> 부하 (P_mech) */}
+          {/* 3. 회전자 <-> 부하 (P_mech) */}
           <line
-            x1="590"
-            y1="140"
-            x2="680"
-            y2="140"
+            x1="860"
+            y1="150"
+            x2="1000"
+            y2="150"
             className={`power-line ${Pmech < 0 ? "reverse" : ""} ${getFlowClass(Pmech)}`}
             strokeWidth={getStrokeWidth(Pmech)}
           />
-          <text x="635" y="125" fill="white" textAnchor="middle" fontSize="14">
+          <text
+            x="930"
+            y="110"
+            fill="white"
+            textAnchor="middle"
+            fontSize="22"
+            fontWeight="bold"
+          >
             P_mech = {Math.abs(Pmech).toFixed(0)}
           </text>
-          <text x="635" y="165" fill="#aaa" textAnchor="middle" fontSize="12">
-            {Pmech > 0 ? "동력 출력 ➔" : "외부 동력 ⬅"}
+          <text
+            x="930"
+            y="195"
+            fill={Pmech > 0 ? "#4ade80" : "#3b82f6"}
+            textAnchor="middle"
+            fontSize="20"
+            fontWeight="bold"
+          >
+            {Pmech > 0 ? "동력 출력 ➔" : "⬅ 외부 동력"}
           </text>
 
-          {/* 회전자 -> 열 (P_loss) */}
+          {/* 4. 회전자 -> 열 손실 (P_loss) */}
           <line
-            x1="530"
-            y1="180"
-            x2="530"
-            y2="260"
+            x1="770"
+            y1="200"
+            x2="770"
+            y2="360"
             className={`power-line heat flow-forward`}
             strokeWidth={getStrokeWidth(Ploss)}
           />
+          <rect
+            x="795"
+            y="250"
+            width="160"
+            height="40"
+            rx="8"
+            fill="#1a1a1a"
+            opacity="0.8"
+          />
           <text
-            x="590"
-            y="225"
+            x="875"
+            y="278"
             fill="#ef4444"
             textAnchor="middle"
-            fontSize="14"
+            fontSize="22"
+            fontWeight="bold"
           >
             P_loss = {Ploss.toFixed(0)}
           </text>
+          {/* 하단 화살표 기호 추가 */}
           <text
-            x="480"
-            y="225"
+            x="730"
+            y="285"
             fill="#ef4444"
             textAnchor="middle"
-            fontSize="18"
+            fontSize="35"
           >
             ⬇
           </text>
