@@ -24,8 +24,8 @@ const SUBJECTS = [
     themeColor: "#ec4899",
   },
   {
-    id: "전기자기학",
-    label: "전기자기학",
+    id: "전자기학",
+    label: "전자기학",
     icon: "⚡",
     color: "from-amber-500 to-orange-500",
     borderColor: "border-amber-500",
@@ -203,6 +203,47 @@ export default function SubjectMapPage() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [focusNodes, setFocusNodes] = useState([]);
 
+  // GraphDB(Neo4j)에서 내려온 lecture_id를 최우선으로 탐색
+  const findLectureIdFromGraph = (node) => {
+    if (!node) return null;
+
+    // 1) 노드 자체에 lecture_id가 있으면 즉시 사용
+    if (node.lecture_id) return String(node.lecture_id);
+
+    const nodesById = new Map((graphData.nodes || []).map((n) => [n.id, n]));
+    const links = graphData.links || [];
+    const visited = new Set([node.id]);
+    const queue = [{ id: node.id, depth: 0 }];
+    const maxDepth = 3;
+
+    // 2) 인접 노드(Topic/Concept/Formula 관계)로 확장 탐색
+    while (queue.length) {
+      const { id: currentId, depth } = queue.shift();
+      if (depth >= maxDepth) continue;
+
+      const neighbors = [];
+      for (const link of links) {
+        const sId = typeof link.source === "object" ? link.source.id : link.source;
+        const tId = typeof link.target === "object" ? link.target.id : link.target;
+        if (sId === currentId) neighbors.push(tId);
+        if (tId === currentId) neighbors.push(sId);
+      }
+
+      for (const nextId of neighbors) {
+        if (!nextId || visited.has(nextId)) continue;
+        visited.add(nextId);
+
+        const nextNode = nodesById.get(nextId);
+        if (nextNode?.lecture_id) {
+          return String(nextNode.lecture_id);
+        }
+        queue.push({ id: nextId, depth: depth + 1 });
+      }
+    }
+
+    return null;
+  };
+
   // ----------------------------------------------------------------------
   // 2. 데이터 로딩 (API 호출)
   // ----------------------------------------------------------------------
@@ -310,16 +351,39 @@ export default function SubjectMapPage() {
   };
 
   // ✅ [추가됨] 강의 보기 버튼 클릭 핸들러
-  const handlePlayLecture = () => {
+  const handlePlayLecture = async () => {
     if (!selectedNode || !selectedNode.name) return;
 
-    const lectureId = NODE_TO_LECTURE_MAP[selectedNode.name];
+    // 1순위: GraphDB의 lecture_id 기반 연결
+    const graphLectureId = findLectureIdFromGraph(selectedNode);
+    let lectureId = graphLectureId;
+
+    // 2순위: 백엔드 Neo4j 조회 API로 이름/그룹/과목 기준 조회
+    if (!lectureId) {
+      try {
+        const res = await apiClient.get("/api/graph/resolve-lecture", {
+          params: {
+            name: selectedNode.name,
+            group: selectedNode.group,
+            subject: selectedSubject.id,
+          },
+        });
+        lectureId = res?.data?.lecture_id || null;
+      } catch (e) {
+        console.warn("resolve-lecture API 실패, fallback 매핑 사용:", e);
+      }
+    }
+
+    // 3순위: 레거시 하드코딩 fallback
+    if (!lectureId) {
+      lectureId = NODE_TO_LECTURE_MAP[selectedNode.name];
+    }
 
     if (lectureId) {
       move(`/user/videos/${lectureId}`);
     } else {
       alert(
-        `[${selectedNode.name}] 개념에 연결된 강의 영상이 아직 준비되지 않았습니다.`,
+        `[${selectedNode.name}] 개념에 연결된 강의 영상이 없습니다. Neo4j Concept/Topic 노드의 lecture_id를 확인해주세요.`,
       );
     }
   };
