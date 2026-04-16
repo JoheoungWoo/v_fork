@@ -308,7 +308,8 @@ const WIDGET_MAP = {
   /** 유도전동기: 분류도 + 유형별 실행(3상 케이지/권선/단상) — DB lecture_id 예: induction_motor_learning_hub */
   induction_motor_learning_hub: [
     lazy(
-      () => import("@/components/animations/machines/InductionMotorLearningHub"),
+      () =>
+        import("@/components/animations/machines/InductionMotorLearningHub"),
     ),
   ],
   /** 동기기 허브: 동기발전기/동기전동기 분류와 등가 모델 학습 */
@@ -316,6 +317,12 @@ const WIDGET_MAP = {
     lazy(
       () =>
         import("@/components/animations/machines/SynchronousMachineLearningHub"),
+    ),
+  ],
+  induction_machine_rmf_hub: [
+    lazy(
+      () =>
+        import("@/components/animations/machines/induction-motor/RotatingMagneticFieldApp"),
     ),
   ],
   // ==========================================
