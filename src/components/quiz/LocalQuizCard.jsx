@@ -10,7 +10,8 @@ import { useEffect, useState } from "react";
 const normalizeLatexText = (text) => {
   if (!text) return "";
   const strText = String(text);
-  if (!/\$\$|\\\[|\\\(|\$/.test(strText) && strText.includes("\\text{")) {
+  // \( … \) 는 \text{…} 안에 자주 들어가므로 여기서 제외 (전체 문자열을 KaTeX에 넘김)
+  if (!/\$\$|\\\[|\$/.test(strText) && strText.includes("\\text{")) {
     const parts = strText.split(/\\text{([^}]+)}/g);
     let result = "";
     for (let i = 0; i < parts.length; i++) {
@@ -54,7 +55,13 @@ const BlockMath = ({ math }) => {
 const AutoMathRenderer = ({ text, isBlock = true }) => {
   if (!text) return null;
   const cleanText = String(text).replace(/\\\$/g, "$");
-  if (!/\$\$|\\\[|\\\(|\$/.test(cleanText)) {
+
+  const hasDollar = /\$/.test(cleanText);
+  const hasDisplayFence = /(\$\$)|(\\\[)/.test(cleanText);
+
+  // 달러/대괄호 디스플레이 구분자가 없고 LaTeX 명령만 있는 경우 → 통째로 KaTeX
+  // (\text{...} 안에 \( \) 가 있을 때 이전 로직은 문자열을 잘못 쪼개 raw 백슬래시가 노출됨)
+  if (!hasDollar && !hasDisplayFence) {
     if (!cleanText.includes("\\")) return <span>{cleanText}</span>;
     return isBlock ? (
       <BlockMath math={cleanText} />
@@ -62,22 +69,33 @@ const AutoMathRenderer = ({ text, isBlock = true }) => {
       <InlineMath math={cleanText} />
     );
   }
+
+  // $...$, $$...$$, \[...\] 만 분리 (\\( \\) 는 분리하지 않음 — \\text 내부와 충돌)
   const parts = cleanText.split(
-    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[\s\S]*?\$|\\\([\s\S]*?\\\))/g,
+    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^$\n]*?\$)/g,
   );
   return (
-    <span className="whitespace-pre-wrap leading-relaxed">
+    <span className="whitespace-pre-wrap leading-relaxed break-words">
       {parts.map((part, i) => {
         if (!part) return null;
         if (part.startsWith("$$") && part.endsWith("$$"))
           return <BlockMath key={i} math={part.slice(2, -2)} />;
         if (part.startsWith("\\[") && part.endsWith("\\]"))
           return <BlockMath key={i} math={part.slice(2, -2)} />;
-        if (part.startsWith("\\(") && part.endsWith("\\)"))
-          return <InlineMath key={i} math={part.slice(2, -2)} />;
         if (part.startsWith("$") && part.endsWith("$"))
           return <InlineMath key={i} math={part.slice(1, -1)} />;
-        return <span key={i}>{part}</span>;
+        if (!part.includes("$") && part.includes("\\")) {
+          return isBlock ? (
+            <BlockMath key={i} math={part} />
+          ) : (
+            <InlineMath key={i} math={part} />
+          );
+        }
+        return (
+          <span key={i} className="break-words">
+            {part}
+          </span>
+        );
       })}
     </span>
   );
@@ -496,12 +514,12 @@ const LocalQuizCard = (props) => {
 
         {problemText && (
           <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100 break-keep">
-            <AutoMathRenderer text={problemText} isBlock={false} />
+            <AutoMathRenderer text={problemText} isBlock />
           </div>
         )}
 
         {/* ── 보기 ──────────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10 min-w-0">
           {choices.map((choice, index) => {
             const isCorrectChoice = index === correctIdx;
             let btnClass =
@@ -529,10 +547,10 @@ const LocalQuizCard = (props) => {
                 key={index}
                 onClick={() => handleChoiceClick(index)}
                 disabled={showSolution}
-                className={btnClass}
+                className={`${btnClass} min-w-0`}
               >
                 <span className={circleClass}>{index + 1}</span>
-                <span className="text-lg font-bold text-gray-800">
+                <span className="text-lg font-bold text-gray-800 min-w-0 flex-1 text-left overflow-x-auto">
                   <AutoMathRenderer text={choice} isBlock={false} />
                 </span>
               </button>

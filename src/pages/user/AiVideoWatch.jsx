@@ -159,21 +159,24 @@ export default function AiVideoWatch() {
 
               <div className="min-h-[400px]">
                 {activeTab === "quiz" && (
-                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-                    <div className="xl:col-span-8">
-                      <LocalQuizCard
-                        id={videoInfo.lecture_id}
-                        subject={videoInfo.subject} /* 🌟 요기를 추가! */
-                        onWrongAnswer={() => {
-                          if (WidgetComponents.length > 0) {
-                            handleTabChange("widget");
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="xl:col-span-4 xl:sticky xl:top-28">
-                      <EngineeringCalculator />
-                    </div>
+                  <div className="flex flex-col gap-8">
+                    <LocalQuizCard
+                      id={videoInfo.lecture_id}
+                      subject={videoInfo.subject} /* 🌟 요기를 추가! */
+                      onWrongAnswer={() => {
+                        if (WidgetComponents.length > 0) {
+                          handleTabChange("widget");
+                        }
+                      }}
+                    />
+                    <details className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <summary className="cursor-pointer select-none px-5 py-4 font-bold text-gray-700 bg-gray-50/80 hover:bg-gray-100/90 transition-colors">
+                        🔧 공학 계산기 (필요할 때만 펼치기)
+                      </summary>
+                      <div className="p-4 max-w-lg mx-auto border-t border-gray-100">
+                        <EngineeringCalculator />
+                      </div>
+                    </details>
                   </div>
                 )}
 
