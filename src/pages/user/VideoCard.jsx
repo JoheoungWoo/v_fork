@@ -1,3 +1,4 @@
+import { getVideoCatalogSubtitle, getVideoHeadline } from "@/utils/videoHeadings";
 import { Lock, Play } from "lucide-react";
 
 export default function VideoCard({ video, onRead, onOpenModal }) {
@@ -13,6 +14,8 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
 
   // 🌟 3. 호환성 매핑 완벽 제거! 백엔드에서 주는 lecture_id 바로 사용 (없으면 id 사용)
   const targetId = video.lecture_id || video.id;
+  const headline = getVideoHeadline(video);
+  const catalogSubtitle = getVideoCatalogSubtitle(video);
 
   return (
     <article
@@ -42,7 +45,7 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
           <>
             <img
               src={thumbnailSrc}
-              alt={video.title}
+              alt={headline}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => {
                 e.target.src =
@@ -63,9 +66,18 @@ export default function VideoCard({ video, onRead, onOpenModal }) {
         <span className="font-bold text-xs uppercase tracking-widest mb-2 block text-[#0047a5]">
           {video.subject || "전기공학 핵심"}
         </span>
-        <h2 className="text-2xl font-bold text-gray-900 mb-3 leading-tight line-clamp-2 min-h-[3.5rem]">
-          {video.title}
+        <h2
+          className={`text-2xl font-bold text-gray-900 leading-tight line-clamp-2 min-h-[3.5rem] ${
+            catalogSubtitle ? "mb-1" : "mb-3"
+          }`}
+        >
+          {headline}
         </h2>
+        {catalogSubtitle && (
+          <p className="text-sm text-slate-500 font-medium mb-3 line-clamp-1">
+            {catalogSubtitle}
+          </p>
+        )}
         <p className="text-gray-500 text-base mb-8 font-medium line-clamp-2">
           {video.description ||
             "해당 강의의 상세 정보를 곧 업데이트할 예정입니다."}

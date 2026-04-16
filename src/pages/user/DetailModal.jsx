@@ -1,7 +1,12 @@
+import { getVideoCatalogSubtitle, getVideoHeadline } from "@/utils/videoHeadings";
 import { X } from "lucide-react";
 
-const DetailModal = ({ selectedVideo, onClose, onRead }) => {
-  if (!selectedVideo) return null;
+const DetailModal = ({ video, selectedVideo, onClose, onRead }) => {
+  const v = video ?? selectedVideo;
+  if (!v) return null;
+  const headline = getVideoHeadline(v);
+  const catalogSubtitle = getVideoCatalogSubtitle(v);
+  const readId = v.lecture_id || v.id;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
@@ -17,8 +22,11 @@ const DetailModal = ({ selectedVideo, onClose, onRead }) => {
               강의 상세 안내
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900 leading-tight">
-              {selectedVideo.title}
+              {headline}
             </h2>
+            {catalogSubtitle && (
+              <p className="mt-2 text-lg text-slate-500 font-medium">{catalogSubtitle}</p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -30,7 +38,7 @@ const DetailModal = ({ selectedVideo, onClose, onRead }) => {
         <div className="p-8 overflow-y-auto">
           <div className="space-y-8">
             <p className="text-xl text-gray-600 leading-relaxed font-medium">
-              {selectedVideo.description}
+              {v.description}
             </p>
             <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
               <h4 className="text-base font-bold text-[#0047a5] uppercase tracking-wider mb-4 border-b border-gray-200 pb-2">
@@ -40,13 +48,13 @@ const DetailModal = ({ selectedVideo, onClose, onRead }) => {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-lg">카테고리</span>
                   <span className="text-gray-900 font-bold text-lg">
-                    {selectedVideo.category || "미분류"}
+                    {v.category || "미분류"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-lg">과목명</span>
                   <span className="text-gray-900 font-bold text-lg">
-                    {selectedVideo.subject || "-"}
+                    {v.subject || "-"}
                   </span>
                 </div>
               </div>
@@ -57,7 +65,7 @@ const DetailModal = ({ selectedVideo, onClose, onRead }) => {
           <button
             onClick={() => {
               onClose();
-              onRead(selectedVideo.id);
+              onRead(readId);
             }}
             className="w-full py-5 bg-[#0047a5] text-white text-xl font-extrabold rounded-xl shadow-lg hover:bg-blue-800 transition-colors"
           >
