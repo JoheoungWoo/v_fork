@@ -205,6 +205,12 @@ const NAME_ALIAS_TO_LECTURE = {
   로렌츠: "lorentz_force",
   플레밍왼손: "flemming_left_hand_3d",
   플레밍오른손: "9_flemming_right_hand_3d",
+  "3상 유도 전동기": "three_phase_induction_motor",
+  "3상유도전동기": "three_phase_induction_motor",
+  유도전동기: "induction_motor_learning_hub",
+  유도기: "induction_motor_learning_hub",
+  슬립: "three_phase_induction_motor",
+  "토크 속도 특성": "three_phase_induction_motor",
 };
 export default function SubjectMapPage() {
   const move = useMove("/user/videos");

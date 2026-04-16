@@ -8,6 +8,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import LocalQuizCard from "@/components/quiz/LocalQuizCard";
 import QnaCard from "@/components/quiz/QnaCard";
+import EngineeringCalculator from "@/components/animations/math/EngineeringCalculator";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
 import VideoInfo from "@/components/video/VideoInfo";
 import VideoPlayer from "@/components/video/VideoPlayer";
@@ -158,15 +159,22 @@ export default function AiVideoWatch() {
 
               <div className="min-h-[400px]">
                 {activeTab === "quiz" && (
-                  <LocalQuizCard
-                    id={videoInfo.lecture_id}
-                    subject={videoInfo.subject} /* 🌟 요기를 추가! */
-                    onWrongAnswer={() => {
-                      if (WidgetComponents.length > 0) {
-                        handleTabChange("widget");
-                      }
-                    }}
-                  />
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+                    <div className="xl:col-span-8">
+                      <LocalQuizCard
+                        id={videoInfo.lecture_id}
+                        subject={videoInfo.subject} /* 🌟 요기를 추가! */
+                        onWrongAnswer={() => {
+                          if (WidgetComponents.length > 0) {
+                            handleTabChange("widget");
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="xl:col-span-4 xl:sticky xl:top-28">
+                      <EngineeringCalculator />
+                    </div>
+                  </div>
                 )}
 
                 {/* 🌟 다중 인터랙티브 위젯 렌더링 영역 */}
