@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import GENERATED_WIDGET_MAP from "@/utils/generatedWidgetMap";
 
 const PowerTrianglePowerFactorLazy = lazy(
   () =>
@@ -344,6 +345,7 @@ const WIDGET_MAP = {
       () => import("@/components/animations/powers/VConnectionCT"),
     ),
   ],
+  ...GENERATED_WIDGET_MAP,
 };
 
 export default WIDGET_MAP;
