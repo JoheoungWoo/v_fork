@@ -92,10 +92,15 @@ const AutoMathRenderer = ({ text, isBlock = true }) => {
  *
  * 우선순위:
  *  1. EM 전용 ID (4_vector_calculus 등) → /api/em/vector-calc/quiz  (POST)
- *  2. 회로/전기 관련              → /api/circuit/random          (GET)
- *  3. 나머지                      → /api/math/random             (GET)
+ *  2. 전자기학 일반               → /api/em/random               (GET)
+ *  3. 회로/전기 관련              → /api/circuit/random          (GET)
+ *  4. 나머지                      → /api/math/random             (GET)
  */
 const EM_VECTOR_CALC_IDS = new Set(["4_vector_calculus"]);
+const EM_GENERAL_IDS = new Set(["em_coulomb", "1_coulombs_law"]);
+const EM_GENERAL_TYPE_ALIAS = {
+  "1_coulombs_law": "em_coulomb",
+};
 
 // 전자기학 과목 중 벡터미적분 외 추가될 경우 여기에 추가
 const EM_TOPIC_MAP = {
@@ -108,6 +113,18 @@ function resolveEndpoint(targetId, subjectName) {
     return {
       type: "em_vector_calc",
       topic: EM_TOPIC_MAP[targetId] ?? "random",
+    };
+  }
+
+  // 1-1) 전자기학 일반 퀴즈 (쿨롱 법칙 등)
+  if (
+    EM_GENERAL_IDS.has(targetId) ||
+    subjectName.includes("전자기") ||
+    targetId.toLowerCase().includes("coulomb")
+  ) {
+    return {
+      type: "em_general",
+      emType: EM_GENERAL_TYPE_ALIAS[targetId] || targetId,
     };
   }
 
@@ -145,6 +162,11 @@ async function fetchProblem(targetId, subjectName) {
     return normalizeVectorCalcResponse(res.data);
   }
 
+  if (route.type === "em_general") {
+    const res = await apiClient.get(`/api/em/random?type=${route.emType}`);
+    return res.data;
+  }
+
   if (route.type === "circuit") {
     const res = await apiClient.get(`/api/circuit/random?type=${targetId}`);
     return res.data;
@@ -171,6 +193,17 @@ async function recordAnswer(
       concept_name: targetId,
       is_correct: isCorrect,
       chosen_answer: chosenIdx ?? -1,
+      problem_latex: problemText,
+    });
+    return;
+  }
+
+  if (route.type === "em_general") {
+    await apiClient.post("/api/em/record", {
+      user_id: "anonymous_user",
+      concept_name: targetId,
+      is_correct: isCorrect,
+      chosen_answer: String(chosenIdx ?? -1),
       problem_latex: problemText,
     });
     return;
