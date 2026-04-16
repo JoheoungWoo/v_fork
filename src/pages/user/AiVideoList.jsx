@@ -117,8 +117,17 @@ function sortVideosForList(list) {
   const getCreatedAtMs = (v) => new Date(v?.created_at || 0).getTime();
   const getSubjectKey = (v) => String(v?.subject || "").trim();
   const getTitleKey = (v) => String(v?.title || "").trim();
+  const getNeoOrder = (v) =>
+    typeof v?.neo_order_in_tab === "number" ? v.neo_order_in_tab : null;
 
   return [...list].sort((a, b) => {
+    // ✅ 기준0) Neo4j Concept 트리 순서 (같은 탭 내)
+    const na = getNeoOrder(a);
+    const nb = getNeoOrder(b);
+    if (na !== null && nb !== null && na !== nb) return na - nb;
+    if (na !== null && nb === null) return -1;
+    if (na === null && nb !== null) return 1;
+
     // ✅ 기준1-1) subject
     const sa = getSubjectKey(a);
     const sb = getSubjectKey(b);
@@ -185,21 +194,44 @@ export default function AiVideoList() {
     fetchSubjects();
   }, []);
 
-  // 2. 전체 목록 1회 로드 — 탭 전환은 클라이언트에서 필터
+  // 2. 전체 목록 1회 로드 — Neo4j lecture-catalog 와 병합 후 탭·순서 결정
   useEffect(() => {
     const fetchLectures = async () => {
       try {
         setLoading(true);
-        const res = await apiClient.get("/api/video/list/all");
+        const [listRes, catalogRes] = await Promise.all([
+          apiClient.get("/api/video/list/all"),
+          apiClient.get("/api/graph/lecture-catalog").catch((e) => {
+            console.warn("Neo4j lecture-catalog 로드 실패(휴리스틱만 사용):", e);
+            return { data: null };
+          }),
+        ]);
 
         const rawArray =
-          res.data?.data || (Array.isArray(res.data) ? res.data : []);
+          listRes.data?.data ||
+          (Array.isArray(listRes.data) ? listRes.data : []);
 
-        const categorizedArray = rawArray.map((video) => ({
-          ...video,
-          subject: normalizeSubject(video.subject),
-          category: getCategory(video),
-        }));
+        const byLectureId =
+          catalogRes.data?.by_lecture_id &&
+          typeof catalogRes.data.by_lecture_id === "object"
+            ? catalogRes.data.by_lecture_id
+            : {};
+
+        const categorizedArray = rawArray.map((video) => {
+          const lid = String(video.lecture_id || video.id || "").trim();
+          const neo = lid ? byLectureId[lid] : null;
+          const subjectFromDb = normalizeSubject(video.subject);
+          const category =
+            neo?.tab_subject || getCategory({ ...video, subject: subjectFromDb });
+          return {
+            ...video,
+            subject: subjectFromDb,
+            category,
+            graph_concept: neo?.concept_name ?? null,
+            neo_order_in_tab:
+              typeof neo?.order_in_tab === "number" ? neo.order_in_tab : null,
+          };
+        });
         setAllLectures(categorizedArray);
       } catch (err) {
         console.error("❌ 강의 목록 로드 실패:", err);
