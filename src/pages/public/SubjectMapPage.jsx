@@ -1,6 +1,7 @@
 import apiClient from "@/api/core/apiClient";
 import FullMapGraph from "@/components/graph/FullMapGraph";
 import { useEffect, useState } from "react";
+import WIDGET_MAP from "@/utils/widgetData";
 
 // 수식 렌더링 라이브러리
 import { Latex } from "@/components/public/Latex";
@@ -192,6 +193,19 @@ const NODE_TO_LECTURE_MAP = {
   "AI Company Vision 영상": "vision_video",
   "비전 영상": "vision_video",
 };
+
+const NAME_ALIAS_TO_LECTURE = {
+  시정수: "8_time_constant",
+  시상수: "8_time_constant",
+  타임콘스탄트: "8_time_constant",
+  "시간 상수": "8_time_constant",
+  리액턴스: "7_reactance_3d",
+  "와이 델타": "3_circuit_ydelta",
+  "Y-델타": "3_circuit_ydelta",
+  로렌츠: "lorentz_force",
+  플레밍왼손: "flemming_left_hand_3d",
+  플레밍오른손: "9_flemming_right_hand_3d",
+};
 export default function SubjectMapPage() {
   const move = useMove("/user/videos");
 
@@ -202,6 +216,12 @@ export default function SubjectMapPage() {
   const [stats, setStats] = useState({ nodes: 0, links: 0 });
   const [selectedNode, setSelectedNode] = useState(null);
   const [focusNodes, setFocusNodes] = useState([]);
+
+  const normalizeName = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .replace(/[·,'"`~!@#$%^&*()_+=|[\]{};:<>/?\\-]/g, "");
 
   // GraphDB(Neo4j)에서 내려온 lecture_id를 최우선으로 탐색
   const findLectureIdFromGraph = (node) => {
@@ -377,6 +397,28 @@ export default function SubjectMapPage() {
     // 3순위: 레거시 하드코딩 fallback
     if (!lectureId) {
       lectureId = NODE_TO_LECTURE_MAP[selectedNode.name];
+    }
+
+    // 4순위: 동의어/유사어 기반 fallback (시정수=시상수 등)
+    if (!lectureId) {
+      const normalizedNodeName = normalizeName(selectedNode.name);
+      const aliasEntry = Object.entries(NAME_ALIAS_TO_LECTURE).find(([alias]) =>
+        normalizedNodeName.includes(normalizeName(alias)),
+      );
+      if (aliasEntry) {
+        lectureId = aliasEntry[1];
+      }
+    }
+
+    // 5순위: 위젯이 존재하는 키로라도 이동 (노드명 키워드 포함 매칭)
+    if (!lectureId) {
+      const normalizedNodeName = normalizeName(selectedNode.name);
+      const widgetKey = Object.keys(WIDGET_MAP).find((key) =>
+        normalizedNodeName.includes(normalizeName(key)),
+      );
+      if (widgetKey) {
+        lectureId = widgetKey;
+      }
     }
 
     if (lectureId) {
