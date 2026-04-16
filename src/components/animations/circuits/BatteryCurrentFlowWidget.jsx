@@ -129,7 +129,7 @@ function ParallelCircuitScene() {
   );
 
   return (
-    <>
+    <group position={[-0.55, 0, 0]}>
       <ambientLight intensity={0.9} />
       <directionalLight position={[4, 6, 7]} intensity={1.5} castShadow />
       <directionalLight position={[-4, -2, 3]} intensity={0.55} />
@@ -142,7 +142,7 @@ function ParallelCircuitScene() {
       <AnimatedPath points={topBridgePath} baseColor="#ef4e4e" flowColor="#69ff5b" active />
       <AnimatedPath points={bottomMainPath} baseColor="#22c55e" flowColor="#69ff5b" active speed={-1.4} />
       <AnimatedPath points={bottomBridgePath} baseColor="#22c55e" flowColor="#69ff5b" active speed={-1.4} />
-    </>
+    </group>
   );
 }
 
@@ -177,21 +177,22 @@ export default function BatteryCurrentFlowWidget() {
       <div
         style={{
           position: "absolute",
-          top: 28,
-          left: 34,
+          top: 24,
+          left: 0,
+          width: "100%",
           zIndex: 2,
           color: "#ffffff",
+          textAlign: "center",
           textShadow: "0 2px 8px rgba(0,0,0,0.25)",
         }}
       >
-        <div style={{ fontSize: "56px", fontWeight: 800, letterSpacing: "-1px" }}>
+        <div style={{ fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 800, letterSpacing: "-1px" }}>
           How Batteries Work
         </div>
         <div
           style={{
-            marginTop: 18,
-            marginLeft: 510,
-            fontSize: "38px",
+            marginTop: 8,
+            fontSize: "clamp(24px, 3.6vw, 38px)",
             fontWeight: 700,
           }}
         >
@@ -199,8 +200,10 @@ export default function BatteryCurrentFlowWidget() {
         </div>
         <div
           style={{
-            marginTop: 48,
-            fontSize: "28px",
+            marginTop: 26,
+            marginLeft: "max(24px, 6vw)",
+            textAlign: "left",
+            fontSize: "clamp(20px, 3vw, 28px)",
             fontWeight: 800,
             color: "#ffe44d",
           }}
@@ -213,11 +216,12 @@ export default function BatteryCurrentFlowWidget() {
         <div
           style={{
             position: "absolute",
-            left: "33%",
+            left: "50%",
+            transform: "translateX(-50%)",
             bottom: 118,
             zIndex: 2,
             color: "#ffe44d",
-            fontSize: "30px",
+            fontSize: "clamp(22px, 3vw, 30px)",
             fontWeight: 800,
             textShadow: "0 2px 8px rgba(0,0,0,0.25)",
           }}
@@ -229,7 +233,7 @@ export default function BatteryCurrentFlowWidget() {
       <div style={{ height: "720px" }}>
         <Canvas shadows dpr={[1, 2]}>
           <color attach="background" args={["#1245aa"]} />
-          <PerspectiveCamera makeDefault position={[0.95, 0.1, 7.2]} fov={36} />
+          <PerspectiveCamera makeDefault position={[0.15, 0.08, 8.4]} fov={42} />
           <OrbitControls
             enablePan={false}
             enableZoom={false}
