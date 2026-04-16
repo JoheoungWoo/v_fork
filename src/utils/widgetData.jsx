@@ -12,6 +12,9 @@ const PowerTrianglePowerFactorLazy = lazy(
  * 하나의 강의에 여러 위젯이 들어갈 수 있도록 모든 값은 배열([])로 관리합니다.
  */
 const WIDGET_MAP = {
+  // auto 생성 맵은 먼저 펼치고, 아래 수동 매핑으로 최종 우선순위를 보장합니다.
+  ...GENERATED_WIDGET_MAP,
+
   // ==========================================
   // ⚡ 회로이론 (Circuit Theory)
   // ==========================================
@@ -345,7 +348,6 @@ const WIDGET_MAP = {
       () => import("@/components/animations/powers/VConnectionCT"),
     ),
   ],
-  ...GENERATED_WIDGET_MAP,
 };
 
 export default WIDGET_MAP;
