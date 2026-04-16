@@ -1,6 +1,6 @@
 import { Center, OrbitControls, Text } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { motion } from "framer-motion-3d";
+import { animated, useSpring } from "@react-spring/three";
 import { useState } from "react";
 
 // --- 3D 코일 배치 데이터 ---
@@ -57,13 +57,43 @@ const MODES = [
   },
 ];
 
-// 스프링 애니메이션 설정
-const springTransition = {
-  type: "spring",
-  stiffness: 60,
-  damping: 12,
-  mass: 1,
-};
+// framer spring 대체: stiffness 60, damping 12 근사
+const springConfig = { mass: 1, tension: 60, friction: 12 };
+
+function NeutralNode({ visible, color }) {
+  const { scale } = useSpring({
+    scale: visible ? 1 : 0,
+    config: springConfig,
+  });
+
+  return (
+    <animated.mesh position={[0, 0, 0]} scale={scale}>
+      <sphereGeometry args={[0.12, 16, 16]} />
+      <meshStandardMaterial color={color} />
+    </animated.mesh>
+  );
+}
+
+function AnimatedCoil({ coil, color }) {
+  const { position, rotation, scale } = useSpring({
+    position: coil.pos,
+    rotation: coil.rot,
+    scale: coil.scale,
+    config: springConfig,
+  });
+
+  return (
+    <animated.mesh position={position} rotation={rotation} scale={scale}>
+      <cylinderGeometry args={COIL_GEOMETRY} />
+      <meshStandardMaterial color={color} metalness={0.6} roughness={0.4} />
+
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.16, 0.16, 1.3, 16, 10, true]} />
+        <meshStandardMaterial color="#f59e0b" wireframe />
+      </mesh>
+    </animated.mesh>
+  );
+}
 
 function WindingGroup({ type, color, position, label }) {
   const coils = CONFIGS[type];
@@ -80,35 +110,10 @@ function WindingGroup({ type, color, position, label }) {
         {label}
       </Text>
 
-      {/* Y결선의 중심 중성점 애니메이션 */}
-      <motion.mesh
-        position={[0, 0, 0]}
-        animate={{ scale: type === "Y" ? 1 : 0 }}
-        transition={springTransition}
-      >
-        <sphereGeometry args={[0.12, 16, 16]} />
-        <meshStandardMaterial color={color} />
-      </motion.mesh>
+      <NeutralNode visible={type === "Y"} color={color} />
 
-      {/* 코일 애니메이션 적용 */}
       {coils.map((coil, idx) => (
-        <motion.mesh
-          key={idx}
-          animate={{
-            position: coil.pos,
-            rotation: coil.rot,
-            scale: coil.scale,
-          }}
-          transition={springTransition}
-        >
-          <cylinderGeometry args={COIL_GEOMETRY} />
-          <meshStandardMaterial color={color} metalness={0.6} roughness={0.4} />
-
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.16, 0.16, 1.3, 16, 10, true]} />
-            <meshStandardMaterial color="#f59e0b" wireframe />
-          </mesh>
-        </motion.mesh>
+        <AnimatedCoil key={`${type}-${idx}`} coil={coil} color={color} />
       ))}
     </group>
   );
