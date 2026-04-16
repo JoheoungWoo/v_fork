@@ -1,9 +1,8 @@
-import { Cylinder, OrbitControls, Text } from "@react-three/drei";
+import { Cylinder, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-// 제어 방식별 설명 데이터
 const CONTROL_METHODS = {
   vf: {
     title: "주파수 (V/f) 제어",
@@ -24,24 +23,24 @@ const CONTROL_METHODS = {
 };
 
 // 3D 모터 컴포넌트
-function MotorModel({ nrSpeed, nsSpeed, poles }) {
+function MotorModel({ nrSpeed, nsSpeed, poles, isPlaying }) {
   const rotorRef = useRef();
   const fieldRef = useRef();
 
   useFrame((state, delta) => {
-    // 시각적 편의를 위해 스케일을 0.05로 증가 (속도 변화가 더 잘 보이도록)
+    // isPlaying이 false면 회전을 멈춤 (Return)
+    if (!isPlaying) return;
+
     if (rotorRef.current) rotorRef.current.rotation.y -= nrSpeed * 0.05 * delta;
     if (fieldRef.current) fieldRef.current.rotation.y -= nsSpeed * 0.05 * delta;
   });
 
-  // 극수(Poles)에 맞춰 N극(빨강), S극(파랑) 조각 생성
   const poleSegments = [];
   const angle = (Math.PI * 2) / poles;
   for (let i = 0; i < poles; i++) {
     const isNorth = i % 2 === 0;
     poleSegments.push(
       <mesh key={i} rotation={[0, i * angle, 0]}>
-        {/* 원기둥의 일부만 렌더링하여 호(Arc) 모양 생성 (틈새를 위해 angle * 0.85 적용) */}
         <cylinderGeometry
           args={[2.1, 2.1, 3.9, 16, 1, true, 0, angle * 0.85]}
         />
@@ -57,10 +56,7 @@ function MotorModel({ nrSpeed, nsSpeed, poles }) {
 
   return (
     <group rotation={[Math.PI / 8, -Math.PI / 6, 0]}>
-      {/* 회전 자기장 (동적으로 쪼개진 N/S 극) */}
       <group ref={fieldRef}>{poleSegments}</group>
-
-      {/* 고정자 (Stator) */}
       <Cylinder
         args={[2, 2, 3.8, 32, 1, true]}
         material-color="#64748b"
@@ -68,8 +64,6 @@ function MotorModel({ nrSpeed, nsSpeed, poles }) {
         material-transparent
         material-opacity={0.2}
       />
-
-      {/* 회전자 (Rotor) */}
       <group ref={rotorRef}>
         <Cylinder
           args={[1.8, 1.8, 3.8, 32]}
@@ -77,34 +71,23 @@ function MotorModel({ nrSpeed, nsSpeed, poles }) {
           material-metalness={0.6}
           material-roughness={0.4}
         />
-        {/* 축 (Shaft) */}
         <Cylinder
           args={[0.3, 0.3, 6, 16]}
           material-color="#cbd5e1"
           material-metalness={0.8}
         />
-        {/* 회전 확인용 마커 */}
         <mesh position={[0, 1.9, 1.5]}>
           <boxGeometry args={[0.2, 0.2, 0.5]} />
           <meshStandardMaterial color="#22c55e" />
         </mesh>
       </group>
-
-      <Text
-        position={[0, 3.5, 0]}
-        fontSize={0.4}
-        color="#1e293b"
-        anchorX="center"
-        anchorY="middle"
-      >
-        N/S 자극 분할 3D 모델
-      </Text>
     </group>
   );
 }
 
 export default function InductionMotorSimulator() {
   const [method, setMethod] = useState("pole");
+  const [isPlaying, setIsPlaying] = useState(true); // 재생 상태
 
   const [frequency, setFrequency] = useState(60);
   const [poles, setPoles] = useState(4);
@@ -126,16 +109,41 @@ export default function InductionMotorSimulator() {
   currentSlip = Math.min(currentSlip, 0.99);
   const Nr = Math.max(0, Ns * (1 - currentSlip));
 
+  // 스페이스바 이벤트 리스너 등록
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // 입력창 등에서 스페이스바를 누를 때는 제외
+      if (e.code === "Space" && e.target.tagName !== "INPUT") {
+        e.preventDefault(); // 스페이스바로 인한 스크롤 방지
+        setIsPlaying((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <div className="w-full max-w-5xl bg-white rounded-2xl shadow-xl overflow-hidden font-sans border border-slate-200">
       <div className="h-[400px] bg-slate-50 relative">
         <Canvas>
           <ambientLight intensity={0.7} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
-          {/* 변경점: poles 값을 MotorModel에 전달 */}
-          <MotorModel nrSpeed={Nr} nsSpeed={Ns} poles={poles} />
+          <MotorModel
+            nrSpeed={Nr}
+            nsSpeed={Ns}
+            poles={poles}
+            isPlaying={isPlaying}
+          />
           <OrbitControls enableZoom={false} />
         </Canvas>
+
+        {/* 재생/일시정지 버튼 */}
+        <button
+          onClick={() => setIsPlaying(!isPlaying)}
+          className="absolute top-4 left-4 bg-white/90 hover:bg-white text-slate-800 px-4 py-2 rounded-lg font-bold shadow-md transition-colors flex items-center gap-2"
+        >
+          {isPlaying ? "⏸ 일시정지 (Space)" : "▶ 재생 (Space)"}
+        </button>
 
         <div className="absolute top-4 right-4 bg-black/80 text-white p-4 rounded-xl backdrop-blur-sm border border-slate-700">
           <div className="mb-2">
@@ -150,12 +158,71 @@ export default function InductionMotorSimulator() {
               {Math.round(Nr)} RPM
             </span>
           </div>
-          <div className="mt-2 text-xs text-slate-500 text-right">
-            현재 슬립 (s): {(currentSlip * 100).toFixed(1)}%
-          </div>
         </div>
+
+        {/* ⏸ 일시정지 시 나타나는 상태 표시 모달 (Modal) */}
+        {!isPlaying && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200 transform scale-100 animate-in fade-in zoom-in duration-200">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-slate-800">
+                  ⏸ 시뮬레이션 일시정지
+                </h3>
+              </div>
+
+              <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">제어 방식</span>
+                  <span className="text-slate-800 font-bold">
+                    {CONTROL_METHODS[method].title}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">
+                    현재 극수 (P)
+                  </span>
+                  <span className="text-blue-600 font-bold">
+                    {poles}극 (N/S {poles}분할)
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">
+                    입력 주파수 (f)
+                  </span>
+                  <span className="text-slate-800 font-bold">
+                    {frequency} Hz
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-500 font-medium">
+                    동기 속도 (Ns)
+                  </span>
+                  <span className="text-blue-600 font-bold">
+                    {Math.round(Ns)} RPM
+                  </span>
+                </div>
+                <div className="flex justify-between pb-1">
+                  <span className="text-slate-500 font-medium">
+                    현재 슬립 (s)
+                  </span>
+                  <span className="text-amber-500 font-bold">
+                    {(currentSlip * 100).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsPlaying(true)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md"
+              >
+                ▶ 계속하기
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* 하단 컨트롤 영역 (기존과 동일하므로 생략 없이 포함) */}
       <div className="p-6">
         <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-4">
           {Object.entries(CONTROL_METHODS).map(([key, data]) => (
@@ -200,7 +267,6 @@ export default function InductionMotorSimulator() {
                 />
               </div>
             )}
-
             {method === "pole" && (
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-3">
@@ -219,7 +285,6 @@ export default function InductionMotorSimulator() {
                 </div>
               </div>
             )}
-
             {method === "voltage" && (
               <div>
                 <label className="flex justify-between text-sm font-bold text-slate-700 mb-2">
@@ -236,7 +301,6 @@ export default function InductionMotorSimulator() {
                 />
               </div>
             )}
-
             {method === "resistance" && (
               <div>
                 <label className="flex justify-between text-sm font-bold text-slate-700 mb-2">
