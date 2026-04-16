@@ -43,7 +43,7 @@ const Motor = ({ direction, speed }) => {
         outlineWidth={0.05}
         outlineColor="black"
       >
-        DC Motor
+        DC 모터
       </Text>
     </group>
   );
@@ -143,11 +143,15 @@ export default function HBridgeSimulation() {
           backgroundColor: "#3a4250",
           color: "white",
           display: "flex",
-          gap: "20px",
-          alignItems: "center",
+          flexDirection: "column",
+          gap: "12px",
         }}
       >
-        <div>
+        <div style={{ fontSize: "15px", lineHeight: 1.45, opacity: 0.95 }}>
+          <strong>전기기기 · 정류기</strong> — 정류(반파·전파·평활) 이후 DC 모터에 H-bridge로
+          극성·PWM을 인가하는 구간을 시뮬레이션합니다.
+        </div>
+        <div style={{ display: "flex", gap: "20px", alignItems: "center", flexWrap: "wrap" }}>
           <strong>방향 제어:</strong>
           <button
             onClick={() => setDirection("forward")}
@@ -189,7 +193,7 @@ export default function HBridgeSimulation() {
             역방향 (Q3, Q2)
           </button>
         </div>
-        <div style={{ flexGrow: 1 }}>
+        <div style={{ flexGrow: 1, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
           <strong>전류 세기 (속도): {speed}</strong>
           <input
             type="range"

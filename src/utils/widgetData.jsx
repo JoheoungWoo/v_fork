@@ -185,6 +185,13 @@ const WIDGET_MAP = {
       () => import("@/components/animations/circuits/BatteryCurrentFlowWidget"),
     ),
   ],
+  /**
+   * 정류기(단상 반파·전파·평활) 토픽과 같은 가지 — Neo4j에서 Concept를 정류기 Topic 하위로 옮긴 뒤
+   * `scripts/neo4j_reparent_h_bridge_under_rectifier.cypher` 실행을 권장합니다.
+   */
+  h_bridge_control: [
+    lazy(() => import("@/components/animations/machines/HBridgeSimulation")),
+  ],
 
   // ==========================================
   // ⚙️ 전기기기 (Electrical Machines)
@@ -302,9 +309,6 @@ const WIDGET_MAP = {
   ],
   lorentz_force: [
     lazy(() => import("@/components/animations/machines/LorentzForceWidget")),
-  ],
-  h_bridge_control: [
-    lazy(() => import("@/components/animations/machines/HBridgeSimulation")),
   ],
   three_phase_induction_motor: [
     lazy(
