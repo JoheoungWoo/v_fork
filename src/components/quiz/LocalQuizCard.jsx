@@ -7,6 +7,49 @@ import { useEffect, useState } from "react";
 // ──────────────────────────────────────────────────────────────────────────────
 // KaTeX 렌더러
 // ──────────────────────────────────────────────────────────────────────────────
+/**
+ * LaTeX 인라인 구분자 \\( … \\) 를 $ … $ 로 바꿉니다 (AutoMathRenderer 분기와 호환).
+ * 중첩 \\( … \\) 도 depth 로 처리합니다.
+ */
+const convertLatexParenDelimiters = (str) => {
+  const s = String(str);
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    if (s[i] === "\\" && s[i + 1] === "(") {
+      let depth = 1;
+      let j = i + 2;
+      while (j < s.length && depth > 0) {
+        if (s[j] === "\\" && j + 1 < s.length) {
+          if (s[j + 1] === "(") {
+            depth += 1;
+            j += 2;
+          } else if (s[j + 1] === ")") {
+            depth -= 1;
+            j += 2;
+          } else {
+            j += 1;
+          }
+        } else {
+          j += 1;
+        }
+      }
+      if (depth === 0) {
+        const inner = s.slice(i + 2, j - 2);
+        out += `$${inner}$`;
+        i = j;
+        continue;
+      }
+      // 닫는 \\) 없음 — 남은 문자열 그대로 붙이고 종료
+      out += s.slice(i);
+      break;
+    }
+    out += s[i];
+    i += 1;
+  }
+  return out;
+};
+
 const normalizeLatexText = (text) => {
   if (!text) return "";
   const strText = String(text);
@@ -34,7 +77,12 @@ const InlineMath = ({ math }) => {
     displayMode: false,
     strict: "ignore",
   });
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <span
+      className="inline-block max-w-full align-middle [&_.katex]:whitespace-normal"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 };
 
 const BlockMath = ({ math }) => {
@@ -54,7 +102,7 @@ const BlockMath = ({ math }) => {
 
 const AutoMathRenderer = ({ text, isBlock = true }) => {
   if (!text) return null;
-  const cleanText = String(text).replace(/\\\$/g, "$");
+  const cleanText = convertLatexParenDelimiters(String(text).replace(/\\\$/g, "$"));
 
   const hasDollar = /\$/.test(cleanText);
   const hasDisplayFence = /(\$\$)|(\\\[)/.test(cleanText);
@@ -70,12 +118,15 @@ const AutoMathRenderer = ({ text, isBlock = true }) => {
     );
   }
 
-  // $...$, $$...$$, \[...\] 만 분리 (\\( \\) 는 분리하지 않음 — \\text 내부와 충돌)
+  // $...$, $$...$$, \[...\] 분리 (\\( \\) 는 위에서 $ 로 정규화됨)
   const parts = cleanText.split(
     /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^$\n]*?\$)/g,
   );
+  const wrapClass = isBlock
+    ? "whitespace-pre-wrap leading-relaxed break-words"
+    : "whitespace-normal leading-relaxed break-words max-w-full [word-break:break-word]";
   return (
-    <span className="whitespace-pre-wrap leading-relaxed break-words">
+    <span className={wrapClass}>
       {parts.map((part, i) => {
         if (!part) return null;
         if (part.startsWith("$$") && part.endsWith("$$"))
@@ -513,7 +564,7 @@ const LocalQuizCard = (props) => {
         )}
 
         {problemText && (
-          <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100 break-keep">
+          <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100 break-words [overflow-wrap:anywhere]">
             <AutoMathRenderer text={problemText} isBlock />
           </div>
         )}
@@ -523,7 +574,7 @@ const LocalQuizCard = (props) => {
           {choices.map((choice, index) => {
             const isCorrectChoice = index === correctIdx;
             let btnClass =
-              "p-6 text-left rounded-2xl border-2 transition-all flex items-center gap-4 group ";
+              "p-6 text-left rounded-2xl border-2 transition-all flex items-start gap-4 group ";
             let circleClass =
               "w-10 h-10 flex items-center justify-center rounded-full font-black shrink-0 transition-colors ";
 
@@ -550,7 +601,7 @@ const LocalQuizCard = (props) => {
                 className={`${btnClass} min-w-0`}
               >
                 <span className={circleClass}>{index + 1}</span>
-                <span className="text-lg font-bold text-gray-800 min-w-0 flex-1 text-left overflow-x-auto">
+                <span className="text-lg font-bold text-gray-800 min-w-0 flex-1 text-left break-words [overflow-wrap:anywhere]">
                   <AutoMathRenderer text={choice} isBlock={false} />
                 </span>
               </button>
