@@ -249,7 +249,6 @@ const WIDGET_MAP = {
     lazy(
       () => import("@/components/animations/machines/NeonYYTransformerWidget"),
     ),
-    lazy(() => import("@/components/animations/machines/RealTransformer3D")),
   ],
   /** Supabase 등 별칭 */
   transformer_yy_delta: [

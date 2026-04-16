@@ -43,14 +43,33 @@ export default function VideoPlayList({ currentLectureId }) {
       (v) => v.subject === currentVideo.subject,
     );
 
-    // ✅ 2. title 기준 정렬 (숫자 + "강")
-    const sorted = filtered.sort((a, b) => {
-      const getOrder = (title = "") => {
-        const match = title.trim().match(/^(\d+)\s*강/);
-        return match ? parseInt(match[1], 10) : 9999;
-      };
+    const getLectureOrder = (title) => {
+      // 1) \b(단어 경계) 제거
+      // 2) ^(시작점) 제거: "[기초수학] 1강" 처럼 앞에 글자가 있어도 번호를 찾도록 유연화
+      const match = String(title || "").match(/(\d+)\s*강/);
+      return match ? parseInt(match[1], 10) : null;
+    };
 
-      return getOrder(a.title) - getOrder(b.title);
+    const getCreatedAtMs = (v) => new Date(v?.created_at || 0).getTime();
+
+    // ✅ 2. title 기준 정렬 (강 번호) + tie-break(업로드일 최신순)
+    // 주의: Array.prototype.sort는 in-place이므로 복사본을 정렬합니다.
+    const sorted = [...filtered].sort((a, b) => {
+      const oa = getLectureOrder(a?.title);
+      const ob = getLectureOrder(b?.title);
+
+      // 1) 둘 다 'N강' 번호가 있는 경우 -> 강 번호 오름차순, 같으면 최신 업로드 순
+      if (oa !== null && ob !== null) {
+        if (oa !== ob) return oa - ob;
+        return getCreatedAtMs(b) - getCreatedAtMs(a);
+      }
+
+      // 2) 한쪽만 'N강' 번호가 있는 경우 -> 번호가 있는 것을 무조건 앞으로 배치
+      if (oa !== null && ob === null) return -1;
+      if (oa === null && ob !== null) return 1;
+
+      // 3) 둘 다 번호가 없는 경우 -> 최신 업로드 순
+      return getCreatedAtMs(b) - getCreatedAtMs(a);
     });
 
     return {

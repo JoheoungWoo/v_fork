@@ -1,6 +1,6 @@
+import { animated, useSpring } from "@react-spring/three";
 import { OrbitControls, PerspectiveCamera, Text } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { animated, useSpring } from "@react-spring/three";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 

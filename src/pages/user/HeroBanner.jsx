@@ -1,3 +1,3 @@
-const HeroBanner = ({ currentCategoryData, total }) => <>사랑</>;
+const HeroBanner = ({ currentCategoryData, total }) => <></>;
 
 export default HeroBanner;

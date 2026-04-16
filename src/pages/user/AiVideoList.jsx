@@ -119,18 +119,49 @@ const getCategory = (video) => {
 };
 
 function sortVideosForList(list) {
+  const getLectureOrder = (title) => {
+    // 1) \b(단어 경계) 제거
+    // 2) ^(시작점) 제거: "[기초수학] 1강" 처럼 앞에 글자가 있어도 번호를 찾도록 유연화
+    const m = String(title || "").match(/(\d+)\s*강/);
+    return m ? parseInt(m[1], 10) : null;
+  };
+
+  const getCreatedAtMs = (v) => new Date(v?.created_at || 0).getTime();
+  const getSubjectKey = (v) => String(v?.subject || "").trim();
+  const getTitleKey = (v) => String(v?.title || "").trim();
+
   return [...list].sort((a, b) => {
-    const getOrder = (title) => {
-      const m = (title || "").match(/^(\d+)\s*강/);
-      return m ? parseInt(m[1], 10) : 9999;
-    };
-    const oa = getOrder(a.title);
-    const ob = getOrder(b.title);
-    if (oa !== ob) return oa - ob;
-    const ta = new Date(a.created_at || 0).getTime();
-    const tb = new Date(b.created_at || 0).getTime();
-    return tb - ta;
+    // ✅ 기준1-1) subject
+    const sa = getSubjectKey(a);
+    const sb = getSubjectKey(b);
+    if (sa !== sb) return sa.localeCompare(sb, "ko");
+
+    // ✅ 기준1-2) title (N강 우선 정렬)
+    const oa = getLectureOrder(a?.title);
+    const ob = getLectureOrder(b?.title);
+
+    // 1) 둘 다 'N강' 번호가 있는 경우 -> 강 번호 오름차순 (1강 -> 2강 -> 3강)
+    if (oa !== null && ob !== null) {
+      if (oa !== ob) return oa - ob;
+      // 강 번호가 완전히 똑같다면 최신 업로드 순으로 타이브레이크
+      return getCreatedAtMs(b) - getCreatedAtMs(a);
+    }
+
+    // 2) 한쪽만 'N강' 번호가 있는 경우 -> 번호가 있는 것을 무조건 앞으로 배치
+    if (oa !== null && ob === null) return -1;
+    if (oa === null && ob !== null) return 1;
+
+    // 3) 둘 다 번호가 없는 경우 (예: OT, 공지사항) -> title 사전순, 같으면 최신 업로드 순
+    const ta = getTitleKey(a);
+    const tb = getTitleKey(b);
+    if (ta !== tb) return ta.localeCompare(tb, "ko");
+    return getCreatedAtMs(b) - getCreatedAtMs(a);
   });
+}
+
+function sortVideosByCreatedAtDesc(list) {
+  const getCreatedAtMs = (v) => new Date(v?.created_at || 0).getTime();
+  return [...list].sort((a, b) => getCreatedAtMs(b) - getCreatedAtMs(a));
 }
 
 export default function AiVideoList() {
@@ -171,7 +202,8 @@ export default function AiVideoList() {
     if (!allLectures || allLectures.length === 0) return [];
 
     if (activeTab === "전체") {
-      return sortVideosForList(allLectures);
+      // ✅ 전체보기: 업로드(생성)일 최신순 정렬
+      return sortVideosByCreatedAtDesc(allLectures);
     }
 
     const filtered = allLectures.filter((v) => v.category === activeTab);
