@@ -108,6 +108,11 @@ const EM_TOPIC_MAP = {
 };
 
 function resolveEndpoint(targetId, subjectName) {
+  // 0) 로렌츠 힘 전용(전기기기/전자기학 브릿지) → 새 퀴즈 엔드포인트 사용
+  if (targetId === "lorentz_force") {
+    return { type: "lecture_quiz" };
+  }
+
   // 1) EM 벡터미적분 계열
   if (EM_VECTOR_CALC_IDS.has(targetId)) {
     return {
@@ -153,6 +158,13 @@ function resolveEndpoint(targetId, subjectName) {
 // ──────────────────────────────────────────────────────────────────────────────
 async function fetchProblem(targetId, subjectName) {
   const route = resolveEndpoint(targetId, subjectName);
+
+  if (route.type === "lecture_quiz") {
+    const res = await apiClient.get("/api/quiz/lecture", {
+      params: { lecture_id: targetId },
+    });
+    return res.data.quiz || res.data;
+  }
 
   if (route.type === "em_vector_calc") {
     // POST /api/em/vector-calc/quiz  { topic: "random" }
