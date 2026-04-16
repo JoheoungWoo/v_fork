@@ -1,4 +1,6 @@
 import FlashcardWidget from "@/components/animations/FlashcardWidget";
+import apiClient from "@/api/core/apiClient";
+import { getQuestionList } from "@/api/questionApi";
 import RecommendedVideo from "@/components/video/RecommendedVideo";
 import useMove from "@/hooks/useMove";
 import { ForwardIcon } from "lucide-react";
@@ -159,6 +161,14 @@ export default function UserDashboard() {
   const [schedules, setSchedules] = useState([]);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(true);
   const [scheduleError, setScheduleError] = useState(null);
+  const [pipelineKpi, setPipelineKpi] = useState({
+    generatedQuizTotal: 0,
+    graphNodeTotal: 0,
+    graphLinkTotal: 0,
+    machineLectureTotal: 0,
+    updatedAt: null,
+  });
+  const [isLoadingPipelineKpi, setIsLoadingPipelineKpi] = useState(true);
 
   useEffect(() => {
     const fetchSchedules = async () => {
@@ -177,6 +187,59 @@ export default function UserDashboard() {
       }
     };
     fetchSchedules();
+  }, []);
+
+  useEffect(() => {
+    const fetchPipelineKpi = async () => {
+      setIsLoadingPipelineKpi(true);
+      try {
+        const [questionRes, graphRes, lectureRes] = await Promise.all([
+          getQuestionList({ page: 1, size: 1 }),
+          apiClient.get(
+            `/api/graph/full-map/${encodeURIComponent("전기기기")}?include_formulas=true`,
+          ),
+          apiClient.get("/api/video/list/all"),
+        ]);
+
+        const generatedQuizTotal = questionRes?.total || 0;
+        const graphNodeTotal = graphRes?.data?.nodes?.length || 0;
+        const graphLinkTotal = graphRes?.data?.links?.length || 0;
+        const lectureRows = Array.isArray(lectureRes?.data?.data)
+          ? lectureRes.data.data
+          : Array.isArray(lectureRes?.data)
+            ? lectureRes.data
+            : [];
+        const machineLectureTotal = lectureRows.filter((row) => {
+          const subject = String(row?.subject || "");
+          const idStr = String(row?.lecture_id || row?.id || "").toLowerCase();
+          return (
+            subject.includes("전기기기") ||
+            idStr.includes("motor") ||
+            idStr.includes("generator") ||
+            idStr.includes("transformer") ||
+            idStr.includes("synchronous") ||
+            idStr.includes("induction")
+          );
+        }).length;
+
+        setPipelineKpi({
+          generatedQuizTotal,
+          graphNodeTotal,
+          graphLinkTotal,
+          machineLectureTotal,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        setPipelineKpi((prev) => ({
+          ...prev,
+          updatedAt: new Date().toISOString(),
+        }));
+      } finally {
+        setIsLoadingPipelineKpi(false);
+      }
+    };
+
+    fetchPipelineKpi();
   }, []);
 
   return (
@@ -334,6 +397,11 @@ export default function UserDashboard() {
             <p className="text-slate-300 text-sm mt-2">
               생성 → 풀이 → 분석 → 3D 튜터링까지 한 흐름으로 연결됩니다.
             </p>
+            <p className="text-slate-500 text-xs mt-2">
+              {isLoadingPipelineKpi
+                ? "KPI 동기화 중..."
+                : `최근 동기화: ${pipelineKpi.updatedAt ? new Date(pipelineKpi.updatedAt).toLocaleString() : "-"}`}
+            </p>
           </div>
           <button
             type="button"
@@ -373,6 +441,53 @@ export default function UserDashboard() {
               </button>
             </article>
           ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <article className="rounded-xl border border-indigo-400/30 bg-indigo-500/10 p-4">
+            <p className="text-[11px] font-bold tracking-wider text-indigo-200">
+              QUIZ GENERATED
+            </p>
+            <p className="text-3xl font-extrabold text-white mt-2">
+              {isLoadingPipelineKpi
+                ? "-"
+                : pipelineKpi.generatedQuizTotal.toLocaleString()}
+            </p>
+            <p className="text-xs text-indigo-100/80 mt-1">
+              Python 자동 생성 파이프라인 누적 문제 수
+            </p>
+          </article>
+
+          <article className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+            <p className="text-[11px] font-bold tracking-wider text-emerald-200">
+              GRAPH COVERAGE
+            </p>
+            <p className="text-3xl font-extrabold text-white mt-2">
+              {isLoadingPipelineKpi
+                ? "-"
+                : `${pipelineKpi.graphNodeTotal.toLocaleString()} nodes`}
+            </p>
+            <p className="text-xs text-emerald-100/80 mt-1">
+              전기기기 그래프 연결 수:{" "}
+              {isLoadingPipelineKpi
+                ? "-"
+                : pipelineKpi.graphLinkTotal.toLocaleString()}
+            </p>
+          </article>
+
+          <article className="rounded-xl border border-violet-400/30 bg-violet-500/10 p-4">
+            <p className="text-[11px] font-bold tracking-wider text-violet-200">
+              3D TUTOR READY
+            </p>
+            <p className="text-3xl font-extrabold text-white mt-2">
+              {isLoadingPipelineKpi
+                ? "-"
+                : pipelineKpi.machineLectureTotal.toLocaleString()}
+            </p>
+            <p className="text-xs text-violet-100/80 mt-1">
+              전기기기 3D 튜터링 연계 가능한 강의 수
+            </p>
+          </article>
         </div>
       </section>
 
