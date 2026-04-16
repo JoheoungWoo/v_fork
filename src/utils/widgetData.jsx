@@ -1,5 +1,5 @@
-import { lazy } from "react";
 import GENERATED_WIDGET_MAP from "@/utils/generatedWidgetMap";
+import { lazy } from "react";
 
 const PowerTrianglePowerFactorLazy = lazy(
   () =>
@@ -178,6 +178,10 @@ const WIDGET_MAP = {
   ],
   bridge_diode_rectifier: [
     lazy(() => import("@/components/animations/DcRectificationWidget")),
+    lazy(
+      () =>
+        import("@/components/animations/circuits/BridgeRectifierFlowCompareWidget"),
+    ),
   ],
 
   // ==========================================
