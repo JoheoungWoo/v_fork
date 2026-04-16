@@ -6,6 +6,49 @@ import { useEffect, useState } from "react";
 // 🌟 방금 만든 오답노트 컴포넌트 임포트 (경로는 실제 위치에 맞게 수정)
 import WrongAnswerNote from "@/components/animations/WrongAnswerNote";
 
+const AI_PIPELINE_STEPS = [
+  {
+    key: "gen",
+    title: "1) Python 퀴즈 자동 생성기",
+    description:
+      "문항 생성/정답/해설을 자동 생산해 문제 저장소로 공급합니다.",
+    badge: "AUTO GEN",
+    tone: "from-indigo-500 to-blue-500",
+    ctaLabel: "문제 저장소 보기",
+    ctaPath: "/user/problems",
+  },
+  {
+    key: "ui",
+    title: "2) React 기반 퀴즈 UI",
+    description:
+      "생성된 문제를 즉시 풀이하고 정답/오답 반응을 수집합니다.",
+    badge: "QUIZ UI",
+    tone: "from-blue-500 to-cyan-500",
+    ctaLabel: "퀴즈 화면 이동",
+    ctaPath: "/user/problems",
+  },
+  {
+    key: "graph",
+    title: "3) Neo4j 지식그래프 취약점 분석",
+    description:
+      "오답 패턴을 그래프 노드에 반영해 약한 개념과 연결 공식을 추적합니다.",
+    badge: "GRAPH AI",
+    tone: "from-emerald-500 to-teal-500",
+    ctaLabel: "지식맵 열기",
+    ctaPath: "/user/subjectmap",
+  },
+  {
+    key: "sim",
+    title: "4) 실시간 3D 튜터링 시뮬레이터",
+    description:
+      "취약 개념으로 즉시 이동해 전기기기 3D 인터랙션으로 개념을 보강합니다.",
+    badge: "3D TUTOR",
+    tone: "from-violet-500 to-purple-500",
+    ctaLabel: "3D 강의 이동",
+    ctaPath: "/user/videos",
+  },
+];
+
 // ---------------------------------------------------------
 // 1. 큐넷 시험 일정 파싱 함수
 // ---------------------------------------------------------
@@ -275,6 +318,61 @@ export default function UserDashboard() {
               송배전 공학 주차 과제가 내일 마감됩니다.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* AI 아키텍처 파이프라인 */}
+      <section className="mb-10 bg-slate-950 rounded-2xl border border-slate-800 p-6 md:p-8 shadow-2xl">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
+          <div>
+            <p className="text-xs tracking-[0.22em] text-slate-400 font-bold uppercase">
+              electric-license.co.kr
+            </p>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-white mt-1">
+              AI 에듀테크 파이프라인
+            </h2>
+            <p className="text-slate-300 text-sm mt-2">
+              생성 → 풀이 → 분석 → 3D 튜터링까지 한 흐름으로 연결됩니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => move("/user/subjectmap")}
+            className="px-4 py-2 rounded-lg bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition"
+          >
+            전체 흐름 추적
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {AI_PIPELINE_STEPS.map((step) => (
+            <article
+              key={step.key}
+              className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col justify-between"
+            >
+              <div>
+                <span
+                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wider text-white bg-gradient-to-r ${step.tone}`}
+                >
+                  {step.badge}
+                </span>
+                <h3 className="text-white font-extrabold leading-snug mt-3 text-[17px]">
+                  {step.title}
+                </h3>
+                <p className="text-slate-300 text-sm mt-2 leading-relaxed">
+                  {step.description}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => move(step.ctaPath)}
+                className="mt-4 text-left text-sm font-bold text-cyan-300 hover:text-cyan-200 transition"
+              >
+                {step.ctaLabel} →
+              </button>
+            </article>
+          ))}
         </div>
       </section>
 
