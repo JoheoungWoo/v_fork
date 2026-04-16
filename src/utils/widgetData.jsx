@@ -216,6 +216,10 @@ const WIDGET_MAP = {
   ],
   "2_induction_motor": [
     lazy(() => import("@/components/animations/machines/EMInductionWidget")),
+    lazy(
+      () =>
+        import("@/components/animations/machines/induction-motor/InductionMotorSimulator"),
+    ),
   ],
 
   /** 백엔드 @RegisterQuiz id와 동일할 때 */
