@@ -244,8 +244,7 @@ const WIDGET_MAP = {
   /** 변압기: 정적 결선도 + Y-Y 3D 네온 시뮬 — DB lecture_id 예: transformer_connection_types */
   transformer_connection_types: [
     lazy(
-      () =>
-        import("@/components/animations/machines/TransformerConnectionWidget"),
+      () => import("@/components/animations/machines/AnimatedTransformer3D"),
     ),
     lazy(
       () => import("@/components/animations/machines/NeonYYTransformerWidget"),
