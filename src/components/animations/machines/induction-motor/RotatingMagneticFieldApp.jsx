@@ -98,7 +98,7 @@ const InductionMotor3D = ({
         rotation={[Math.PI / 2, 0, 0]}
       >
         <meshStandardMaterial
-          color="#880088"
+          color="#888888"
           transparent
           opacity={motorOpacity}
           side={THREE.DoubleSide}
