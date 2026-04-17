@@ -29,7 +29,7 @@ export default function AiVideoWatch() {
   const activeTab = searchParams.get("tab") || "quiz";
 
   const cleanId = useMemo(() => id, [id]);
-  const isVision = cleanId.startsWith("vision_");
+  const isVision = String(cleanId ?? "").startsWith("vision_");
 
   useEffect(() => {
     const fetchVideoData = async () => {
@@ -39,11 +39,16 @@ export default function AiVideoWatch() {
         const res = await apiClient.get(`/api/video/url/${cleanId}`);
         console.log("video fetch data:", res, res?.data);
 
-        const { data } = res;
-        const { data: data3 } = data;
-        const backendData = data3;
+        const payload = res?.data;
+        const backendData =
+          payload && typeof payload === "object" && "data" in payload
+            ? payload.data
+            : null;
 
-        if (!backendData || backendData.lecture_id === undefined) {
+        if (
+          !backendData ||
+          (backendData.lecture_id == null && backendData.id == null)
+        ) {
           setVideoInfo(null);
         } else {
           setVideoInfo(backendData);

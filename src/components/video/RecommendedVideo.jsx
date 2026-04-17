@@ -16,8 +16,13 @@ export default function RecommendedVideo({ count = 4, currentLectureId }) {
       try {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
-        // 🌟 핵심 수정: res.data 안의 진짜 배열인 'data'를 꺼내야 .filter 에러가 안 납니다!
-        setAllLectures(res.data?.data || []);
+        const raw = res.data;
+        const list = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw)
+            ? raw
+            : [];
+        setAllLectures(list);
       } catch (error) {
         console.error("추천 영상을 위한 리스트 로딩 실패:", error);
       } finally {
@@ -33,13 +38,24 @@ export default function RecommendedVideo({ count = 4, currentLectureId }) {
     if (!Array.isArray(allLectures) || allLectures.length === 0) return [];
 
     // 영상 URL이 있고 현재 보고 있는 영상이 아닌 것 필터링
-    const playableVideos = allLectures.filter(
-      (video) =>
-        (video.video_url || (video.videoUrls && video.videoUrls[0])) &&
-        // 🌟 수정: useParams의 id 대신 부모가 넘겨준 currentLectureId를 사용!
-        video.lecture_id !== currentLectureId &&
-        video.id !== currentLectureId,
-    );
+    const cur =
+      currentLectureId != null && currentLectureId !== ""
+        ? String(currentLectureId)
+        : null;
+
+    const playableVideos = allLectures.filter((video) => {
+      const hasUrl =
+        !!(video.video_url &&
+          video.video_url !== "" &&
+          video.video_url !== "null") ||
+        !!(video.videoUrls && video.videoUrls[0]);
+      if (!hasUrl) return false;
+      if (cur == null) return true;
+      const sameAsCurrent =
+        String(video.lecture_id ?? "") === cur ||
+        String(video.id ?? "") === cur;
+      return !sameAsCurrent;
+    });
 
     // 무작위 셔플 후 count만큼 추출
     return [...playableVideos].sort(() => 0.5 - Math.random()).slice(0, count);
@@ -66,13 +82,13 @@ export default function RecommendedVideo({ count = 4, currentLectureId }) {
       <h3 className="font-bold text-slate-800 mb-2 px-1">
         📺 함께 보면 좋은 강의
       </h3>
-      {recommendedVideos.map((video) => {
+      {recommendedVideos.map((video, index) => {
         // 🌟 ID 우선순위: lecture_id가 있으면 그것을 사용 (없으면 기본 id)
         const targetId = video.lecture_id || video.id;
 
         return (
           <div
-            key={video.id}
+            key={String(video.lecture_id ?? video.id ?? `rec-${index}`)}
             className="flex gap-4 bg-white p-3 rounded-xl border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
             onClick={() => moveToRead(targetId)}
           >

@@ -202,7 +202,10 @@ export default function AiVideoList() {
         const [listRes, catalogRes] = await Promise.all([
           apiClient.get("/api/video/list/all"),
           apiClient.get("/api/graph/lecture-catalog").catch((e) => {
-            console.warn("Neo4j lecture-catalog 로드 실패(휴리스틱만 사용):", e);
+            console.warn(
+              "Neo4j lecture-catalog 로드 실패(휴리스틱만 사용):",
+              e,
+            );
             return { data: null };
           }),
         ]);
@@ -222,7 +225,8 @@ export default function AiVideoList() {
           const neo = lid ? byLectureId[lid] : null;
           const subjectFromDb = normalizeSubject(video.subject);
           const category =
-            neo?.tab_subject || getCategory({ ...video, subject: subjectFromDb });
+            neo?.tab_subject ||
+            getCategory({ ...video, subject: subjectFromDb });
           return {
             ...video,
             subject: subjectFromDb,
