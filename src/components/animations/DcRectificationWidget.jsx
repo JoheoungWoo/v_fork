@@ -68,7 +68,7 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
     : currentIntensity * 4; // 커패시터 OFF: 맥류에 따른 깜빡임
 
   return (
-    <>
+    <group position={[-1.35, 0, 0]}>
       <ambientLight intensity={0.9} />
       <directionalLight position={[10, 10, 10]} intensity={1.2} />
       <directionalLight position={[-8, -6, 8]} intensity={0.65} />
@@ -118,11 +118,12 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
       </group>
 
       {/* ★ 다이오드 표시 로직 수정 (조건부 렌더링 대신 불투명도 조절 사용) ★ */}
+      {/* 전파 브리지: 한 주기에 대각선 한 쌍만 도통 — (+) D1·D2, (-) D3·D4 */}
       {[
         { id: "D1", pos: [0, 3.4, 0], rot: [0, 0, -Math.PI / 4], active: isPositiveHalf },
-        { id: "D4", pos: [0, -3.4, 0], rot: [0, 0, Math.PI / 4], active: isPositiveHalf },
-        { id: "D2", pos: [-1.8, -1.8, 0], rot: [0, 0, Math.PI / 4], active: !isPositiveHalf },
-        { id: "D3", pos: [-1.8, 1.8, 0], rot: [0, 0, -Math.PI / 4], active: !isPositiveHalf }
+        { id: "D2", pos: [-1.8, -1.8, 0], rot: [0, 0, Math.PI / 4], active: isPositiveHalf },
+        { id: "D3", pos: [-1.8, 1.8, 0], rot: [0, 0, -Math.PI / 4], active: !isPositiveHalf },
+        { id: "D4", pos: [0, -3.4, 0], rot: [0, 0, Math.PI / 4], active: !isPositiveHalf },
       ].map((d) => (
         <group position={d.pos} key={d.id}>
           <Box args={[1.2, 0.6, 0.6]} rotation={d.rot}>
@@ -148,7 +149,7 @@ function BridgeScene({ phase, amplitude, capacitorEnabled }) {
       ))}
 
       <GlowingParticles phase={phase} amplitude={amplitude} />
-    </>
+    </group>
   );
 }
 

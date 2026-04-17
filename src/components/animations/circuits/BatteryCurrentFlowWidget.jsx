@@ -132,7 +132,7 @@ function ParallelCircuitScene() {
   );
 
   return (
-    <group position={[0.08, 0, 0]} scale={0.88}>
+    <group position={[-0.85, 0, 0]} scale={0.88}>
       <ambientLight intensity={0.9} />
       <directionalLight position={[4, 6, 7]} intensity={1.5} castShadow />
       <directionalLight position={[-4, -2, 3]} intensity={0.55} />
