@@ -5,24 +5,21 @@ import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 function Battery({ position }) {
-  const r = 0.32;
-  const hTop = 0.6;
-  const hBot = 0.7;
   return (
     <group position={position}>
-      <mesh castShadow position={[0, 0.28, 0]}>
-        <cylinderGeometry args={[r, r, hTop, 48]} />
+      <mesh castShadow position={[0, 0.36, 0]}>
+        <cylinderGeometry args={[0.43, 0.43, 0.8, 48]} />
         <meshStandardMaterial color="#c69159" metalness={0.55} roughness={0.35} />
       </mesh>
-      <mesh castShadow position={[0, -0.33, 0]}>
-        <cylinderGeometry args={[r, r, hBot, 48]} />
+      <mesh castShadow position={[0, -0.42, 0]}>
+        <cylinderGeometry args={[0.43, 0.43, 0.92, 48]} />
         <meshStandardMaterial color="#161616" metalness={0.7} roughness={0.25} />
       </mesh>
-      <mesh position={[0, 0.66, 0]}>
-        <cylinderGeometry args={[0.09, 0.09, 0.06, 32]} />
+      <mesh position={[0, 0.83, 0]}>
+        <cylinderGeometry args={[0.11, 0.11, 0.08, 32]} />
         <meshStandardMaterial color="#c7ccd4" metalness={1} roughness={0.18} />
       </mesh>
-      <Text position={[0, 0.22, 0.34]} fontSize={0.2} color="#1f1f1f" anchorX="center" anchorY="middle">
+      <Text position={[0, 0.3, 0.44]} fontSize={0.28} color="#1f1f1f" anchorX="center" anchorY="middle">
         +
       </Text>
     </group>
@@ -32,9 +29,9 @@ function Battery({ position }) {
 function LightBulb({ intensity }) {
   const glow = Math.max(0.35, intensity);
   return (
-    <group position={[3.55, -0.02, 0]}>
+    <group position={[3.95, -0.02, 0]}>
       <mesh position={[0, 0, 0]}>
-        <sphereGeometry args={[0.46, 48, 48]} />
+        <sphereGeometry args={[0.62, 48, 48]} />
         <meshStandardMaterial
           color="#fff2a8"
           emissive="#ffd23f"
@@ -44,15 +41,15 @@ function LightBulb({ intensity }) {
           roughness={0.1}
         />
       </mesh>
-      <mesh position={[-0.48, -0.02, 0]}>
-        <cylinderGeometry args={[0.17, 0.21, 0.48, 32]} />
+      <mesh position={[-0.64, -0.02, 0]}>
+        <cylinderGeometry args={[0.22, 0.28, 0.62, 32]} />
         <meshStandardMaterial color="#7b5a1d" metalness={0.85} roughness={0.3} />
       </mesh>
-      <mesh position={[-0.28, 0.03, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <torusGeometry args={[0.14, 0.025, 12, 48, Math.PI * 1.2]} />
+      <mesh position={[-0.37, 0.04, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.18, 0.03, 12, 48, Math.PI * 1.2]} />
         <meshStandardMaterial color="#ffef91" emissive="#ffef91" emissiveIntensity={glow * 2} />
       </mesh>
-      <pointLight intensity={glow * 14} color="#ffd54a" distance={7} />
+      <pointLight intensity={glow * 16} color="#ffd54a" distance={8} />
     </group>
   );
 }
@@ -96,43 +93,43 @@ function AnimatedPath({ points, baseColor, flowColor, active, width = 8, speed =
 function ParallelCircuitScene() {
   const topMainPath = useMemo(
     () => [
-      [-0.6, 1.05, 0],
-      [-0.6, 1.48, 0],
-      [2.35, 1.48, 0],
-      [2.78, 1.02, 0],
-      [2.78, 0.28, 0],
+      [-0.6, 1.18, 0],
+      [-0.6, 1.62, 0],
+      [2.45, 1.62, 0],
+      [2.95, 1.1, 0],
+      [2.95, 0.32, 0],
     ],
     [],
   );
   const topBridgePath = useMemo(
     () => [
-      [0.6, 1.05, 0],
-      [0.6, 1.48, 0],
-      [1.12, 1.48, 0],
+      [0.6, 1.18, 0],
+      [0.6, 1.62, 0],
+      [1.18, 1.62, 0],
     ],
     [],
   );
   const bottomMainPath = useMemo(
     () => [
-      [-0.6, -1.12, 0],
-      [-0.6, -1.58, 0],
-      [3.55, -1.58, 0],
-      [3.55, -0.38, 0],
-      [3.02, -0.38, 0],
+      [-0.6, -1.28, 0],
+      [-0.6, -1.82, 0],
+      [3.9, -1.82, 0],
+      [3.9, -0.42, 0],
+      [3.28, -0.42, 0],
     ],
     [],
   );
   const bottomBridgePath = useMemo(
     () => [
-      [0.6, -1.12, 0],
-      [0.6, -1.58, 0],
-      [0.12, -1.58, 0],
+      [0.6, -1.28, 0],
+      [0.6, -1.82, 0],
+      [0.12, -1.82, 0],
     ],
     [],
   );
 
   return (
-    <group position={[-0.85, 0, 0]} scale={0.88}>
+    <group position={[-0.55, 0, 0]}>
       <ambientLight intensity={0.9} />
       <directionalLight position={[4, 6, 7]} intensity={1.5} castShadow />
       <directionalLight position={[-4, -2, 3]} intensity={0.55} />
@@ -236,7 +233,7 @@ export default function BatteryCurrentFlowWidget() {
       <div style={{ height: "720px" }}>
         <Canvas shadows dpr={[1, 2]}>
           <color attach="background" args={["#1245aa"]} />
-          <PerspectiveCamera makeDefault position={[0, 0.06, 7.6]} fov={40} />
+          <PerspectiveCamera makeDefault position={[0.15, 0.08, 8.4]} fov={42} />
           <OrbitControls
             enablePan={false}
             enableZoom={false}

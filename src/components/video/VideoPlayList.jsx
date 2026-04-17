@@ -17,7 +17,12 @@ export default function VideoPlayList({ currentLectureId }) {
       try {
         setLoading(true);
         const res = await apiClient.get("/api/video/list/all");
-        const fetchedList = res.data?.data || [];
+        const raw = res.data;
+        const fetchedList = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw)
+            ? raw
+            : [];
         setVideoList(fetchedList);
       } catch (error) {
         console.error("목록 가져오기 실패", error);
@@ -32,15 +37,18 @@ export default function VideoPlayList({ currentLectureId }) {
     if (videoList.length === 0 || !currentLectureId)
       return { currentSubjectLectures: [], currentTitle: "" };
 
+    const idStr = String(currentLectureId ?? "");
     const currentVideo = videoList.find(
-      (v) => v.lecture_id === currentLectureId,
+      (v) =>
+        String(v?.lecture_id ?? "") === idStr || String(v?.id ?? "") === idStr,
     );
 
     if (!currentVideo) return { currentSubjectLectures: [], currentTitle: "" };
 
     // ✅ 1. 같은 subject 필터
+    const subKey = currentVideo?.subject ?? "";
     const filtered = videoList.filter(
-      (v) => v.subject === currentVideo.subject,
+      (v) => (v?.subject ?? "") === subKey,
     );
 
     const getLectureOrder = (title) => {
@@ -86,7 +94,7 @@ export default function VideoPlayList({ currentLectureId }) {
         block: "center",
       });
     }
-  }, [loading]);
+  }, [loading, currentLectureId]);
 
   if (loading) {
     return (
@@ -115,13 +123,17 @@ export default function VideoPlayList({ currentLectureId }) {
       <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
         {currentSubjectLectures.map((video, index) => {
           const targetId = video.lecture_id || video.id;
-          const isActive = targetId === currentLectureId;
-          const isLocked =
-            !video.video_url && (!video.videoUrls || video.videoUrls[0] === "");
+          const isActive =
+            String(targetId ?? "") === String(currentLectureId ?? "");
+          const hasVideo =
+            !!video.video_url &&
+            video.video_url !== "" &&
+            video.video_url !== "null";
+          const isLocked = !hasVideo;
 
           return (
             <div
-              key={video.id}
+              key={String(video.lecture_id ?? video.id ?? index)}
               ref={isActive ? activeItemRef : null} // 🔥 명찰 달아주기
               onClick={() => !isLocked && moveToRead(targetId)}
               className={`group flex items-start gap-3 p-4 transition-all border-b border-gray-50 last:border-0

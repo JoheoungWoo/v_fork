@@ -3,8 +3,9 @@ import { createSearchParams, useSearchParams } from "react-router-dom";
 import useMove from "./useMove";
 
 const getNum = (param, defaultValue) => {
-  if (!param) return defaultValue;
-  return parseInt(param);
+  if (param === null || param === undefined || param === "") return defaultValue;
+  const n = parseInt(String(param), 10);
+  return Number.isFinite(n) ? n : defaultValue;
 };
 
 const useCustomMove = (basePath) => {

@@ -1,156 +1,8 @@
 import apiClient from "@/api/core/apiClient";
-import katex from "katex";
-import "katex/dist/katex.min.css";
+import { AutoMathRenderer, BlockMath } from "@/components/common/MathRichText";
+import { normalizeLatexText } from "@/utils/mathRichTextUtils";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-
-// ──────────────────────────────────────────────────────────────────────────────
-// KaTeX 렌더러
-// ──────────────────────────────────────────────────────────────────────────────
-/**
- * LaTeX 인라인 구분자 \\( … \\) 를 $ … $ 로 바꿉니다 (AutoMathRenderer 분기와 호환).
- * 중첩 \\( … \\) 도 depth 로 처리합니다.
- */
-const convertLatexParenDelimiters = (str) => {
-  const s = String(str);
-  let out = "";
-  let i = 0;
-  while (i < s.length) {
-    if (s[i] === "\\" && s[i + 1] === "(") {
-      let depth = 1;
-      let j = i + 2;
-      while (j < s.length && depth > 0) {
-        if (s[j] === "\\" && j + 1 < s.length) {
-          if (s[j + 1] === "(") {
-            depth += 1;
-            j += 2;
-          } else if (s[j + 1] === ")") {
-            depth -= 1;
-            j += 2;
-          } else {
-            j += 1;
-          }
-        } else {
-          j += 1;
-        }
-      }
-      if (depth === 0) {
-        const inner = s.slice(i + 2, j - 2);
-        out += `$${inner}$`;
-        i = j;
-        continue;
-      }
-      // 닫는 \\) 없음 — 남은 문자열 그대로 붙이고 종료
-      out += s.slice(i);
-      break;
-    }
-    out += s[i];
-    i += 1;
-  }
-  return out;
-};
-
-const normalizeLatexText = (text) => {
-  if (!text) return "";
-  const strText = String(text);
-  // \( … \) 는 \text{…} 안에 자주 들어가므로 여기서 제외 (전체 문자열을 KaTeX에 넘김)
-  if (!/\$\$|\\\[|\$/.test(strText) && strText.includes("\\text{")) {
-    const parts = strText.split(/\\text{([^}]+)}/g);
-    let result = "";
-    for (let i = 0; i < parts.length; i++) {
-      if (i % 2 === 0) {
-        const mathPart = parts[i].trim();
-        if (mathPart) result += ` $${mathPart}$ `;
-      } else {
-        result += parts[i];
-      }
-    }
-    return result.replace(/\s+/g, " ").trim();
-  }
-  return strText;
-};
-
-const InlineMath = ({ math }) => {
-  if (!math) return null;
-  const html = katex.renderToString(String(math).replace(/\\\\/g, "\\"), {
-    throwOnError: false,
-    displayMode: false,
-    strict: "ignore",
-  });
-  return (
-    <span
-      className="inline-block max-w-full align-middle [&_.katex]:whitespace-normal"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-};
-
-const BlockMath = ({ math }) => {
-  if (!math) return null;
-  const html = katex.renderToString(String(math).replace(/\\\\/g, "\\"), {
-    throwOnError: false,
-    displayMode: true,
-    strict: "ignore",
-  });
-  return (
-    <div
-      dangerouslySetInnerHTML={{ __html: html }}
-      className="overflow-x-auto flex justify-center w-full"
-    />
-  );
-};
-
-const AutoMathRenderer = ({ text, isBlock = true }) => {
-  if (!text) return null;
-  const cleanText = convertLatexParenDelimiters(String(text).replace(/\\\$/g, "$"));
-
-  const hasDollar = /\$/.test(cleanText);
-  const hasDisplayFence = /(\$\$)|(\\\[)/.test(cleanText);
-
-  // 달러/대괄호 디스플레이 구분자가 없고 LaTeX 명령만 있는 경우 → 통째로 KaTeX
-  // (\text{...} 안에 \( \) 가 있을 때 이전 로직은 문자열을 잘못 쪼개 raw 백슬래시가 노출됨)
-  if (!hasDollar && !hasDisplayFence) {
-    if (!cleanText.includes("\\")) return <span>{cleanText}</span>;
-    return isBlock ? (
-      <BlockMath math={cleanText} />
-    ) : (
-      <InlineMath math={cleanText} />
-    );
-  }
-
-  // $...$, $$...$$, \[...\] 분리 (\\( \\) 는 위에서 $ 로 정규화됨)
-  const parts = cleanText.split(
-    /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^$\n]*?\$)/g,
-  );
-  const wrapClass = isBlock
-    ? "whitespace-pre-wrap leading-relaxed break-words"
-    : "whitespace-normal leading-relaxed break-words max-w-full [word-break:break-word]";
-  return (
-    <span className={wrapClass}>
-      {parts.map((part, i) => {
-        if (!part) return null;
-        if (part.startsWith("$$") && part.endsWith("$$"))
-          return <BlockMath key={i} math={part.slice(2, -2)} />;
-        if (part.startsWith("\\[") && part.endsWith("\\]"))
-          return <BlockMath key={i} math={part.slice(2, -2)} />;
-        if (part.startsWith("$") && part.endsWith("$"))
-          return <InlineMath key={i} math={part.slice(1, -1)} />;
-        if (!part.includes("$") && part.includes("\\")) {
-          return isBlock ? (
-            <BlockMath key={i} math={part} />
-          ) : (
-            <InlineMath key={i} math={part} />
-          );
-        }
-        return (
-          <span key={i} className="break-words">
-            {part}
-          </span>
-        );
-      })}
-    </span>
-  );
-};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 🌟 라우팅 판별 (한 곳에서만 관리)
@@ -564,7 +416,8 @@ const LocalQuizCard = (props) => {
         )}
 
         {problemText && (
-          <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100 break-words [overflow-wrap:anywhere]">
+          // overflow-x-auto 추가
+          <div className="mb-10 text-xl text-gray-900 font-bold px-4 py-6 bg-white rounded-2xl shadow-sm border border-gray-100 break-words [overflow-wrap:anywhere] overflow-x-auto touch-pan-x">
             <AutoMathRenderer text={problemText} isBlock />
           </div>
         )}
@@ -598,12 +451,14 @@ const LocalQuizCard = (props) => {
                 key={index}
                 onClick={() => handleChoiceClick(index)}
                 disabled={showSolution}
-                className={`${btnClass} min-w-0`}
+                className={`${btnClass} w-full min-w-0 overflow-hidden`}
               >
                 <span className={circleClass}>{index + 1}</span>
-                <span className="text-lg font-bold text-gray-800 min-w-0 flex-1 text-left break-words [overflow-wrap:anywhere]">
+                {/* flex-1 컨테이너에 overflow-x-auto와 touch-pan-x를 추가하여 가로 스크롤 생성 */}
+                {/* 스크롤바 영역이 글자를 가리지 않도록 pb-1(패딩)을 살짝 줍니다. */}
+                <div className="text-lg font-bold text-gray-800 min-w-0 flex-1 text-left whitespace-normal break-words [overflow-wrap:anywhere] overflow-x-auto touch-pan-x pb-1">
                   <AutoMathRenderer text={choice} isBlock={false} />
-                </span>
+                </div>
               </button>
             );
           })}
@@ -626,7 +481,7 @@ const LocalQuizCard = (props) => {
                       {idx + 1}
                     </span>
                     <div className="mt-1 w-full overflow-hidden">
-                      <div className="text-gray-700 font-bold mb-4 text-lg leading-relaxed break-keep">
+                      <div className="text-gray-700 font-bold mb-4 text-lg leading-relaxed break-keep overflow-x-auto touch-pan-x pb-1">
                         <AutoMathRenderer
                           text={step.description || step.text || ""}
                           isBlock={false}

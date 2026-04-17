@@ -14,7 +14,7 @@ const VideoPlayer = ({ videoUrl, title }) => {
 
   return (
     <div className="w-full h-full">
-      {videoUrl.includes("cloudflarestream.com") ? (
+      {String(videoUrl).includes("cloudflarestream.com") ? (
         <iframe
           src={`${videoUrl.replace("/watch", "/iframe")}?autoplay=1`}
           className="w-full h-full"

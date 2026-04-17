@@ -10,10 +10,6 @@ const PowerTrianglePowerFactorLazy = lazy(
  * 🌟 [Single Source of Truth]
  * DB의 'lecture_id'를 키(Key) 값으로 사용하여 위젯을 직접 연결합니다.
  * 하나의 강의에 여러 위젯이 들어갈 수 있도록 모든 값은 배열([])로 관리합니다.
- *
- * Neo4j: `widgetNeo4jBindings.csv`에 행 추가 후 레포 루트에서
- * `python cloudflare_prj/scripts/run_widget_neo4j_sync.py --dry-run` (또는 `make sync-neo4j-widgets-dry`).
- * pre-commit 설치 시 해당 CSV가 커밋에 포함되면 dry-run 자동 실행 (.cursorrules Rule 4).
  */
 const WIDGET_MAP = {
   // auto 생성 맵은 먼저 펼치고, 아래 수동 매핑으로 최종 우선순위를 보장합니다.
