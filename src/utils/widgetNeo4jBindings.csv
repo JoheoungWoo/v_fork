@@ -1,2 +1,12 @@
 lecture_id,topic_uid,concept_uid,concept_name
 bridge_diode_rectifier,EE-05-01,EE-C-026,
+dc_rectifier,EE-05-01,EE-C-025,
+h_bridge_control,EE-05-01,EE-C-027,
+1_induction_motor,EE-04-01,EE-C-020,
+three_phase_induction_motor,EE-04-01,EE-C-019,
+induction_motor_learning_hub,EE-04-02,EE-C-022,
+simple_dc_motor,EE-01-02,EE-C-004,
+dc_shunt_generator,EE-01-01,EE-C-001,
+transformer_connection_types,EE-02-01,EE-C-007,
+transformer_yy_delta,EE-02-01,EE-C-008,
+synchronous_machine_learning_hub,EE-03-01,EE-C-013,
